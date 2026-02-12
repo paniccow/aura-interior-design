@@ -1132,10 +1132,10 @@ export default function App() {
               <h2 style={{ fontFamily: "Georgia,serif", fontSize: "clamp(32px,4vw,52px)", fontWeight: 400, lineHeight: 1.15 }}>From vision to floor plan<br />in minutes</h2>
             </RevealSection>
 
-            {/* Timeline */}
-            <div style={{ position: "relative" }}>
-              {/* Vertical line */}
-              <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 2, background: "linear-gradient(to bottom, #C17550, #E8D0C0, #C17550)", transform: "translateX(-50%)", zIndex: 0 }} />
+            {/* Timeline — alternating cards connected by a vertical line */}
+            <div style={{ position: "relative", padding: "20px 0" }}>
+              {/* Vertical connecting line */}
+              <div style={{ position: "absolute", left: "50%", top: 40, bottom: 40, width: 2, background: "linear-gradient(to bottom, transparent, #C17550 10%, #D4A888 50%, #C17550 90%, transparent)", transform: "translateX(-50%)", zIndex: 0 }} />
 
               {[
                 { icon: "\u{1F4D0}", title: "Define Your Space", desc: "Upload a floor plan, enter dimensions, or snap a photo of your room. Our AI identifies windows, doors, focal walls, existing furniture, and maps out traffic flow — building a spatial model of your exact space.", accent: "#C17550" },
@@ -1143,25 +1143,37 @@ export default function App() {
                 { icon: "\u{1F4AC}", title: "Chat & Curate", desc: "Describe your vision in natural language. AURA generates three personalized mood boards from your conversation — each spatially verified so every piece actually fits.", accent: "#5B7B6B" },
                 { icon: "\u{2B50}", title: "See It Come to Life", desc: "Get AI-rendered room visualizations showing your exact products in place. Pro users unlock full CAD floor plans with clearances, traffic paths, and dimensional callouts.", accent: "#6B5B8B" },
               ].map((step, i) => (
-                <RevealSection key={i} delay={i * 0.2} style={{ position: "relative", display: "flex", alignItems: "flex-start", marginBottom: i < 3 ? 80 : 0, flexDirection: i % 2 === 0 ? "row" : "row-reverse" }}>
-                  {/* Content card */}
-                  <div style={{ width: "42%", background: "#fff", borderRadius: 24, padding: "36px 32px", border: "1px solid #F0EBE4", boxShadow: "0 8px 40px rgba(0,0,0,.04)", position: "relative", transition: "transform .3s, box-shadow .3s" }}
-                    onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 16px 60px rgba(0,0,0,.08)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "0 8px 40px rgba(0,0,0,.04)"; }}
-                  >
-                    <h3 style={{ fontFamily: "Georgia,serif", fontSize: 22, fontWeight: 500, marginBottom: 14, color: "#1A1815" }}>{step.title}</h3>
-                    <p style={{ fontSize: 15, color: "#6B5B4B", lineHeight: 1.8, margin: 0 }}>{step.desc}</p>
+                <RevealSection key={i} delay={i * 0.15} style={{ position: "relative", display: "flex", alignItems: "center", marginBottom: i < 3 ? 48 : 0, gap: 0 }}>
+                  {/* Left side */}
+                  <div style={{ flex: 1, display: "flex", justifyContent: "flex-end", paddingRight: 44 }}>
+                    {i % 2 === 0 ? (
+                      <div style={{ maxWidth: 380, background: "#fff", borderRadius: 20, padding: "32px 28px", border: "1px solid #F0EBE4", boxShadow: "0 8px 40px rgba(0,0,0,.04)", transition: "transform .3s, box-shadow .3s" }}
+                        onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 16px 60px rgba(0,0,0,.08)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "0 8px 40px rgba(0,0,0,.04)"; }}
+                      >
+                        <h3 style={{ fontFamily: "Georgia,serif", fontSize: 21, fontWeight: 500, marginBottom: 10, color: "#1A1815" }}>{step.title}</h3>
+                        <p style={{ fontSize: 14, color: "#6B5B4B", lineHeight: 1.75, margin: 0 }}>{step.desc}</p>
+                      </div>
+                    ) : <div />}
                   </div>
 
                   {/* Center node */}
-                  <div style={{ position: "absolute", left: "50%", top: 20, transform: "translateX(-50%)", zIndex: 2 }}>
-                    <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#fff", border: "3px solid " + step.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, boxShadow: "0 4px 20px " + step.accent + "25", animation: "glowPulse 3s ease infinite " + (i * 0.5) + "s" }}>
-                      {step.icon}
-                    </div>
+                  <div style={{ width: 52, height: 52, flexShrink: 0, borderRadius: "50%", background: "#fff", border: "3px solid " + step.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, boxShadow: "0 4px 20px " + step.accent + "25", zIndex: 2, animation: "glowPulse 3s ease infinite " + (i * 0.7) + "s" }}>
+                    {step.icon}
                   </div>
 
-                  {/* Spacer for other side */}
-                  <div style={{ width: "42%" }} />
+                  {/* Right side */}
+                  <div style={{ flex: 1, display: "flex", justifyContent: "flex-start", paddingLeft: 44 }}>
+                    {i % 2 === 1 ? (
+                      <div style={{ maxWidth: 380, background: "#fff", borderRadius: 20, padding: "32px 28px", border: "1px solid #F0EBE4", boxShadow: "0 8px 40px rgba(0,0,0,.04)", transition: "transform .3s, box-shadow .3s" }}
+                        onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 16px 60px rgba(0,0,0,.08)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "0 8px 40px rgba(0,0,0,.04)"; }}
+                      >
+                        <h3 style={{ fontFamily: "Georgia,serif", fontSize: 21, fontWeight: 500, marginBottom: 10, color: "#1A1815" }}>{step.title}</h3>
+                        <p style={{ fontSize: 14, color: "#6B5B4B", lineHeight: 1.75, margin: 0 }}>{step.desc}</p>
+                      </div>
+                    ) : <div />}
+                  </div>
                 </RevealSection>
               ))}
             </div>
