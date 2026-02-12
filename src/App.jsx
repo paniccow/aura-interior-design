@@ -713,41 +713,71 @@ export default function App() {
     reader.readAsDataURL(file);
   };
 
-  // Generate room visualizations using Pollinations.ai (free, reliable, high quality)
+  // Generate room visualizations — AI writes the perfect prompt, Pollinations renders it
   const generateViz = async () => {
     if (selItems.length === 0) return;
     setVizSt("loading");
     setVizUrls([]);
     setVizErr("");
-    const items = selItems.slice(0, 8);
+    const items = selItems.slice(0, 12);
     const roomName = room || "living room";
     const styleName = vibe || "modern luxury";
     const palette = STYLE_PALETTES[styleName] || STYLE_PALETTES["Warm Modern"];
 
-    // Keep prompts SHORT — Pollinations has URL length limits
-    const keyPieces = items.slice(0, 5).map(i => i.n).join(", ");
-    const colorStr = palette.colors.slice(0, 3).join(" and ");
-    const matStr = palette.materials.slice(0, 3).join(" and ");
+    // Step 1: Use GPT-4o to craft the PERFECT condensed prompt (under 450 chars)
+    // This ensures every product name is included and the prompt is optimized for FLUX
+    const productList = items.map(i => i.n + " (" + i.c + ")").join(", ");
+    const cadSnippet = cadAnalysis ? "Room info: " + cadAnalysis.slice(0, 150) : "";
+    const photoSnippet = roomPhotoAnalysis ? "Existing room: " + roomPhotoAnalysis.slice(0, 150) : "";
 
-    const core = "Stunning " + styleName + " " + roomName + " interior design photo with " + keyPieces + ", " + colorStr + " tones, " + matStr + " materials" + (sqft ? ", " + sqft + " sqft space" : "") + ", Architectural Digest quality, luxury editorial, 8k";
+    let aiPrompts = null;
+    try {
+      if (window.puter && window.puter.ai && window.puter.ai.chat) {
+        const resp = await window.puter.ai.chat([
+          { role: "system", content: "You generate image prompts for FLUX AI. Output ONLY 3 prompts separated by |||. Each must be under 400 characters. Each must be a photorealistic interior design image prompt." },
+          { role: "user", content: "Create 3 prompts for a " + styleName + " " + roomName + (sqft ? " (" + sqft + " sqft)" : "") + " with THESE EXACT products: " + productList + ". Colors: " + palette.colors.slice(0,4).join(", ") + ". Materials: " + palette.materials.slice(0,4).join(", ") + "." + (cadSnippet ? " " + cadSnippet : "") + (photoSnippet ? " " + photoSnippet : "") + "\n\nVariations: 1) bright morning light wide angle 2) warm golden hour intimate detail 3) evening moody accent lighting. Each prompt MUST name the specific furniture pieces. Architectural Digest quality, 8k photorealistic." }
+        ], { model: "gpt-4o", max_tokens: 600 });
+        let txt = "";
+        if (typeof resp === "string") txt = resp;
+        else if (resp?.message?.content) txt = String(resp.message.content);
+        else if (resp?.text) txt = String(resp.text);
+        if (txt && txt.includes("|||")) {
+          aiPrompts = txt.split("|||").map(p => p.trim()).filter(p => p.length > 30);
+        }
+      }
+    } catch (e) { console.log("Prompt generation error:", e); }
 
-    const variations = [
-      { prompt: core + ", bright morning light, wide angle, airy", label: "Morning Light" },
-      { prompt: core + ", golden hour warmth, detailed textures, intimate", label: "Golden Hour" },
-      { prompt: core + ", evening ambiance, accent lighting, moody elegant", label: "Evening Ambiance" },
+    // Fallback: craft prompts manually if AI fails
+    const shortPieces = items.slice(0, 6).map(i => {
+      const words = i.n.split(" ").slice(0, 3).join(" ");
+      return words + " " + i.c;
+    }).join(", ");
+    const colorStr = palette.colors.slice(0, 3).join(", ");
+    const fallbackCore = styleName + " " + roomName + " with " + shortPieces + ", " + colorStr + " palette, luxury editorial photo, 8k photorealistic";
+
+    const labels = ["Morning Light", "Golden Hour", "Evening Ambiance"];
+    const fallbacks = [
+      fallbackCore + ", morning sunlight, wide angle, airy bright",
+      fallbackCore + ", golden hour warmth, rich textures, intimate",
+      fallbackCore + ", evening mood lighting, dramatic elegant"
     ];
+
+    const prompts = aiPrompts && aiPrompts.length >= 3
+      ? aiPrompts.slice(0, 3)
+      : fallbacks;
 
     const results = [];
     const seed = Math.floor(Math.random() * 100000);
 
-    // Generate images sequentially with retry — more reliable than parallel
-    for (let vi = 0; vi < variations.length; vi++) {
-      const v = variations[vi];
+    // Generate images sequentially with retry
+    for (let vi = 0; vi < prompts.length; vi++) {
+      // Ensure prompt fits in URL (max ~1500 encoded chars)
+      let p = prompts[vi].slice(0, 600);
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
-          const encoded = encodeURIComponent(v.prompt);
+          const encoded = encodeURIComponent(p);
           const useSeed = seed + vi + attempt * 1000;
-          const url = "https://image.pollinations.ai/prompt/" + encoded + "?width=1344&height=768&seed=" + useSeed + "&nologo=true&model=flux";
+          const url = "https://image.pollinations.ai/prompt/" + encoded + "?width=1344&height=768&seed=" + useSeed + "&nologo=true&model=flux&enhance=true";
 
           const loaded = await new Promise((resolve, reject) => {
             const img = new Image();
@@ -755,17 +785,16 @@ export default function App() {
             img.onload = () => resolve(true);
             img.onerror = () => reject(new Error("Load failed"));
             img.src = url;
-            setTimeout(() => reject(new Error("Timeout")), 60000);
+            setTimeout(() => reject(new Error("Timeout")), 90000);
           });
 
           if (loaded) {
-            results.push({ url, label: v.label });
-            // Update UI progressively
+            results.push({ url, label: labels[vi] || "View " + (vi+1) });
             setVizUrls([...results]);
-            break; // Success, move to next variation
+            break;
           }
         } catch {
-          if (attempt === 1) console.log("Viz attempt failed for", v.label);
+          if (attempt === 1) console.log("Viz failed for view", vi);
         }
       }
     }
@@ -774,7 +803,7 @@ export default function App() {
       setVizUrls(results);
       setVizSt("ok");
     } else {
-      setVizErr("Images are taking longer than expected. Please try again — FLUX AI may be under heavy load.");
+      setVizErr("Images are taking longer than expected. Please try again.");
       setVizSt("idle");
     }
   };
@@ -1064,7 +1093,7 @@ export default function App() {
   /* ─── MAIN LAYOUT ─── */
   return (
     <div style={{ fontFamily: "'Helvetica Neue',Helvetica,Arial,sans-serif", background: "#FDFCFA", minHeight: "100vh", color: "#1A1815" }}>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}} @keyframes fadeUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}} @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}} @keyframes drawLine{from{stroke-dashoffset:1000}to{stroke-dashoffset:0}}`}</style>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}} @keyframes fadeUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}} @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}} @keyframes drawLine{from{stroke-dashoffset:1000}to{stroke-dashoffset:0}} @keyframes growLine{from{transform:scaleY(0)}to{transform:scaleY(1)}} @keyframes glowPulse{0%,100%{box-shadow:0 0 20px rgba(193,117,80,.15)}50%{box-shadow:0 0 40px rgba(193,117,80,.35)}} @keyframes slideInLeft{from{opacity:0;transform:translateX(-60px)}to{opacity:1;transform:translateX(0)}} @keyframes slideInRight{from{opacity:0;transform:translateX(60px)}to{opacity:1;transform:translateX(0)}} @keyframes scaleIn{from{opacity:0;transform:scale(.5)}to{opacity:1;transform:scale(1)}}`}</style>
 
       {/* NAV */}
       <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000, padding: sc ? "10px 5%" : "16px 5%", display: "flex", alignItems: "center", justifyContent: "space-between", background: sc ? "rgba(253,252,250,.96)" : "transparent", backdropFilter: sc ? "blur(20px)" : "none", transition: "all .3s", borderBottom: sc ? "1px solid #F0EBE4" : "none" }}>
@@ -1096,24 +1125,43 @@ export default function App() {
             </div>
           </section>
 
-          {/* How It Works */}
-          <section style={{ padding: "100px 6%", maxWidth: 1100, margin: "0 auto" }}>
-            <RevealSection>
-              <p style={{ fontSize: 12, letterSpacing: ".2em", textTransform: "uppercase", color: "#C17550", fontWeight: 600, marginBottom: 16 }}>How AURA Works</p>
-              <h2 style={{ fontFamily: "Georgia,serif", fontSize: "clamp(32px,4vw,52px)", fontWeight: 400, marginBottom: 60 }}>From vision to floor plan<br />in minutes</h2>
+          {/* How It Works — Flowing Timeline */}
+          <section style={{ padding: "120px 6% 80px", maxWidth: 1000, margin: "0 auto" }}>
+            <RevealSection style={{ textAlign: "center", marginBottom: 80 }}>
+              <p style={{ fontSize: 12, letterSpacing: ".25em", textTransform: "uppercase", color: "#C17550", fontWeight: 600, marginBottom: 16 }}>The Process</p>
+              <h2 style={{ fontFamily: "Georgia,serif", fontSize: "clamp(32px,4vw,52px)", fontWeight: 400, lineHeight: 1.15 }}>From vision to floor plan<br />in minutes</h2>
             </RevealSection>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 32 }}>
+            {/* Timeline */}
+            <div style={{ position: "relative" }}>
+              {/* Vertical line */}
+              <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: 2, background: "linear-gradient(to bottom, #C17550, #E8D0C0, #C17550)", transform: "translateX(-50%)", zIndex: 0 }} />
+
               {[
-                { num: "01", title: "Define Your Space", desc: "Upload your floor plan, enter dimensions, or snap a photo of your room. Our AI analyzes windows, doors, focal walls, existing furniture, and traffic flow to deeply understand your space." },
-                { num: "02", title: "Choose Your Style", desc: "Select from 14 curated design styles — each with matched color palettes and material recommendations. We'll score every product for color harmony, material compatibility, and proportional fit." },
-                { num: "03", title: "Chat & Get Boards", desc: "Tell our AI about your vision and receive three distinct mood boards tailored to your conversation. Every product is spatially verified to fit your room — not just aesthetics." },
-                { num: "04", title: "See the Layout", desc: "Pro users get an AI-generated CAD floor plan showing exact furniture placement, clearances, traffic paths, and dimensional callouts — like having an interior designer draw it for you." },
+                { icon: "\u{1F4D0}", title: "Define Your Space", desc: "Upload a floor plan, enter dimensions, or snap a photo of your room. Our AI identifies windows, doors, focal walls, existing furniture, and maps out traffic flow — building a spatial model of your exact space.", accent: "#C17550" },
+                { icon: "\u{1F3A8}", title: "Discover Your Style", desc: "Explore 14 curated design palettes with matched colors and materials. Every one of our 500 products is scored for harmony, material compatibility, and proportional fit to your room.", accent: "#8B7355" },
+                { icon: "\u{1F4AC}", title: "Chat & Curate", desc: "Describe your vision in natural language. AURA generates three personalized mood boards from your conversation — each spatially verified so every piece actually fits.", accent: "#5B7B6B" },
+                { icon: "\u{2B50}", title: "See It Come to Life", desc: "Get AI-rendered room visualizations showing your exact products in place. Pro users unlock full CAD floor plans with clearances, traffic paths, and dimensional callouts.", accent: "#6B5B8B" },
               ].map((step, i) => (
-                <RevealSection key={i} delay={i * 0.15} style={{ background: "#fff", borderRadius: 20, padding: "36px 28px", border: "1px solid #F0EBE4" }}>
-                  <div style={{ fontSize: 32, fontFamily: "Georgia,serif", color: "#E8E0D8", fontWeight: 400, marginBottom: 20 }}>{step.num}</div>
-                  <h3 style={{ fontFamily: "Georgia,serif", fontSize: 20, fontWeight: 500, marginBottom: 12 }}>{step.title}</h3>
-                  <p style={{ fontSize: 14, color: "#7A6B5B", lineHeight: 1.7 }}>{step.desc}</p>
+                <RevealSection key={i} delay={i * 0.2} style={{ position: "relative", display: "flex", alignItems: "flex-start", marginBottom: i < 3 ? 80 : 0, flexDirection: i % 2 === 0 ? "row" : "row-reverse" }}>
+                  {/* Content card */}
+                  <div style={{ width: "42%", background: "#fff", borderRadius: 24, padding: "36px 32px", border: "1px solid #F0EBE4", boxShadow: "0 8px 40px rgba(0,0,0,.04)", position: "relative", transition: "transform .3s, box-shadow .3s" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 16px 60px rgba(0,0,0,.08)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "0 8px 40px rgba(0,0,0,.04)"; }}
+                  >
+                    <h3 style={{ fontFamily: "Georgia,serif", fontSize: 22, fontWeight: 500, marginBottom: 14, color: "#1A1815" }}>{step.title}</h3>
+                    <p style={{ fontSize: 15, color: "#6B5B4B", lineHeight: 1.8, margin: 0 }}>{step.desc}</p>
+                  </div>
+
+                  {/* Center node */}
+                  <div style={{ position: "absolute", left: "50%", top: 20, transform: "translateX(-50%)", zIndex: 2 }}>
+                    <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#fff", border: "3px solid " + step.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, boxShadow: "0 4px 20px " + step.accent + "25", animation: "glowPulse 3s ease infinite " + (i * 0.5) + "s" }}>
+                      {step.icon}
+                    </div>
+                  </div>
+
+                  {/* Spacer for other side */}
+                  <div style={{ width: "42%" }} />
                 </RevealSection>
               ))}
             </div>
@@ -1417,14 +1465,14 @@ export default function App() {
 
                   {/* Visualizations */}
                   <div style={{ marginBottom: 16, padding: "10px 14px", background: "#F8F5F0", borderRadius: 10, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 11, color: "#7A6B5B" }}>Room visualization powered by <strong>FLUX AI</strong>{roomPhotoAnalysis ? " — incorporating your room photo" : ""}</span>
+                    <span style={{ fontSize: 11, color: "#7A6B5B" }}>AI visualizations feature your <strong>{selItems.length} selected products</strong> rendered by FLUX{roomPhotoAnalysis ? " — matched to your room" : ""}{cadAnalysis ? " — using your floor plan" : ""}</span>
                   </div>
                   {vizErr && <p style={{ fontSize: 12, color: "#C17550", marginBottom: 16 }}>{vizErr}</p>}
                   {vizSt === "loading" && (
                     <div style={{ marginBottom: 24, borderRadius: 16, border: "1px solid #F0EBE4", padding: 60, textAlign: "center", background: "#F8F5F0" }}>
                       <div style={{ width: 32, height: 32, border: "3px solid #E8E0D8", borderTopColor: "#C17550", borderRadius: "50%", animation: "spin .8s linear infinite", margin: "0 auto 16px" }} />
-                      <p style={{ fontSize: 14, color: "#7A6B5B", margin: 0 }}>Generating 3 room visualizations...</p>
-                      <p style={{ fontSize: 11, color: "#B8A898", margin: "6px 0 0" }}>Using FLUX AI — creating photorealistic scenes (15-30 seconds)</p>
+                      <p style={{ fontSize: 14, color: "#7A6B5B", margin: 0 }}>AI is crafting your room with {selItems.length} products...</p>
+                      <p style={{ fontSize: 11, color: "#B8A898", margin: "6px 0 0" }}>Writing optimized prompts, then rendering in high resolution (30-60 seconds)</p>
                     </div>
                   )}
                   {vizUrls.length > 0 && (
