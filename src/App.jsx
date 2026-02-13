@@ -3,6 +3,53 @@ import { DB } from "./data.js";
 
 /* AURA v20 — Scroll Landing, Spatial Engine, Pro CAD Layout, 500 Products */
 
+/* ─── LAZY PUTER.JS LOADER ─── */
+/* Loads Puter.js SDK only when AI features are used — prevents redirects */
+let puterLoading = false;
+let puterLoaded = false;
+let puterFailed = false;
+
+async function ensurePuter() {
+  if (puterFailed) return false;
+  if (puterLoaded && window.puter && window.puter.ai) return true;
+  if (puterLoading) {
+    for (let i = 0; i < 50; i++) {
+      await new Promise(r => setTimeout(r, 200));
+      if (puterFailed) return false;
+      if (window.puter && window.puter.ai) { puterLoaded = true; return true; }
+    }
+    puterFailed = true;
+    return false;
+  }
+  puterLoading = true;
+  try {
+    const ok = await new Promise((resolve) => {
+      const script = document.createElement("script");
+      script.src = "https://js.puter.com/v2/";
+      script.onload = () => {
+        setTimeout(() => {
+          if (window.puter && window.puter.ai) resolve(true);
+          else resolve(false);
+        }, 1500);
+      };
+      script.onerror = () => resolve(false);
+      document.head.appendChild(script);
+      setTimeout(() => resolve(false), 10000);
+    });
+    puterLoading = false;
+    if (ok && window.puter && window.puter.ai) {
+      puterLoaded = true;
+      return true;
+    }
+    puterFailed = true;
+    return false;
+  } catch (e) {
+    puterLoading = false;
+    puterFailed = true;
+    return false;
+  }
+}
+
 const ROOMS = ["Living Room","Dining Room","Kitchen","Bedroom","Office","Outdoor","Bathroom","Great Room"];
 const VIBES = ["Warm Modern","Minimalist","Bohemian","Scandinavian","Mid-Century","Luxury","Coastal","Japandi","Industrial","Art Deco","Rustic","Glam","Transitional","Organic Modern"];
 const fmt = (n) => "$" + n.toLocaleString();
@@ -178,6 +225,37 @@ function generateCADLayout(items, roomSqft, roomType, cadAnalysis) {
     doors.push({ x: canvasW - 2 * scale, y: canvasH - 3 * scale, w: 3 * scale, side: "right" });
   }
 
+  // Define zones based on room type for smarter placement
+  const needs = ROOM_NEEDS[roomType] || ROOM_NEEDS["Living Room"];
+  const zones = {};
+  const zoneDefs = {
+    "Living Room": {
+      conversation: { x: canvasW * 0.15, y: canvasH * 0.35, w: canvasW * 0.7, h: canvasH * 0.55 },
+      "reading nook": { x: margin, y: margin, w: canvasW * 0.3, h: canvasH * 0.3 },
+      entry: { x: canvasW * 0.6, y: canvasH * 0.8, w: canvasW * 0.35, h: canvasH * 0.18 },
+    },
+    "Dining Room": {
+      dining: { x: canvasW * 0.15, y: canvasH * 0.2, w: canvasW * 0.7, h: canvasH * 0.6 },
+      buffet: { x: margin, y: canvasH * 0.1, w: canvasW * 0.2, h: canvasH * 0.4 },
+    },
+    "Bedroom": {
+      sleep: { x: canvasW * 0.2, y: canvasH * 0.5, w: canvasW * 0.6, h: canvasH * 0.4 },
+      dressing: { x: canvasW * 0.7, y: margin, w: canvasW * 0.25, h: canvasH * 0.4 },
+      reading: { x: margin, y: margin, w: canvasW * 0.25, h: canvasH * 0.35 },
+    },
+    "Office": {
+      work: { x: canvasW * 0.2, y: margin * 2, w: canvasW * 0.6, h: canvasH * 0.4 },
+      storage: { x: margin, y: canvasH * 0.5, w: canvasW * 0.25, h: canvasH * 0.4 },
+    },
+    "Great Room": {
+      conversation: { x: canvasW * 0.05, y: canvasH * 0.45, w: canvasW * 0.55, h: canvasH * 0.5 },
+      dining: { x: canvasW * 0.55, y: canvasH * 0.15, w: canvasW * 0.4, h: canvasH * 0.45 },
+      entry: { x: canvasW * 0.3, y: canvasH * 0.85, w: canvasW * 0.4, h: canvasH * 0.12 },
+      reading: { x: margin, y: margin, w: canvasW * 0.3, h: canvasH * 0.35 },
+    },
+  };
+  const activeZones = zoneDefs[roomType] || zoneDefs["Living Room"];
+
   // Place items using zone-based positioning
   const placed = [];
   const occupied = [];
@@ -190,7 +268,13 @@ function generateCADLayout(items, roomSqft, roomType, cadAnalysis) {
     return false;
   };
 
+  // Clamp coordinates to stay within room bounds
+  const clamp = (val, min, max) => Math.max(min, Math.min(val, max));
+
   const placeAt = (item, x, y, w, h, rotation) => {
+    // Ensure within bounds
+    x = clamp(x, 2, canvasW - w - 2);
+    y = clamp(y, 2, canvasH - h - 2);
     placed.push({ item, x, y, w, h, rotation: rotation || 0, color: catColors[item.c] || "#6B685B" });
     if (!["rug","art","light"].includes(item.c)) occupied.push({ x, y, w, h });
   };
@@ -198,12 +282,34 @@ function generateCADLayout(items, roomSqft, roomType, cadAnalysis) {
   // Sort items for placement priority — anchor pieces first
   const sortOrder = { rug: 0, sofa: 1, table: 2, chair: 3, stool: 4, accent: 5, light: 6, art: 7 };
   const sortedItems = [...items].sort((a, b) => (sortOrder[a.c] ?? 5) - (sortOrder[b.c] ?? 5));
-  const margin = 1.5 * scale;
-  const walkway = 3 * scale; // 3ft walkway
+  const margin2 = 1.5 * scale;
 
   // Track anchor positions for relational placement
   let sofaCenter = null;
   let tableCenter = null;
+  let sofaW = 0;
+
+  // Helper: find best non-colliding position near a target
+  const findNear = (targetX, targetY, w, h, radius) => {
+    const step = scale * 1.5; // Larger steps to keep search fast
+    const r = Math.min(radius || scale * 4, scale * 8); // Cap radius to prevent huge searches
+    let bestDist = Infinity, bestPos = null;
+    let iterations = 0;
+    const maxIter = 400; // Hard cap on iterations
+    for (let dy = -r; dy <= r && iterations < maxIter; dy += step) {
+      for (let dx = -r; dx <= r && iterations < maxIter; dx += step) {
+        iterations++;
+        const nx = targetX + dx;
+        const ny = targetY + dy;
+        if (nx < 2 || ny < 2 || nx + w > canvasW - 2 || ny + h > canvasH - 2) continue;
+        if (!collides(nx, ny, w, h)) {
+          const dist = dx * dx + dy * dy; // skip sqrt for speed
+          if (dist < bestDist) { bestDist = dist; bestPos = { x: nx, y: ny }; }
+        }
+      }
+    }
+    return bestPos;
+  };
 
   for (const item of sortedItems) {
     const dims = FURN_DIMS[item.c] || FURN_DIMS.accent;
@@ -215,83 +321,107 @@ function generateCADLayout(items, roomSqft, roomType, cadAnalysis) {
     const lightCount = placed.filter(p => p.item.c === "light").length;
 
     if (item.c === "rug") {
-      // Rug centered in conversation zone (offset toward sofa if present)
-      const rx = (canvasW - w) / 2;
-      const ry = sofaCenter ? sofaCenter.y - h - 1 * scale : (canvasH - h) / 2;
-      placeAt(item, rx, Math.max(margin, ry), w, h);
+      // Rug: centered in the main conversation/dining zone
+      const zone = activeZones.conversation || activeZones.dining || { x: canvasW * 0.15, y: canvasH * 0.3, w: canvasW * 0.7, h: canvasH * 0.5 };
+      const rx = zone.x + (zone.w - w) / 2;
+      const ry = zone.y + (zone.h - h) / 2;
+      placeAt(item, rx, ry, w, h);
       continue;
     }
 
     if (item.c === "sofa") {
-      // First sofa: centered against back wall (bottom). Second: facing the first across the room
       let sx, sy;
       if (sofaCount === 0) {
-        sx = (canvasW - w) / 2;
-        sy = canvasH - h - margin;
+        // Primary sofa: against back wall (bottom), centered in conversation zone
+        const zone = activeZones.conversation || { x: canvasW * 0.15, y: canvasH * 0.4, w: canvasW * 0.7, h: canvasH * 0.5 };
+        sx = zone.x + (zone.w - w) / 2;
+        sy = zone.y + zone.h - h; // against bottom of zone
         sofaCenter = { x: sx + w / 2, y: sy + h / 2 };
+        sofaW = w;
       } else {
-        // Second sofa faces first — place against opposite wall or side
-        sx = (canvasW - w) / 2;
-        sy = margin + 2 * scale;
+        // Second sofa: facing the first across the conversation zone
+        const zone = activeZones.conversation || { x: canvasW * 0.15, y: canvasH * 0.4, w: canvasW * 0.7, h: canvasH * 0.5 };
+        sx = zone.x + (zone.w - w) / 2;
+        sy = zone.y; // against top of zone, facing first sofa
       }
-      if (!collides(sx, sy, w, h)) { placeAt(item, sx, sy, w, h); if (sofaCount === 0) sofaCenter = { x: sx + w / 2, y: sy + h / 2 }; continue; }
+      if (!collides(sx, sy, w, h)) { placeAt(item, sx, sy, w, h); if (sofaCount === 0) { sofaCenter = { x: sx + w / 2, y: sy + h / 2 }; sofaW = w; } continue; }
+      // Fallback: try finding nearby
+      const pos = findNear(sx, sy, w, h);
+      if (pos) { placeAt(item, pos.x, pos.y, w, h); if (sofaCount === 0) { sofaCenter = { x: pos.x + w / 2, y: pos.y + h / 2 }; sofaW = w; } continue; }
     }
 
     if (item.c === "table") {
       let tx, ty;
       if (roomType === "Dining Room" || roomType === "Kitchen") {
-        // Dining: center with clearance all around
-        tx = (canvasW - w) / 2;
-        ty = (canvasH - h) / 2;
+        // Dining: center of dining zone
+        const zone = activeZones.dining || { x: canvasW * 0.15, y: canvasH * 0.2, w: canvasW * 0.7, h: canvasH * 0.6 };
+        tx = zone.x + (zone.w - w) / 2;
+        ty = zone.y + (zone.h - h) / 2;
+      } else if (roomType === "Great Room" && placed.filter(p => p.item.c === "table").length > 0) {
+        // Second table in Great Room goes to dining zone
+        const zone = activeZones.dining || { x: canvasW * 0.55, y: canvasH * 0.15, w: canvasW * 0.4, h: canvasH * 0.45 };
+        tx = zone.x + (zone.w - w) / 2;
+        ty = zone.y + (zone.h - h) / 2;
       } else if (sofaCenter) {
-        // Coffee table: 14-18" in front of sofa (toward center)
+        // Coffee table: 14-18" in front of sofa (toward room center)
         tx = sofaCenter.x - w / 2;
-        ty = sofaCenter.y - h - 1.3 * scale; // 1.3ft (~16") gap
+        ty = sofaCenter.y - (dims.d * scale) / 2 - 1.3 * scale - h; // 1.3ft (~16") gap
       } else {
         tx = (canvasW - w) / 2;
         ty = (canvasH - h) / 2;
       }
       tableCenter = { x: tx + w / 2, y: ty + h / 2 };
       if (!collides(tx, ty, w, h)) { placeAt(item, tx, ty, w, h); continue; }
+      const pos = findNear(tx, ty, w, h);
+      if (pos) { placeAt(item, pos.x, pos.y, w, h); tableCenter = { x: pos.x + w / 2, y: pos.y + h / 2 }; continue; }
     }
 
     if (item.c === "chair") {
-      let cx, cy, didPlace = false;
       if (roomType === "Dining Room" && tableCenter) {
-        // Dining chairs: evenly around the table
+        // Dining chairs: evenly spaced around table with proper clearance
+        const tableW = (FURN_DIMS.table.w * scale);
+        const tableH = (FURN_DIMS.table.d * scale);
+        const gap = 0.3 * scale; // small gap between chair and table edge
         const positions = [
-          { x: tableCenter.x - w - 0.5 * scale, y: tableCenter.y - h / 2 },  // left
-          { x: tableCenter.x + 0.5 * scale, y: tableCenter.y - h / 2 },      // right
-          { x: tableCenter.x - w / 2, y: tableCenter.y - h - 1 * scale },    // top
-          { x: tableCenter.x - w / 2, y: tableCenter.y + 1 * scale },        // bottom
-          { x: tableCenter.x - w * 2 - 1 * scale, y: tableCenter.y - h / 2 }, // far left
-          { x: tableCenter.x + w + 1 * scale, y: tableCenter.y - h / 2 },    // far right
+          { x: tableCenter.x - tableW / 2 - w - gap, y: tableCenter.y - h / 2 },          // left 1
+          { x: tableCenter.x + tableW / 2 + gap, y: tableCenter.y - h / 2 },               // right 1
+          { x: tableCenter.x - w / 2, y: tableCenter.y - tableH / 2 - h - gap },           // top center
+          { x: tableCenter.x - w / 2, y: tableCenter.y + tableH / 2 + gap },               // bottom center
+          { x: tableCenter.x - tableW / 2 - w - gap, y: tableCenter.y - h / 2 - h - gap }, // left 2
+          { x: tableCenter.x + tableW / 2 + gap, y: tableCenter.y - h / 2 - h - gap },     // right 2
+          { x: tableCenter.x - w - gap, y: tableCenter.y - tableH / 2 - h - gap },         // top left
+          { x: tableCenter.x + gap, y: tableCenter.y + tableH / 2 + gap },                 // bottom right
         ];
         const pos = positions[chairCount % positions.length];
         if (pos && !collides(pos.x, pos.y, w, h)) { placeAt(item, pos.x, pos.y, w, h); continue; }
+        // Try finding near the intended position
+        if (pos) { const near = findNear(pos.x, pos.y, w, h, scale * 3); if (near) { placeAt(item, near.x, near.y, w, h); continue; } }
       } else if (sofaCenter) {
-        // Accent chairs: flanking at 45° angle from sofa, facing conversation zone
+        // Accent chairs: flanking the sofa at conversational angles
         const offsets = [
-          { x: -w - 2 * scale, y: -h * 0.3 },   // left of sofa
-          { x: (placed.find(p => p.item.c === "sofa")?.w || 7 * scale) + 2 * scale, y: -h * 0.3 }, // right of sofa
-          { x: -w - 2 * scale, y: -h - 3 * scale },  // far left corner
-          { x: (placed.find(p => p.item.c === "sofa")?.w || 7 * scale) + 2 * scale, y: -h - 3 * scale },  // far right corner
+          { x: sofaCenter.x - sofaW / 2 - w - 1.5 * scale, y: sofaCenter.y - h * 0.8 },  // left of sofa, angled in
+          { x: sofaCenter.x + sofaW / 2 + 1.5 * scale, y: sofaCenter.y - h * 0.8 },       // right of sofa, angled in
+          { x: sofaCenter.x - sofaW / 2 - w - 1.5 * scale, y: sofaCenter.y - h * 2.5 },   // far left
+          { x: sofaCenter.x + sofaW / 2 + 1.5 * scale, y: sofaCenter.y - h * 2.5 },       // far right
         ];
         const off = offsets[chairCount % offsets.length];
-        cx = sofaCenter.x - (placed.find(p => p.item.c === "sofa")?.w || 7 * scale) / 2 + off.x;
-        cy = sofaCenter.y + off.y;
-        if (cx > margin && cx + w < canvasW - margin && cy > margin && cy + h < canvasH - margin && !collides(cx, cy, w, h)) {
-          placeAt(item, cx, cy, w, h); continue;
+        if (off.x > 2 && off.x + w < canvasW - 2 && off.y > 2 && off.y + h < canvasH - 2 && !collides(off.x, off.y, w, h)) {
+          placeAt(item, off.x, off.y, w, h); continue;
         }
+        const near = findNear(off.x, off.y, w, h, scale * 4);
+        if (near) { placeAt(item, near.x, near.y, w, h); continue; }
       }
     }
 
     if (item.c === "stool") {
-      // Stools: along the top wall (kitchen island area)
+      // Stools: along the top wall (kitchen island area) with even spacing
       const stoolCount = placed.filter(p => p.item.c === "stool").length;
-      const stoolX = margin + stoolCount * (w + 1.5 * scale) + 2 * scale;
-      const stoolY = margin + 1 * scale;
-      if (stoolX + w < canvasW - margin && !collides(stoolX, stoolY, w, h)) { placeAt(item, stoolX, stoolY, w, h); continue; }
+      const totalStools = sortedItems.filter(p => p.c === "stool").length;
+      const spacing = Math.min(w + 1.8 * scale, (canvasW - 4 * margin2) / totalStools);
+      const startX = (canvasW - totalStools * spacing) / 2;
+      const stoolX = startX + stoolCount * spacing;
+      const stoolY = margin2 + 0.5 * scale;
+      if (stoolX + w < canvasW - margin2 && !collides(stoolX, stoolY, w, h)) { placeAt(item, stoolX, stoolY, w, h); continue; }
     }
 
     if (item.c === "art") {
@@ -299,7 +429,7 @@ function generateCADLayout(items, roomSqft, roomType, cadAnalysis) {
       const totalArtWidth = (artCount + 1) * (w + 2 * scale);
       const startX = (canvasW - totalArtWidth) / 2;
       const ax = startX + artCount * (w + 2 * scale);
-      placeAt(item, Math.max(margin, Math.min(ax, canvasW - w - margin)), margin * 0.3, w, h);
+      placeAt(item, Math.max(margin2, Math.min(ax, canvasW - w - margin2)), margin2 * 0.3, w, h);
       continue;
     }
 
@@ -307,20 +437,20 @@ function generateCADLayout(items, roomSqft, roomType, cadAnalysis) {
       // Lights: distributed based on position — near windows, over table, flanking sofa
       let lx, ly;
       if (lightCount === 0 && tableCenter) {
-        // First light: above the table
+        // First light: above the table (pendant/chandelier position)
         lx = tableCenter.x - w / 2;
         ly = tableCenter.y - h - 0.5 * scale;
       } else if (lightCount === 1 && sofaCenter) {
-        // Second light: beside the sofa
-        lx = sofaCenter.x + (placed.find(p => p.item.c === "sofa")?.w || 7 * scale) / 2 + 1 * scale;
+        // Second light: beside the sofa (floor lamp)
+        lx = sofaCenter.x + (sofaW || 7 * scale) / 2 + 1 * scale;
         ly = sofaCenter.y - h / 2;
       } else {
-        // Remaining: along walls/corners
+        // Remaining: along walls/corners (sconces/floor lamps)
         const corners = [
-          { x: margin, y: margin },
-          { x: canvasW - w - margin, y: margin },
-          { x: margin, y: canvasH - h - margin },
-          { x: canvasW - w - margin, y: canvasH - h - margin },
+          { x: margin2, y: margin2 },
+          { x: canvasW - w - margin2, y: margin2 },
+          { x: margin2, y: canvasH - h - margin2 },
+          { x: canvasW - w - margin2, y: canvasH - h - margin2 },
         ];
         const c = corners[lightCount % corners.length];
         lx = c.x; ly = c.y;
@@ -335,19 +465,19 @@ function generateCADLayout(items, roomSqft, roomType, cadAnalysis) {
       let ax, ay;
       if (accentCount === 0 && sofaCenter) {
         // First accent: side table next to sofa
-        ax = sofaCenter.x + (placed.find(p => p.item.c === "sofa")?.w || 7 * scale) / 2 + 0.5 * scale;
+        ax = sofaCenter.x + (sofaW || 7 * scale) / 2 + 0.5 * scale;
         ay = sofaCenter.y - h / 2;
       } else if (accentCount === 1 && sofaCenter) {
         // Second: other side of sofa
-        ax = sofaCenter.x - (placed.find(p => p.item.c === "sofa")?.w || 7 * scale) / 2 - w - 0.5 * scale;
+        ax = sofaCenter.x - (sofaW || 7 * scale) / 2 - w - 0.5 * scale;
         ay = sofaCenter.y - h / 2;
       } else {
-        // Along walls
+        // Along walls with proper spacing
         const wallPositions = [
-          { x: margin, y: canvasH * 0.4 },
-          { x: canvasW - w - margin, y: canvasH * 0.4 },
-          { x: canvasW * 0.3, y: margin },
-          { x: canvasW * 0.7 - w, y: margin },
+          { x: margin2, y: canvasH * 0.4 },
+          { x: canvasW - w - margin2, y: canvasH * 0.4 },
+          { x: canvasW * 0.3, y: margin2 },
+          { x: canvasW * 0.7 - w, y: margin2 },
         ];
         const wp = wallPositions[accentCount % wallPositions.length];
         ax = wp.x; ay = wp.y;
@@ -355,19 +485,26 @@ function generateCADLayout(items, roomSqft, roomType, cadAnalysis) {
       if (ax > 0 && ax + w < canvasW && ay > 0 && ay + h < canvasH && !collides(ax, ay, w, h)) {
         placeAt(item, ax, ay, w, h); continue;
       }
+      // Fallback: find nearest non-colliding position
+      const near = findNear(ax || canvasW / 2, ay || canvasH / 2, w, h, scale * 5);
+      if (near) { placeAt(item, near.x, near.y, w, h); continue; }
     }
 
-    // General fallback — try grid positions with walkway spacing
+    // General fallback — place at first available grid position
     let didPlace = false;
-    for (let gy = margin; gy < canvasH - h - margin && !didPlace; gy += scale * 2) {
-      for (let gx = margin; gx < canvasW - w - margin && !didPlace; gx += scale * 2) {
+    const gridStep = scale * 2;
+    for (let gy = margin2; gy < canvasH - h - margin2 && !didPlace; gy += gridStep) {
+      for (let gx = margin2; gx < canvasW - w - margin2 && !didPlace; gx += gridStep) {
         if (!collides(gx, gy, w, h)) {
           placeAt(item, gx, gy, w, h);
           didPlace = true;
         }
       }
     }
-    if (!didPlace) placeAt(item, margin + Math.random() * (canvasW - w - 2 * margin), margin + Math.random() * (canvasH - h - 2 * margin), w, h);
+    if (!didPlace) {
+      // Last resort: place with slight random offset (allows overlap)
+      placeAt(item, margin2 + Math.random() * Math.max(1, canvasW - w - 2 * margin2), margin2 + Math.random() * Math.max(1, canvasH - h - 2 * margin2), w, h);
+    }
   }
 
   return { placed, canvasW, canvasH, roomW: Math.round(roomW * 10) / 10, roomH: Math.round(roomH * 10) / 10, windows, doors, scale };
@@ -541,15 +678,25 @@ function CADFloorPlan({ layout, roomType, style }) {
 /* ─── MAIN APP ─── */
 export default function App() {
   const [pg, setPg] = useState("home");
-  const [user, setUser] = useState(null);
-  const [projects, setProjects] = useState([]);
+  const [user, setUser] = useState(() => {
+    try { const u = localStorage.getItem("aura_user"); return u ? JSON.parse(u) : null; } catch { return null; }
+  });
+  const [projects, setProjects] = useState(() => {
+    try { const p = localStorage.getItem("aura_projects"); return p ? JSON.parse(p) : []; } catch { return []; }
+  });
   const [msgs, setMsgs] = useState([{ role: "bot", text: "Welcome to AURA! I have **" + DB.length + " products** from luxury brands like McGee & Co, Shoppe Amber, and Lulu & Georgia.\n\n**Tell me about your space** — your room type, style preferences, and what you're looking for. I'll generate personalized mood boards based on our conversation.\n\n**Upload a room photo** above and I'll analyze your existing space to create layouts that actually work.\n\nOr ask me anything about design — I'll explain exactly why each piece works for your space!", recs: [] }]);
   const [inp, setInp] = useState("");
   const [busy, setBusy] = useState(false);
-  const [room, setRoom] = useState(null);
-  const [vibe, setVibe] = useState(null);
+  const [room, setRoom] = useState(() => {
+    try { return localStorage.getItem("aura_room") || null; } catch { return null; }
+  });
+  const [vibe, setVibe] = useState(() => {
+    try { return localStorage.getItem("aura_vibe") || null; } catch { return null; }
+  });
   const [bud, setBud] = useState("all");
-  const [sel, setSel] = useState(new Set());
+  const [sel, setSel] = useState(() => {
+    try { const s = localStorage.getItem("aura_sel"); return s ? new Set(JSON.parse(s)) : new Set(); } catch { return new Set(); }
+  });
   const [sc, setSc] = useState(false);
   const [tab, setTab] = useState("studio");
   const [catFilter, setCatFilter] = useState("all");
@@ -578,6 +725,23 @@ export default function App() {
   const chatEnd = useRef(null);
   const PAGE_SIZE = 40;
 
+  // Persist user, projects, and selection to localStorage
+  useEffect(() => {
+    try { if (user) localStorage.setItem("aura_user", JSON.stringify(user)); else localStorage.removeItem("aura_user"); } catch {}
+  }, [user]);
+  useEffect(() => {
+    try { localStorage.setItem("aura_projects", JSON.stringify(projects)); } catch {}
+  }, [projects]);
+  useEffect(() => {
+    try { localStorage.setItem("aura_sel", JSON.stringify(Array.from(sel))); } catch {}
+  }, [sel]);
+  useEffect(() => {
+    try { if (room) localStorage.setItem("aura_room", room); else localStorage.removeItem("aura_room"); } catch {}
+  }, [room]);
+  useEffect(() => {
+    try { if (vibe) localStorage.setItem("aura_vibe", vibe); else localStorage.removeItem("aura_vibe"); } catch {}
+  }, [vibe]);
+
   useEffect(() => {
     const h = () => setSc(window.scrollY > 40);
     window.addEventListener("scroll", h);
@@ -605,10 +769,15 @@ export default function App() {
   // Auto-generate CAD layout for Pro users when selection changes
   useEffect(() => {
     if (user?.plan === "pro" && sel.size > 0 && room) {
-      const items = DB.filter(p => sel.has(p.id));
-      const sq = parseInt(sqft) || (ROOM_NEEDS[room]?.minSqft || 200);
-      const layout = generateCADLayout(items, sq, room, cadAnalysis);
-      setCadLayout(layout);
+      try {
+        const items = DB.filter(p => sel.has(p.id));
+        const sq = parseInt(sqft) || (ROOM_NEEDS[room]?.minSqft || 200);
+        const layout = generateCADLayout(items, sq, room, cadAnalysis);
+        setCadLayout(layout);
+      } catch (err) {
+        console.error("CAD layout error:", err);
+        setCadLayout(null);
+      }
     } else {
       setCadLayout(null);
     }
@@ -635,7 +804,8 @@ export default function App() {
     reader.onload = async (ev) => {
       setCadFile({ name: file.name, data: ev.target.result, type: file.type });
       try {
-        if (window.puter && window.puter.ai && window.puter.ai.chat) {
+        const puterReady = await ensurePuter();
+        if (puterReady && window.puter && window.puter.ai && window.puter.ai.chat) {
           const base64 = ev.target.result.split(",")[1];
           const mimeType = file.type || "image/png";
           const analysis = await window.puter.ai.chat([
@@ -673,7 +843,8 @@ export default function App() {
     reader.onload = async (ev) => {
       setRoomPhoto({ name: file.name, data: ev.target.result, type: file.type });
       try {
-        if (window.puter && window.puter.ai && window.puter.ai.chat) {
+        const puterReady = await ensurePuter();
+        if (puterReady && window.puter && window.puter.ai && window.puter.ai.chat) {
           const base64 = ev.target.result.split(",")[1];
           const mimeType = file.type || "image/jpeg";
           const analysis = await window.puter.ai.chat([
@@ -713,97 +884,134 @@ export default function App() {
     reader.readAsDataURL(file);
   };
 
-  // Generate room visualizations — AI writes the perfect prompt, Pollinations renders it
+  // Generate room visualizations — Pollinations FLUX renders the images
+  // Uses ALL selected products + CAD layout positions for spatial accuracy
+  // Optionally uses GPT-4o via Puter to write optimized prompts, but works without it
   const generateViz = async () => {
     if (selItems.length === 0) return;
-    setVizSt("loading");
-    setVizUrls([]);
-    setVizErr("");
-    const items = selItems.slice(0, 12);
-    const roomName = room || "living room";
-    const styleName = vibe || "modern luxury";
-    const palette = STYLE_PALETTES[styleName] || STYLE_PALETTES["Warm Modern"];
-
-    // Step 1: Use GPT-4o to craft the PERFECT condensed prompt (under 450 chars)
-    // This ensures every product name is included and the prompt is optimized for FLUX
-    const productList = items.map(i => i.n + " (" + i.c + ")").join(", ");
-    const cadSnippet = cadAnalysis ? "Room info: " + cadAnalysis.slice(0, 150) : "";
-    const photoSnippet = roomPhotoAnalysis ? "Existing room: " + roomPhotoAnalysis.slice(0, 150) : "";
-
-    let aiPrompts = null;
     try {
-      if (window.puter && window.puter.ai && window.puter.ai.chat) {
-        const resp = await window.puter.ai.chat([
-          { role: "system", content: "You generate image prompts for FLUX AI. Output ONLY 3 prompts separated by |||. Each must be under 400 characters. Each must be a photorealistic interior design image prompt." },
-          { role: "user", content: "Create 3 prompts for a " + styleName + " " + roomName + (sqft ? " (" + sqft + " sqft)" : "") + " with THESE EXACT products: " + productList + ". Colors: " + palette.colors.slice(0,4).join(", ") + ". Materials: " + palette.materials.slice(0,4).join(", ") + "." + (cadSnippet ? " " + cadSnippet : "") + (photoSnippet ? " " + photoSnippet : "") + "\n\nVariations: 1) bright morning light wide angle 2) warm golden hour intimate detail 3) evening moody accent lighting. Each prompt MUST name the specific furniture pieces. Architectural Digest quality, 8k photorealistic." }
-        ], { model: "gpt-4o", max_tokens: 600 });
-        let txt = "";
-        if (typeof resp === "string") txt = resp;
-        else if (resp?.message?.content) txt = String(resp.message.content);
-        else if (resp?.text) txt = String(resp.text);
-        if (txt && txt.includes("|||")) {
-          aiPrompts = txt.split("|||").map(p => p.trim()).filter(p => p.length > 30);
-        }
+      setVizSt("loading");
+      setVizUrls([]);
+      setVizErr("");
+      const items = selItems; // ALL selected products — no limit
+      const roomName = room || "living room";
+      const styleName = vibe || "modern luxury";
+      const palette = STYLE_PALETTES[styleName] || STYLE_PALETTES["Warm Modern"];
+
+      // Build spatial description from CAD layout if available
+      let spatialDesc = "";
+      if (cadLayout && cadLayout.placed && cadLayout.placed.length > 0) {
+        const roomWft = cadLayout.roomW;
+        const roomHft = cadLayout.roomH;
+        const scl = cadLayout.scale || 60;
+        const descriptions = cadLayout.placed.map(p => {
+          const xFt = Math.round((p.x / scl) * 10) / 10;
+          const yFt = Math.round((p.y / scl) * 10) / 10;
+          let pos = "";
+          if (yFt < roomHft * 0.3) pos = "near the window wall";
+          else if (yFt > roomHft * 0.7) pos = "against the back wall";
+          else pos = "in the center";
+          if (xFt < roomWft * 0.3) pos += ", on the left side";
+          else if (xFt > roomWft * 0.7) pos += ", on the right side";
+          return p.item.n + " " + pos;
+        });
+        spatialDesc = "EXACT LAYOUT: " + roomWft + "'x" + roomHft + "' room. " + descriptions.slice(0, 15).join(". ") + ".";
       }
-    } catch (e) { console.log("Prompt generation error:", e); }
 
-    // Fallback: craft prompts manually if AI fails
-    const shortPieces = items.slice(0, 6).map(i => {
-      const words = i.n.split(" ").slice(0, 3).join(" ");
-      return words + " " + i.c;
-    }).join(", ");
-    const colorStr = palette.colors.slice(0, 3).join(", ");
-    const fallbackCore = styleName + " " + roomName + " with " + shortPieces + ", " + colorStr + " palette, luxury editorial photo, 8k photorealistic";
+      // Include room photo context if available
+      let photoContext = "";
+      if (roomPhotoAnalysis) {
+        // Extract key visual details from room photo analysis
+        const photoLines = roomPhotoAnalysis.split("\n").filter(l => l.trim().length > 5).slice(0, 6).join(". ");
+        photoContext = "Match this existing room: " + photoLines.slice(0, 250);
+      }
 
-    const labels = ["Morning Light", "Golden Hour", "Evening Ambiance"];
-    const fallbacks = [
-      fallbackCore + ", morning sunlight, wide angle, airy bright",
-      fallbackCore + ", golden hour warmth, rich textures, intimate",
-      fallbackCore + ", evening mood lighting, dramatic elegant"
-    ];
+      // Group products by category with counts for the prompt
+      const catCounts = {};
+      items.forEach(i => { catCounts[i.c] = (catCounts[i.c] || 0) + 1; });
+      const productSummary = Object.entries(catCounts).map(([cat, count]) => {
+        const names = items.filter(i => i.c === cat).map(i => i.n);
+        return count + "x " + cat + ": " + names.join(", ");
+      }).join(". ");
 
-    const prompts = aiPrompts && aiPrompts.length >= 3
-      ? aiPrompts.slice(0, 3)
-      : fallbacks;
+      const cadSnippet = cadAnalysis ? "Room info: " + cadAnalysis.slice(0, 150) : "";
 
-    const results = [];
-    const seed = Math.floor(Math.random() * 100000);
-
-    // Generate images sequentially with retry
-    for (let vi = 0; vi < prompts.length; vi++) {
-      // Ensure prompt fits in URL (max ~1500 encoded chars)
-      let p = prompts[vi].slice(0, 600);
-      for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-          const encoded = encodeURIComponent(p);
-          const useSeed = seed + vi + attempt * 1000;
-          const url = "https://image.pollinations.ai/prompt/" + encoded + "?width=1344&height=768&seed=" + useSeed + "&nologo=true&model=flux&enhance=true";
-
-          const loaded = await new Promise((resolve, reject) => {
-            const img = new Image();
-            img.crossOrigin = "anonymous";
-            img.onload = () => resolve(true);
-            img.onerror = () => reject(new Error("Load failed"));
-            img.src = url;
-            setTimeout(() => reject(new Error("Timeout")), 90000);
-          });
-
-          if (loaded) {
-            results.push({ url, label: labels[vi] || "View " + (vi+1) });
-            setVizUrls([...results]);
-            break;
+      // Use Puter AI-crafted prompts ONLY if Puter is already loaded and authenticated
+      // Never trigger Puter loading/popup here — the fallback prompts work great
+      let aiPrompts = null;
+      try {
+        if (puterLoaded && window.puter && window.puter.ai && window.puter.ai.chat) {
+          const resp = await window.puter.ai.chat([
+            { role: "system", content: "You generate image prompts for FLUX AI. Output ONLY 3 prompts separated by |||. Each must be under 450 characters. Each must be a photorealistic interior design image prompt that includes EVERY product listed." },
+            { role: "user", content: "Create 3 prompts for a " + styleName + " " + roomName + (sqft ? " (" + sqft + " sqft)" : "") + ".\n\nALL PRODUCTS (must include every one): " + productSummary + "\n\nColors: " + palette.colors.slice(0,4).join(", ") + ". Materials: " + palette.materials.slice(0,4).join(", ") + "." + (spatialDesc ? "\n" + spatialDesc : "") + (cadSnippet && !spatialDesc ? " " + cadSnippet : "") + (photoContext ? "\n" + photoContext : "") + "\n\nVariations: 1) bright morning light wide angle showing full room 2) warm golden hour intimate detail 3) evening moody accent lighting. MUST show ALL " + items.length + " products in their correct positions. Architectural Digest quality, 8k photorealistic." }
+          ], { model: "gpt-4o", max_tokens: 800 });
+          let txt = "";
+          if (typeof resp === "string") txt = resp;
+          else if (resp?.message?.content) txt = String(resp.message.content);
+          else if (resp?.text) txt = String(resp.text);
+          if (txt && txt.includes("|||")) {
+            aiPrompts = txt.split("|||").map(p => p.trim()).filter(p => p.length > 30);
           }
-        } catch {
-          if (attempt === 1) console.log("Viz failed for view", vi);
+        }
+      } catch (e) { console.log("AI prompt generation skipped:", e); }
+
+      // Build fallback prompts that include products + room context
+      const shortPieces = items.slice(0, 8).map(i => i.n.split(" ").slice(0, 3).join(" ")).join(", ");
+      const countStr = items.length + " furniture pieces";
+      const colorStr = palette.colors.slice(0, 3).join(", ");
+      const spatialHint = spatialDesc ? spatialDesc.slice(0, 100) : "";
+      const photoHint = roomPhotoAnalysis ? roomPhotoAnalysis.split("\n")[0].slice(0, 80) : "";
+      const fallbackBase = "Luxurious " + styleName + " " + roomName + " interior, " + countStr + " including " + shortPieces + ", " + colorStr + " color palette, " + palette.materials.slice(0, 3).join(" and ") + " materials" + (spatialHint ? ", " + spatialHint : "") + (photoHint ? ", " + photoHint : "");
+
+      const labels = ["Morning Light", "Golden Hour", "Evening Ambiance"];
+      const fallbacks = [
+        fallbackBase + ", morning sunlight streaming through windows, wide angle shot showing entire room layout, airy and bright, Architectural Digest photo, 8k photorealistic",
+        fallbackBase + ", warm golden hour light, rich textures visible, intimate detail shot, luxury editorial photography, 8k photorealistic",
+        fallbackBase + ", evening mood lighting, dramatic ambient lighting, elegant atmosphere, luxury design magazine cover, 8k photorealistic"
+      ];
+
+      const prompts = aiPrompts && aiPrompts.length >= 3 ? aiPrompts.slice(0, 3) : fallbacks;
+      const results = [];
+      const seed = Math.floor(Math.random() * 100000);
+
+      // Generate images sequentially with retry — 5 minute timeout per image
+      for (let vi = 0; vi < prompts.length; vi++) {
+        let p = prompts[vi].slice(0, 600);
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            const encoded = encodeURIComponent(p);
+            const useSeed = seed + vi + attempt * 1000;
+            const url = "https://image.pollinations.ai/prompt/" + encoded + "?seed=" + useSeed + "&model=flux";
+
+            const loaded = await new Promise((resolve, reject) => {
+              const img = new Image();
+              img.onload = () => resolve(true);
+              img.onerror = (e) => reject(new Error("Load failed: " + (e?.message || "unknown")));
+              img.src = url;
+              setTimeout(() => reject(new Error("Timeout after 5min")), 300000);
+            });
+
+            if (loaded) {
+              results.push({ url, label: labels[vi] || "View " + (vi+1) });
+              setVizUrls([...results]);
+              break;
+            }
+          } catch {
+            if (attempt === 2) console.log("Viz failed for view", vi);
+          }
         }
       }
-    }
 
-    if (results.length > 0) {
-      setVizUrls(results);
-      setVizSt("ok");
-    } else {
-      setVizErr("Images are taking longer than expected. Please try again.");
+      if (results.length > 0) {
+        setVizUrls(results);
+        setVizSt("ok");
+      } else {
+        setVizErr("Images are taking longer than expected. Please try again — AI generation can take up to 5 minutes.");
+        setVizSt("idle");
+      }
+    } catch (err) {
+      console.error("Visualization error:", err);
+      setVizErr("Something went wrong. Please try again.");
       setVizSt("idle");
     }
   };
@@ -834,7 +1042,8 @@ export default function App() {
 
     let aiWorked = false;
     try {
-      if (window.puter && window.puter.ai && window.puter.ai.chat) {
+      const puterReady = await ensurePuter();
+      if (puterReady && window.puter && window.puter.ai && window.puter.ai.chat) {
         const m = msg.toLowerCase();
         const scored = DB.map((x) => {
           let s = 0;
@@ -1027,7 +1236,7 @@ export default function App() {
         <div style={{ textAlign: "center", maxWidth: 720, margin: "0 auto" }}>
           <p style={{ fontSize: 12, letterSpacing: ".2em", textTransform: "uppercase", color: "#C17550", fontWeight: 600, marginBottom: 12 }}>Pricing</p>
           <h1 style={{ fontFamily: "Georgia,serif", fontSize: 42, fontWeight: 400, marginBottom: 48 }}>Design without limits</h1>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 24 }}>
+          <div className="aura-pricing-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 24 }}>
             <div style={{ background: "#fff", borderRadius: 20, padding: "40px 32px", textAlign: "left" }}>
               <p style={{ fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", color: "#A89B8B", marginBottom: 8 }}>Free</p>
               <div style={{ fontFamily: "Georgia,serif", fontSize: 48, fontWeight: 400, marginBottom: 24 }}>$0<span style={{ fontSize: 16, color: "#B8A898" }}>/mo</span></div>
@@ -1093,16 +1302,52 @@ export default function App() {
   /* ─── MAIN LAYOUT ─── */
   return (
     <div style={{ fontFamily: "'Helvetica Neue',Helvetica,Arial,sans-serif", background: "#FDFCFA", minHeight: "100vh", color: "#1A1815" }}>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}} @keyframes fadeUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}} @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}} @keyframes drawLine{from{stroke-dashoffset:1000}to{stroke-dashoffset:0}} @keyframes growLine{from{transform:scaleY(0)}to{transform:scaleY(1)}} @keyframes glowPulse{0%,100%{box-shadow:0 0 20px rgba(193,117,80,.15)}50%{box-shadow:0 0 40px rgba(193,117,80,.35)}} @keyframes slideInLeft{from{opacity:0;transform:translateX(-60px)}to{opacity:1;transform:translateX(0)}} @keyframes slideInRight{from{opacity:0;transform:translateX(60px)}to{opacity:1;transform:translateX(0)}} @keyframes scaleIn{from{opacity:0;transform:scale(.5)}to{opacity:1;transform:scale(1)}}`}</style>
+      <style>{`
+        @keyframes spin{to{transform:rotate(360deg)}}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+        @keyframes drawLine{from{stroke-dashoffset:1000}to{stroke-dashoffset:0}}
+        @keyframes growLine{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+        @keyframes glowPulse{0%,100%{box-shadow:0 0 20px rgba(193,117,80,.15)}50%{box-shadow:0 0 40px rgba(193,117,80,.35)}}
+        @keyframes slideInLeft{from{opacity:0;transform:translateX(-60px)}to{opacity:1;transform:translateX(0)}}
+        @keyframes slideInRight{from{opacity:0;transform:translateX(60px)}to{opacity:1;transform:translateX(0)}}
+        @keyframes scaleIn{from{opacity:0;transform:scale(.5)}to{opacity:1;transform:scale(1)}}
+        *{-webkit-tap-highlight-color:transparent}
+        input,button,select,textarea{font-size:16px!important}
+        @media(max-width:768px){
+          .aura-timeline-left,.aura-timeline-right{flex:none!important;width:100%!important;padding:0 8px!important;justify-content:center!important}
+          .aura-timeline-left>div,.aura-timeline-right>div{max-width:100%!important}
+          .aura-timeline-line{display:none!important}
+          .aura-grid-2col{grid-template-columns:1fr!important;gap:24px!important}
+          .aura-pricing-grid{grid-template-columns:1fr!important}
+          .aura-nav-links{gap:4px!important}
+          .aura-nav-links>button,.aura-nav-links>span{font-size:10px!important;padding:5px 8px!important}
+          .aura-filter-wrap{flex-direction:column!important}
+          .aura-hero h1{font-size:36px!important}
+          .aura-hero p{font-size:15px!important}
+          .aura-studio-filters{padding:16px 4%!important}
+          .aura-card-grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))!important;gap:10px!important}
+          .aura-chat-box{padding:16px!important}
+          .aura-chat-input{flex-direction:column!important}
+          .aura-chat-input input{width:100%!important}
+          .aura-chat-input button{width:100%!important}
+          .aura-viz-grid{grid-template-columns:1fr!important}
+          .aura-mood-tabs{flex-wrap:wrap!important}
+          .aura-upload-row{flex-direction:column!important;gap:12px!important}
+          .aura-sel-header{flex-direction:column!important;align-items:flex-start!important;gap:12px!important}
+          .aura-sel-actions{width:100%!important}
+          .aura-sel-actions button{flex:1!important}
+        }
+      `}</style>
 
       {/* NAV */}
       <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000, padding: sc ? "10px 5%" : "16px 5%", display: "flex", alignItems: "center", justifyContent: "space-between", background: sc ? "rgba(253,252,250,.96)" : "transparent", backdropFilter: sc ? "blur(20px)" : "none", transition: "all .3s", borderBottom: sc ? "1px solid #F0EBE4" : "none" }}>
         <div onClick={() => go("home")} style={{ fontFamily: "Georgia,serif", fontSize: 24, fontWeight: 400, cursor: "pointer" }}>AURA</div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-          {sel.size > 0 && <span style={{ fontSize: 12, color: "#C17550", fontWeight: 600, background: "rgba(193,117,80,.06)", padding: "6px 16px", borderRadius: 20 }}>{sel.size} items - {fmt(selTotal)}</span>}
+        <div className="aura-nav-links" style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          {sel.size > 0 && <span style={{ fontSize: 11, color: "#C17550", fontWeight: 600, background: "rgba(193,117,80,.06)", padding: "5px 12px", borderRadius: 20, whiteSpace: "nowrap" }}>{sel.size} items - {fmt(selTotal)}</span>}
           <button onClick={() => go("pricing")} style={{ background: "none", border: "none", fontSize: 12, color: "#9B8B7B", cursor: "pointer", fontFamily: "inherit" }}>Pricing</button>
-          {user ? <button onClick={() => go("account")} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 24, padding: "7px 18px", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>{user.name || "Account"}</button> : <button onClick={() => go("auth")} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 24, padding: "7px 18px", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Sign In</button>}
-          <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#C17550", color: "#fff", borderRadius: 24, padding: "8px 20px", border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Design</button>
+          {user ? <button onClick={() => go("account")} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 24, padding: "7px 14px", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>{user.name || "Account"}</button> : <button onClick={() => go("auth")} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 24, padding: "7px 14px", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Sign In</button>}
+          <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#C17550", color: "#fff", borderRadius: 24, padding: "8px 16px", border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Design</button>
         </div>
       </nav>
 
@@ -1134,42 +1379,34 @@ export default function App() {
 
             {/* Timeline — alternating cards connected by a vertical line */}
             <div style={{ position: "relative", padding: "20px 0" }}>
-              {/* Vertical connecting line */}
-              <div style={{ position: "absolute", left: "50%", top: 40, bottom: 40, width: 2, background: "linear-gradient(to bottom, transparent, #C17550 10%, #D4A888 50%, #C17550 90%, transparent)", transform: "translateX(-50%)", zIndex: 0 }} />
+              {/* Vertical connecting line — hidden on mobile */}
+              <div className="aura-timeline-line" style={{ position: "absolute", left: "50%", top: 40, bottom: 40, width: 2, background: "linear-gradient(to bottom, transparent, #C17550 10%, #D4A888 50%, #C17550 90%, transparent)", transform: "translateX(-50%)", zIndex: 0 }} />
 
               {[
-                { icon: "\u{1F4D0}", title: "Define Your Space", desc: "Upload a floor plan, enter dimensions, or snap a photo of your room. Our AI identifies windows, doors, focal walls, existing furniture, and maps out traffic flow — building a spatial model of your exact space.", accent: "#C17550" },
-                { icon: "\u{1F3A8}", title: "Discover Your Style", desc: "Explore 14 curated design palettes with matched colors and materials. Every one of our 500 products is scored for harmony, material compatibility, and proportional fit to your room.", accent: "#8B7355" },
-                { icon: "\u{1F4AC}", title: "Chat & Curate", desc: "Describe your vision in natural language. AURA generates three personalized mood boards from your conversation — each spatially verified so every piece actually fits.", accent: "#5B7B6B" },
-                { icon: "\u{2B50}", title: "See It Come to Life", desc: "Get AI-rendered room visualizations showing your exact products in place. Pro users unlock full CAD floor plans with clearances, traffic paths, and dimensional callouts.", accent: "#6B5B8B" },
+                { title: "Define Your Space", desc: "Upload a floor plan, enter dimensions, or snap a photo of your room. Our AI identifies windows, doors, focal walls, existing furniture, and maps out traffic flow — building a spatial model of your exact space.", accent: "#C17550" },
+                { title: "Discover Your Style", desc: "Explore 14 curated design palettes with matched colors and materials. Every one of our 500 products is scored for harmony, material compatibility, and proportional fit to your room.", accent: "#8B7355" },
+                { title: "Chat & Curate", desc: "Describe your vision in natural language. AURA generates three personalized mood boards from your conversation — each spatially verified so every piece actually fits.", accent: "#5B7B6B" },
+                { title: "See It Come to Life", desc: "Get AI-rendered room visualizations showing your exact products in place. Pro users unlock full CAD floor plans with clearances, traffic paths, and dimensional callouts.", accent: "#6B5B8B" },
               ].map((step, i) => (
                 <RevealSection key={i} delay={i * 0.15} style={{ position: "relative", display: "flex", alignItems: "center", marginBottom: i < 3 ? 48 : 0, gap: 0 }}>
                   {/* Left side */}
-                  <div style={{ flex: 1, display: "flex", justifyContent: "flex-end", paddingRight: 44 }}>
+                  <div className="aura-timeline-left" style={{ flex: 1, display: "flex", justifyContent: "flex-end", paddingRight: 44 }}>
                     {i % 2 === 0 ? (
-                      <div style={{ maxWidth: 380, background: "#fff", borderRadius: 20, padding: "32px 28px", border: "1px solid #F0EBE4", boxShadow: "0 8px 40px rgba(0,0,0,.04)", transition: "transform .3s, box-shadow .3s" }}
-                        onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 16px 60px rgba(0,0,0,.08)"; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "0 8px 40px rgba(0,0,0,.04)"; }}
-                      >
-                        <h3 style={{ fontFamily: "Georgia,serif", fontSize: 21, fontWeight: 500, marginBottom: 10, color: "#1A1815" }}>{step.title}</h3>
+                      <div style={{ maxWidth: 380, background: "#fff", borderRadius: 20, padding: "28px 24px", border: "1px solid #F0EBE4", boxShadow: "0 8px 40px rgba(0,0,0,.04)", transition: "transform .3s, box-shadow .3s", borderLeft: "4px solid " + step.accent }}>
+                        <h3 style={{ fontFamily: "Georgia,serif", fontSize: 20, fontWeight: 500, marginBottom: 10, color: "#1A1815" }}>{step.title}</h3>
                         <p style={{ fontSize: 14, color: "#6B5B4B", lineHeight: 1.75, margin: 0 }}>{step.desc}</p>
                       </div>
                     ) : <div />}
                   </div>
 
-                  {/* Center node */}
-                  <div style={{ width: 52, height: 52, flexShrink: 0, borderRadius: "50%", background: "#fff", border: "3px solid " + step.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, boxShadow: "0 4px 20px " + step.accent + "25", zIndex: 2, animation: "glowPulse 3s ease infinite " + (i * 0.7) + "s" }}>
-                    {step.icon}
-                  </div>
+                  {/* Center node — plain circle */}
+                  <div style={{ width: 18, height: 18, flexShrink: 0, borderRadius: "50%", background: step.accent, boxShadow: "0 0 0 6px #fff, 0 0 0 8px " + step.accent + "30, 0 4px 20px " + step.accent + "25", zIndex: 2, animation: "glowPulse 3s ease infinite " + (i * 0.7) + "s" }} />
 
                   {/* Right side */}
-                  <div style={{ flex: 1, display: "flex", justifyContent: "flex-start", paddingLeft: 44 }}>
+                  <div className="aura-timeline-right" style={{ flex: 1, display: "flex", justifyContent: "flex-start", paddingLeft: 44 }}>
                     {i % 2 === 1 ? (
-                      <div style={{ maxWidth: 380, background: "#fff", borderRadius: 20, padding: "32px 28px", border: "1px solid #F0EBE4", boxShadow: "0 8px 40px rgba(0,0,0,.04)", transition: "transform .3s, box-shadow .3s" }}
-                        onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 16px 60px rgba(0,0,0,.08)"; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "0 8px 40px rgba(0,0,0,.04)"; }}
-                      >
-                        <h3 style={{ fontFamily: "Georgia,serif", fontSize: 21, fontWeight: 500, marginBottom: 10, color: "#1A1815" }}>{step.title}</h3>
+                      <div style={{ maxWidth: 380, background: "#fff", borderRadius: 20, padding: "28px 24px", border: "1px solid #F0EBE4", boxShadow: "0 8px 40px rgba(0,0,0,.04)", transition: "transform .3s, box-shadow .3s", borderLeft: "4px solid " + step.accent }}>
+                        <h3 style={{ fontFamily: "Georgia,serif", fontSize: 20, fontWeight: 500, marginBottom: 10, color: "#1A1815" }}>{step.title}</h3>
                         <p style={{ fontSize: 14, color: "#6B5B4B", lineHeight: 1.75, margin: 0 }}>{step.desc}</p>
                       </div>
                     ) : <div />}
@@ -1196,7 +1433,7 @@ export default function App() {
           {/* Pro Feature: CAD */}
           <section style={{ padding: "100px 6%", maxWidth: 1100, margin: "0 auto" }}>
             <RevealSection>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "center" }}>
+              <div className="aura-grid-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "center" }}>
                 <div>
                   <span style={{ display: "inline-block", background: "#C17550", color: "#fff", padding: "5px 14px", borderRadius: 20, fontSize: 10, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", marginBottom: 20 }}>Pro Feature</span>
                   <h2 style={{ fontFamily: "Georgia,serif", fontSize: 36, fontWeight: 400, marginBottom: 20 }}>AI floor plan layouts</h2>
@@ -1280,8 +1517,8 @@ export default function App() {
                     <input value={sqft} onChange={(e) => setSqft(e.target.value.replace(/\D/g, ""))} placeholder="e.g. 350" style={{ width: "100%", padding: "8px 14px", border: "1px solid #E8E0D8", borderRadius: 10, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-                  <div style={{ flex: 1, minWidth: 220 }}>
+                <div className="aura-upload-row" style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+                  <div style={{ flex: 1, minWidth: 200 }}>
                     <div style={{ fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "#B8A898", fontWeight: 600, marginBottom: 8 }}>Floor Plan / CAD</div>
                     <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                       <label style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 18px", background: "#fff", border: "1px dashed #D8D0C8", borderRadius: 12, fontSize: 12, color: "#7A6B5B", cursor: "pointer" }}>
@@ -1359,7 +1596,7 @@ export default function App() {
                       <h2 style={{ fontFamily: "Georgia,serif", fontSize: 24, fontWeight: 400 }}>{room} — {vibe}{sqft ? " — " + sqft + " sqft" : ""}</h2>
                       {boardsGenHint && <p style={{ fontSize: 11, color: "#B8A898", margin: "4px 0 0", fontStyle: "italic" }}>{boardsGenHint}</p>}
                     </div>
-                    <div style={{ display: "flex", gap: 6 }}>
+                    <div className="aura-mood-tabs" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                       {boards.map((b, i) => (
                         <button key={i} onClick={() => setActiveBoard(i)} style={{ padding: "8px 16px", fontSize: 11, fontWeight: activeBoard === i ? 700 : 500, background: activeBoard === i ? "#C17550" : "#fff", color: activeBoard === i ? "#fff" : "#7A6B5B", border: activeBoard === i ? "none" : "1px solid #E8E0D8", borderRadius: 20, cursor: "pointer", fontFamily: "inherit" }}>{b.name}</button>
                       ))}
@@ -1383,7 +1620,7 @@ export default function App() {
                           <button onClick={() => addBoard(activeBoard)} style={{ background: "#C17550", color: "#fff", border: "none", borderRadius: 10, padding: "8px 18px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Add All to Selection</button>
                         </div>
                       </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: 14 }}>
+                      <div className="aura-card-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: 14 }}>
                         {boards[activeBoard].items.map((p) => <Card key={p.id} p={p} sel={sel.has(p.id)} toggle={toggle} small />)}
                       </div>
                     </div>
@@ -1394,11 +1631,11 @@ export default function App() {
               {/* AI Chat */}
               <div style={{ padding: "28px 5%", background: "#F8F5F0" }}>
                 <p style={{ fontSize: 12, letterSpacing: ".15em", textTransform: "uppercase", color: "#C17550", fontWeight: 600, marginBottom: 12 }}>AI Designer</p>
-                <div style={{ background: "#fff", borderRadius: 16, padding: 24, maxWidth: 900, boxShadow: "0 2px 16px rgba(0,0,0,.04)" }}>
-                  <div style={{ maxHeight: 500, overflowY: "auto", marginBottom: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+                <div className="aura-chat-box" style={{ background: "#fff", borderRadius: 16, padding: 24, maxWidth: 900, boxShadow: "0 2px 16px rgba(0,0,0,.04)" }}>
+                  <div style={{ maxHeight: 500, overflowY: "auto", marginBottom: 16, display: "flex", flexDirection: "column", gap: 12, WebkitOverflowScrolling: "touch" }}>
                     {msgs.map((m, i) => (
                       <div key={i}>
-                        <div style={{ padding: m.role === "user" ? "12px 18px" : "18px 22px", borderRadius: m.role === "user" ? 14 : 18, fontSize: 14, lineHeight: 1.8, maxWidth: m.role === "user" ? "85%" : "100%", background: m.role === "user" ? "#C17550" : "#F5F0EB", color: m.role === "user" ? "#fff" : "#3A3530", marginLeft: m.role === "user" ? "auto" : 0 }} dangerouslySetInnerHTML={{ __html: (m.text || "")
+                        <div style={{ padding: m.role === "user" ? "12px 16px" : "16px 18px", borderRadius: m.role === "user" ? 14 : 18, fontSize: 14, lineHeight: 1.8, maxWidth: m.role === "user" ? "85%" : "100%", background: m.role === "user" ? "#C17550" : "#F5F0EB", color: m.role === "user" ? "#fff" : "#3A3530", marginLeft: m.role === "user" ? "auto" : 0, wordBreak: "break-word" }} dangerouslySetInnerHTML={{ __html: (m.text || "")
                           .replace(/\*\*(.*?)\*\*/g, '<strong style="color:#8B6040;font-weight:700">$1</strong>')
                           .replace(/_(.*?)_/g, "<em>$1</em>")
                           .replace(/^\d+[\.\)]\s*/gm, "") // strip numbered list prefixes
@@ -1411,7 +1648,7 @@ export default function App() {
                         {m.recs?.length > 0 && (
                           <div style={{ marginTop: 14 }}>
                             <p style={{ fontSize: 11, color: "#B8A898", marginBottom: 10 }}>Tap + to add. Click card to shop the exact product.</p>
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))", gap: 10 }}>
+                            <div className="aura-card-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: 10 }}>
                               {m.recs.map((p) => <Card key={p.id} p={p} small sel={sel.has(p.id)} toggle={toggle} />)}
                             </div>
                           </div>
@@ -1426,8 +1663,8 @@ export default function App() {
                     )}
                     <div ref={chatEnd} />
                   </div>
-                  <div style={{ display: "flex", gap: 10 }}>
-                    <input value={inp} onChange={(e) => setInp(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder={room ? "What do you need for your " + room.toLowerCase() + "?" : "Describe your ideal space..."} style={{ flex: 1, background: "#F8F5F0", border: "1px solid #E8E0D8", borderRadius: 12, padding: "14px 18px", fontFamily: "inherit", fontSize: 14, outline: "none" }} />
+                  <div className="aura-chat-input" style={{ display: "flex", gap: 10 }}>
+                    <input value={inp} onChange={(e) => setInp(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder={room ? "What do you need for your " + room.toLowerCase() + "?" : "Describe your ideal space..."} style={{ flex: 1, background: "#F8F5F0", border: "1px solid #E8E0D8", borderRadius: 12, padding: "14px 18px", fontFamily: "inherit", fontSize: 16, outline: "none" }} />
                     <button onClick={send} disabled={busy} style={{ background: "#C17550", color: "#fff", border: "none", padding: "14px 24px", borderRadius: 12, fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: busy ? 0.4 : 1, fontFamily: "inherit" }}>Send</button>
                   </div>
                 </div>
@@ -1436,12 +1673,12 @@ export default function App() {
               {/* Selection + CAD Layout + Viz */}
               {sel.size > 0 && (
                 <div style={{ padding: "28px 5%", background: "#fff", borderTop: "1px solid #F0EBE4" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
+                  <div className="aura-sel-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
                     <div>
                       <p style={{ fontSize: 12, letterSpacing: ".15em", textTransform: "uppercase", color: "#C17550", fontWeight: 600, marginBottom: 6 }}>Your Selection</p>
                       <h2 style={{ fontFamily: "Georgia,serif", fontSize: 24, fontWeight: 400 }}>{sel.size} items - {fmt(selTotal)}</h2>
                     </div>
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    <div className="aura-sel-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                       <button onClick={generateViz} disabled={vizSt === "loading"} style={{ background: "linear-gradient(135deg,#C17550,#D4956E)", color: "#fff", border: "none", borderRadius: 12, padding: "10px 22px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: vizSt === "loading" ? 0.5 : 1 }}>{vizSt === "loading" ? "Generating 3 views..." : "\u2728 Visualize Room with AI"}</button>
                       <button onClick={() => { setSel(new Set()); setVizUrls([]); setVizSt("idle"); setVizErr(""); setCadLayout(null); }} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 10, padding: "8px 18px", fontSize: 12, color: "#9B8B7B", cursor: "pointer", fontFamily: "inherit" }}>Clear All</button>
                     </div>
@@ -1484,11 +1721,11 @@ export default function App() {
                     <div style={{ marginBottom: 24, borderRadius: 16, border: "1px solid #F0EBE4", padding: 60, textAlign: "center", background: "#F8F5F0" }}>
                       <div style={{ width: 32, height: 32, border: "3px solid #E8E0D8", borderTopColor: "#C17550", borderRadius: "50%", animation: "spin .8s linear infinite", margin: "0 auto 16px" }} />
                       <p style={{ fontSize: 14, color: "#7A6B5B", margin: 0 }}>AI is crafting your room with {selItems.length} products...</p>
-                      <p style={{ fontSize: 11, color: "#B8A898", margin: "6px 0 0" }}>Writing optimized prompts, then rendering in high resolution (30-60 seconds)</p>
+                      <p style={{ fontSize: 11, color: "#B8A898", margin: "6px 0 0" }}>Writing optimized prompts, then rendering in high resolution. This may take up to 5 minutes.</p>
                     </div>
                   )}
                   {vizUrls.length > 0 && (
-                    <div style={{ display: "grid", gridTemplateColumns: vizUrls.length === 1 ? "1fr" : "repeat(auto-fit,minmax(320px,1fr))", gap: 16, marginBottom: 24 }}>
+                    <div className="aura-viz-grid" style={{ display: "grid", gridTemplateColumns: vizUrls.length === 1 ? "1fr" : "repeat(auto-fit,minmax(280px,1fr))", gap: 16, marginBottom: 24 }}>
                       {vizUrls.map((v, i) => (
                         <div key={i} style={{ borderRadius: 16, overflow: "hidden", border: "1px solid #F0EBE4" }}>
                           <img src={v.url || v} alt={"Room visualization " + (i + 1)} loading="lazy" style={{ width: "100%", height: "auto", minHeight: 200, objectFit: "cover", display: "block", background: "#F0EBE4" }} />
@@ -1500,7 +1737,7 @@ export default function App() {
                       ))}
                     </div>
                   )}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(220px,1fr))", gap: 14 }}>
+                  <div className="aura-card-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: 14 }}>
                     {selItems.map((p) => <Card key={p.id} p={p} sel toggle={toggle} small />)}
                   </div>
                 </div>
@@ -1521,7 +1758,7 @@ export default function App() {
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 24 }}>
                 {cats.map((ct) => <Pill key={ct.id} active={catFilter === ct.id} onClick={() => { setCatFilter(ct.id); setPage(0); }}>{ct.n}</Pill>)}
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(260px,1fr))", gap: 18 }}>
+              <div className="aura-card-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: 14 }}>
                 {pagedDB.map((p) => <Card key={p.id} p={p} sel={sel.has(p.id)} toggle={toggle} />)}
               </div>
               {hasMore && (

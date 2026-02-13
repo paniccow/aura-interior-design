@@ -2,18 +2,21 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <title>AURA — AI Interior Design</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background: #FDFCFA; color: #1A1815; }
+      * { margin: 0; padding: 0; box-sizing: border-box; -webkit-text-size-adjust: 100%; }
+      html { -webkit-overflow-scrolling: touch; overflow-x: hidden; }
+      body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background: #FDFCFA; color: #1A1815; overflow-x: hidden; }
+      input, button, select, textarea { font-size: 16px; }
       @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     </style>
   </head>
   <body>
     <div id="root"></div>
-    <script src="https://js.puter.com/v2/"></script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
