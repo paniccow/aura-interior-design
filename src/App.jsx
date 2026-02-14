@@ -1136,35 +1136,10 @@ export default function App() {
   const chatEnd = useRef(null);
   const chatBoxRef = useRef(null);
   const vizAreaRef = useRef(null);
-  // Homepage AI-generated images
-  const [homeHeroImg, setHomeHeroImg] = useState(null);
-  const [homeVizImg, setHomeVizImg] = useState(null);
-  const homeImgRequested = useRef(false);
+  // Homepage static images
+  const homeHeroImg = "/hero-room.jpg";
+  const homeVizImg = "/viz-room.jpg";
   const PAGE_SIZE = 40;
-
-  // Generate AI images for homepage on first load
-  useEffect(() => {
-    if (pg !== "home" || homeImgRequested.current) return;
-    homeImgRequested.current = true;
-    // Check sessionStorage cache first
-    const cachedHero = sessionStorage.getItem("aura_heroImg");
-    const cachedViz = sessionStorage.getItem("aura_vizImg");
-    if (cachedHero) { setHomeHeroImg(cachedHero); }
-    if (cachedViz) { setHomeVizImg(cachedViz); }
-    if (cachedHero && cachedViz) return;
-    // Generate hero image
-    if (!cachedHero) {
-      generateAIImage("A photorealistic wide-angle interior design photograph of a stunning warm modern living room. Natural oak hardwood floors, warm white walls, floor-to-ceiling windows with sheer linen curtains letting in golden afternoon light. A large cream boucle sectional sofa with cognac leather throw pillows, a round walnut coffee table, a woven jute area rug, brass floor lamp, and a large abstract art piece on the wall. Architectural Digest quality, eye-level perspective, no text or watermarks. Ultra high resolution, cinematic lighting, warm tones.")
-        .then(url => { if (url && url !== "__CREDITS_REQUIRED__") { setHomeHeroImg(url); try { sessionStorage.setItem("aura_heroImg", url); } catch {} } })
-        .catch(() => {});
-    }
-    // Generate viz image
-    if (!cachedViz) {
-      generateAIImage("A photorealistic interior design photograph of a beautiful Japandi bedroom. Low platform bed with white linen bedding, light oak nightstands, paper pendant lamp, dried pampas grass in a ceramic vase, soft gray wool throw, minimalist wall art. Warm natural light from a large window, clean lines, organic textures. Architectural Digest quality, wide-angle, eye-level, no text or watermarks.")
-        .then(url => { if (url && url !== "__CREDITS_REQUIRED__") { setHomeVizImg(url); try { sessionStorage.setItem("aura_vizImg", url); } catch {} } })
-        .catch(() => {});
-    }
-  }, [pg]);
 
   // Persist user, projects, and selection to localStorage
   useEffect(() => {
@@ -1978,16 +1953,7 @@ export default function App() {
               </div>
               {/* Right — AI image */}
               <div style={{ borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 80px rgba(0,0,0,.1)", border: "1px solid #E8E0D8", animation: "fadeUp 1s ease .15s both" }}>
-                {homeHeroImg ? (
-                  <img src={homeHeroImg} alt="AI-generated room visualization" style={{ width: "100%", display: "block", height: "auto", minHeight: 320, maxHeight: 480, objectFit: "cover", transition: "opacity .8s ease" }} />
-                ) : (
-                  <div style={{ width: "100%", height: 380, background: "linear-gradient(135deg, #F0EBE4 25%, #F8F5F0 50%, #F0EBE4 75%)", backgroundSize: "400% 100%", animation: "shimmer 2s ease infinite", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <div style={{ textAlign: "center" }}>
-                      <div style={{ width: 28, height: 28, border: "2.5px solid #D8D0C8", borderTopColor: "#C17550", borderRadius: "50%", animation: "spin .8s linear infinite", margin: "0 auto 10px" }} />
-                      <p style={{ fontSize: 12, color: "#B8A898", margin: 0 }}>Generating room preview...</p>
-                    </div>
-                  </div>
-                )}
+                <img src={homeHeroImg} alt="Modern living room interior design" style={{ width: "100%", display: "block", height: "auto", minHeight: 320, maxHeight: 480, objectFit: "cover" }} />
               </div>
             </div>
             <div style={{ position: "absolute", bottom: 36, left: "50%", transform: "translateX(-50%)", animation: "pulse 2s ease infinite" }}>
@@ -2195,15 +2161,9 @@ export default function App() {
                     <span style={{ fontSize: 11, fontWeight: 600, color: "#1A1815" }}>AI Room Visualization</span>
                     <span style={{ fontSize: 10, color: "#5B8B6B", fontWeight: 600 }}>Generated</span>
                   </div>
-                  {/* AI-generated room visualization */}
+                  {/* Room visualization preview */}
                   <div style={{ position: "relative", minHeight: 280 }}>
-                    {homeVizImg ? (
-                      <img src={homeVizImg} alt="AI-generated room visualization" style={{ width: "100%", display: "block", objectFit: "cover", minHeight: 280, maxHeight: 380, transition: "opacity .6s ease" }} />
-                    ) : (
-                      <div style={{ width: "100%", height: 320, background: "linear-gradient(135deg, #E8E0D8 25%, #D4C8B8 50%, #E8E0D8 75%)", backgroundSize: "400% 100%", animation: "shimmer 2s ease infinite", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <span style={{ fontSize: 13, color: "#9B8B7B", fontWeight: 500 }}>Generating preview...</span>
-                      </div>
-                    )}
+                    <img src={homeVizImg} alt="Interior design visualization example" style={{ width: "100%", display: "block", objectFit: "cover", minHeight: 280, maxHeight: 380 }} />
                     <div style={{ position: "absolute", bottom: 12, left: 12, right: 12, display: "flex", gap: 6, flexWrap: "wrap" }}>
                       {["Warm Modern", "Living Room", "18' x 22'"].map(t => (
                         <span key={t} style={{ fontSize: 10, background: "rgba(255,255,255,.85)", backdropFilter: "blur(8px)", padding: "4px 10px", borderRadius: 8, color: "#5A5045", fontWeight: 600 }}>{t}</span>
