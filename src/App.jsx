@@ -2293,6 +2293,8 @@ export default function App() {
           .aura-purchase-footer{grid-template-columns:40px 1fr 60px 70px 60px!important}
           .aura-purchase-retailer,.aura-purchase-unit{display:none!important}
           .aura-admin-grid{grid-template-columns:1fr!important}
+          .aura-compare-header,.aura-compare-row{grid-template-columns:1fr repeat(3,56px)!important;gap:4px!important;padding:12px 16px!important}
+          .aura-compare-header>div:nth-child(n+5),.aura-compare-row>div:nth-child(n+5){display:none!important}
         }
       `}</style>
 
@@ -2641,43 +2643,77 @@ export default function App() {
             </RevealSection>
           </section>
 
-          {/* What You Get — Features Checklist */}
+          {/* Feature Comparison Table */}
           <section style={{ padding: "100px 6%", background: "#FDFCFA" }}>
             <RevealSection>
               <div style={{ maxWidth: 1100, margin: "0 auto" }}>
                 <div style={{ textAlign: "center", marginBottom: 56 }}>
-                  <span style={{ display: "inline-block", background: "#5B8B6B15", color: "#5B8B6B", padding: "6px 16px", borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 20 }}>Everything You Need</span>
-                  <h2 style={{ fontFamily: "Georgia,serif", fontSize: "clamp(28px,3.5vw,42px)", fontWeight: 400, marginBottom: 14, lineHeight: 1.15 }}>Design smarter, not harder</h2>
+                  <span style={{ display: "inline-block", background: "#5B8B6B15", color: "#5B8B6B", padding: "6px 16px", borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 20 }}>Why AURA</span>
+                  <h2 style={{ fontFamily: "Georgia,serif", fontSize: "clamp(28px,3.5vw,42px)", fontWeight: 400, marginBottom: 14, lineHeight: 1.15 }}>See how we compare</h2>
                   <p style={{ fontSize: 16, color: "#7A6B5B", lineHeight: 1.7, maxWidth: 560, margin: "0 auto" }}>Every tool a designer needs — powered by AI, accessible to everyone.</p>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20 }}>
-                  {[
-                    { icon: "🏠", title: "AI Room Analysis", desc: "Upload a photo and AI maps your walls, windows, doors, and dimensions automatically" },
-                    { icon: "🎨", title: "14 Curated Style Palettes", desc: "Hand-designed color and material combinations from Warm Modern to Art Deco" },
-                    { icon: "💬", title: "AI Design Assistant", desc: "Chat in plain language — get mood boards, product picks, and layout advice instantly" },
-                    { icon: "📐", title: "CAD Floor Plans", desc: "Professional floor plans with real dimensions, clearances, and traffic flow paths" },
-                    { icon: "🖼️", title: "Photorealistic Visualizations", desc: "See your exact products rendered in your room with AI-generated photography" },
-                    { icon: "🛋️", title: DB.length + " Curated Products", desc: "Every item hand-picked from premium brands with direct purchase links" },
-                    { icon: "📷", title: "Room Photo Integration", desc: "Upload your actual room and see AI place furniture directly into your space" },
-                    { icon: "💰", title: "Real Pricing & Purchase Links", desc: "No hidden costs — every product links to the exact page where you can buy it" },
-                    { icon: "📊", title: "Smart Fit Scoring", desc: "AI scores every product for style harmony, room compatibility, and budget fit" },
-                    { icon: "🔄", title: "Multi-Project Support", desc: "Save unlimited design projects and switch between rooms effortlessly" },
-                    { icon: "📦", title: "Quantity Control", desc: "Add multiples of the same item — 2 side tables, 4 dining chairs, your call" },
-                    { icon: "🏷️", title: "Premium Brand Partners", desc: "Lulu & Georgia, McGee & Co, Shoppe Amber Interiors, West Elm, and more" },
-                  ].map(f => (
-                    <div key={f.title} style={{ display: "flex", gap: 16, padding: "22px 24px", background: "#fff", borderRadius: 14, border: "1px solid #EDE8E2", transition: "box-shadow .3s, transform .3s" }}
-                      onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 8px 30px rgba(0,0,0,.06)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-                      onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.transform = ""; }}
-                    >
-                      <div style={{ width: 40, height: 40, borderRadius: 10, background: "#5B8B6B10", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
-                        <span style={{ color: "#5B8B6B", fontWeight: 800, fontSize: 16 }}>{"✓"}</span>
+                {(() => {
+                  const competitors = ["Havenly", "Modsy", "RoomGPT", "Pottery Barn", "Houzz"];
+                  const features = [
+                    { name: "AI room visualization", desc: "Photorealistic renders of your space", aura: true, others: [true, false, true, false, false] },
+                    { name: "Real product links", desc: "Direct purchase from premium brands", aura: true, others: [true, true, false, true, true] },
+                    { name: "Room photo upload", desc: "Upload your actual room photo", aura: true, others: [false, true, true, false, false] },
+                    { name: "AI design assistant", desc: "Chat for personalized suggestions", aura: true, others: [false, false, true, false, false] },
+                    { name: "CAD floor plans", desc: "Professional layouts with dimensions", aura: true, others: [false, false, false, false, false] },
+                    { name: "Style library", desc: "14+ curated design palettes", aura: true, others: [true, false, false, false, true] },
+                    { name: "Beginner-friendly", desc: "No design skills needed", aura: true, others: [true, true, true, false, false] },
+                    { name: "Instant results", desc: "Designs generated in seconds", aura: true, others: [false, false, true, false, false] },
+                    { name: DB.length + " curated products", desc: "Hand-picked from top brands", aura: true, others: [false, false, false, false, false] },
+                    { name: "Smart fit scoring", desc: "AI checks style & room compatibility", aura: true, others: [false, false, false, false, false] },
+                    { name: "Multi-project support", desc: "Save unlimited design projects", aura: true, others: [true, true, false, false, true] },
+                    { name: "Quantity control", desc: "Add multiples of any item", aura: true, others: [false, false, false, true, false] },
+                    { name: "Mood board generation", desc: "AI-curated product collections", aura: true, others: [true, true, false, false, false] },
+                    { name: "Web-based", desc: "No installation required", aura: true, others: [true, true, true, true, true] },
+                    { name: "Free tier available", desc: "Start designing at no cost", aura: true, others: [false, false, true, false, false] },
+                  ];
+                  const Check = () => <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#E8F5EC", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#34A853" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg></div>;
+                  const Cross = () => <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#FDE8E8", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#EA4335" strokeWidth="2.5" strokeLinecap="round"/></svg></div>;
+                  return (
+                    <div style={{ background: "#fff", borderRadius: 20, border: "1px solid #EDE8E2", overflow: "hidden", boxShadow: "0 4px 24px rgba(0,0,0,.04)" }}>
+                      {/* Header row */}
+                      <div className="aura-compare-header" style={{ display: "grid", gridTemplateColumns: "1fr repeat(6, 90px)", alignItems: "end", padding: "24px 28px 16px", borderBottom: "2px solid #F0EBE4", background: "#FDFCFA", position: "sticky", top: 60, zIndex: 5 }}>
+                        <div style={{ fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "#9B8B7B", fontWeight: 600 }}>Feature</div>
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#C17550", padding: "5px 14px", borderRadius: 20 }}>
+                            <AuraLogo size={14} />
+                            <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", letterSpacing: ".05em" }}>AURA</span>
+                          </div>
+                        </div>
+                        {competitors.map(c => <div key={c} style={{ textAlign: "center", fontSize: 11, fontWeight: 600, color: "#9B8B7B" }}>{c}</div>)}
                       </div>
-                      <div>
-                        <p style={{ fontSize: 14, fontWeight: 700, color: "#1A1815", margin: "0 0 4px", lineHeight: 1.3 }}>{f.title}</p>
-                        <p style={{ fontSize: 13, color: "#7A6B5B", lineHeight: 1.55, margin: 0 }}>{f.desc}</p>
+                      {/* Feature rows */}
+                      {features.map((f, i) => (
+                        <div key={f.name} className="aura-compare-row" style={{ display: "grid", gridTemplateColumns: "1fr repeat(6, 90px)", alignItems: "center", padding: "18px 28px", borderBottom: i < features.length - 1 ? "1px solid #F5F0EB" : "none", background: i % 2 === 0 ? "#fff" : "#FDFCFA", transition: "background .15s" }}
+                          onMouseEnter={e => { e.currentTarget.style.background = "#F8F5F0"; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#FDFCFA"; }}
+                        >
+                          <div>
+                            <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1815", margin: "0 0 2px" }}>{f.name}</p>
+                            <p style={{ fontSize: 12, color: "#9B8B7B", margin: 0 }}>{f.desc}</p>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "center" }}>{f.aura ? <Check /> : <Cross />}</div>
+                          {f.others.map((has, ci) => <div key={ci} style={{ display: "flex", justifyContent: "center" }}>{has ? <Check /> : <Cross />}</div>)}
+                        </div>
+                      ))}
+                      {/* Summary row */}
+                      <div className="aura-compare-row" style={{ display: "grid", gridTemplateColumns: "1fr repeat(6, 90px)", alignItems: "center", padding: "20px 28px", background: "#F8F5F0", borderTop: "2px solid #F0EBE4" }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1815" }}>Total features</div>
+                        <div style={{ textAlign: "center", fontSize: 20, fontWeight: 700, color: "#C17550", fontFamily: "Georgia,serif" }}>{features.filter(f => f.aura).length}/{features.length}</div>
+                        {competitors.map((c, ci) => {
+                          const ct = features.filter(f => f.others[ci]).length;
+                          return <div key={c} style={{ textAlign: "center", fontSize: 16, fontWeight: 600, color: ct > 5 ? "#5A5045" : "#B8A898", fontFamily: "Georgia,serif" }}>{ct}/{features.length}</div>;
+                        })}
                       </div>
                     </div>
-                  ))}
+                  );
+                })()}
+                <div style={{ textAlign: "center", marginTop: 36 }}>
+                  <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#C17550", color: "#fff", padding: "16px 40px", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 20px rgba(193,117,80,.25)" }}>Start designing for free</button>
                 </div>
               </div>
             </RevealSection>
