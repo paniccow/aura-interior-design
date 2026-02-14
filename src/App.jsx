@@ -1795,6 +1795,367 @@ export default function App() {
     { id: "art", n: "Art" }, { id: "accent", n: "Accents" }
   ];
 
+  /* ─── ADMIN ANALYTICS PAGE ─── */
+  if (pg === "admin") {
+    // Compute all analytics from DB and localStorage
+    const catCounts = {};
+    const retailerCounts = {};
+    const retailerRevenue = {};
+    const styleCounts = {};
+    const roomCounts = {};
+    const priceRanges = { "Under $100": 0, "$100-$500": 0, "$500-$1K": 0, "$1K-$5K": 0, "$5K-$10K": 0, "$10K-$25K": 0, "$25K+": 0 };
+    const leadTimes = {};
+    let totalValue = 0;
+    let minPrice = Infinity;
+    let maxPrice = 0;
+    let kaaCount = 0;
+    let hasImageCount = 0;
+    let brokenImgCount = 0;
+
+    DB.forEach(p => {
+      // Category
+      catCounts[p.c] = (catCounts[p.c] || 0) + 1;
+      // Retailer
+      retailerCounts[p.r] = (retailerCounts[p.r] || 0) + 1;
+      retailerRevenue[p.r] = (retailerRevenue[p.r] || 0) + p.p;
+      // Style vibes
+      (p.v || []).forEach(v => { styleCounts[v] = (styleCounts[v] || 0) + 1; });
+      // Room compatibility
+      (p.rm || []).forEach(r => { roomCounts[r] = (roomCounts[r] || 0) + 1; });
+      // Price ranges
+      if (p.p < 100) priceRanges["Under $100"]++;
+      else if (p.p < 500) priceRanges["$100-$500"]++;
+      else if (p.p < 1000) priceRanges["$500-$1K"]++;
+      else if (p.p < 5000) priceRanges["$1K-$5K"]++;
+      else if (p.p < 10000) priceRanges["$5K-$10K"]++;
+      else if (p.p < 25000) priceRanges["$10K-$25K"]++;
+      else priceRanges["$25K+"]++;
+      // Lead times
+      leadTimes[p.l] = (leadTimes[p.l] || 0) + 1;
+      // Stats
+      totalValue += p.p;
+      if (p.p < minPrice) minPrice = p.p;
+      if (p.p > maxPrice) maxPrice = p.p;
+      if (p.kaa) kaaCount++;
+      if (p.img) hasImageCount++;
+    });
+
+    const avgPrice = Math.round(totalValue / DB.length);
+    const medianPrice = [...DB].sort((a, b) => a.p - b.p)[Math.floor(DB.length / 2)].p;
+    const sortedRetailers = Object.entries(retailerCounts).sort((a, b) => b[1] - a[1]);
+    const sortedCats = Object.entries(catCounts).sort((a, b) => b[1] - a[1]);
+    const sortedStyles = Object.entries(styleCounts).sort((a, b) => b[1] - a[1]);
+    const sortedRooms = Object.entries(roomCounts).sort((a, b) => b[1] - a[1]);
+    const sortedLeadTimes = Object.entries(leadTimes).sort((a, b) => b[1] - a[1]);
+
+    // User activity stats from localStorage
+    const savedProjects = projects.length;
+    const currentSelCount = sel.size;
+    const currentSelTotal = selTotal;
+    const currentSelQtyCount = selCount;
+
+    // Session analytics
+    const sessionVibes = vibe || "None selected";
+    const sessionRoom = room || "None selected";
+
+    const statCard = (label, value, sub, color) => (
+      <div style={{ background: "#fff", borderRadius: 14, padding: "22px 24px", border: "1px solid #EDE8E2", flex: "1 1 200px", minWidth: 180 }}>
+        <p style={{ fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "#9B8B7B", margin: "0 0 8px", fontWeight: 600 }}>{label}</p>
+        <p style={{ fontSize: 28, fontWeight: 700, color: color || "#1A1815", margin: "0 0 4px", fontFamily: "Georgia,serif" }}>{value}</p>
+        {sub && <p style={{ fontSize: 12, color: "#B8A898", margin: 0 }}>{sub}</p>}
+      </div>
+    );
+
+    const barChart = (data, maxVal, color) => (
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {data.map(([label, count]) => (
+          <div key={label} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 12, color: "#5A5045", width: 140, textAlign: "right", flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+            <div style={{ flex: 1, background: "#F5F0EB", borderRadius: 6, height: 24, overflow: "hidden", position: "relative" }}>
+              <div style={{ width: Math.max(2, (count / maxVal) * 100) + "%", height: "100%", background: color || "#C17550", borderRadius: 6, transition: "width .8s ease" }} />
+              <span style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", fontSize: 11, fontWeight: 600, color: count / maxVal > 0.5 ? "#fff" : "#5A5045" }}>{count}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+
+    return (
+      <div style={{ minHeight: "100vh", background: "#F8F5F0", paddingTop: 60 }}>
+        {/* Admin Nav */}
+        <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000, padding: "12px 5%", display: "flex", alignItems: "center", justifyContent: "space-between", background: "rgba(253,252,250,.96)", backdropFilter: "blur(20px)", borderBottom: "1px solid #F0EBE4" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div onClick={() => go("home")} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}><AuraLogo size={26} /><span style={{ fontFamily: "Georgia,serif", fontSize: 20, fontWeight: 400 }}>AURA</span></div>
+            <span style={{ fontSize: 10, background: "#1A1815", color: "#fff", padding: "3px 10px", borderRadius: 8, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase" }}>Admin</span>
+          </div>
+          <button onClick={() => go("home")} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 10, padding: "7px 16px", fontSize: 12, color: "#9B8B7B", cursor: "pointer", fontFamily: "inherit" }}>Back to Site</button>
+        </nav>
+
+        <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 5% 60px" }}>
+          <h1 style={{ fontFamily: "Georgia,serif", fontSize: 32, fontWeight: 400, marginBottom: 6, color: "#1A1815" }}>Analytics Dashboard</h1>
+          <p style={{ fontSize: 14, color: "#9B8B7B", marginBottom: 32 }}>Catalog stats, user activity, and product breakdowns</p>
+
+          {/* KPI Row */}
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 32 }}>
+            {statCard("Total Products", DB.length.toLocaleString(), "In catalog", "#C17550")}
+            {statCard("Total Catalog Value", fmt(totalValue), DB.length + " products combined")}
+            {statCard("Average Price", fmt(avgPrice), "Median: " + fmt(medianPrice))}
+            {statCard("Price Range", fmt(minPrice) + " - " + fmt(maxPrice), "Min to max")}
+            {statCard("Retailers", sortedRetailers.length, "Unique brands")}
+          </div>
+
+          {/* Second KPI Row */}
+          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 40 }}>
+            {statCard("AD / KAA Items", kaaCount, Math.round(kaaCount / DB.length * 100) + "% of catalog", "#8B7355")}
+            {statCard("With Images", hasImageCount, Math.round(hasImageCount / DB.length * 100) + "% coverage")}
+            {statCard("Design Styles", Object.keys(styleCounts).length, "Curated palettes", "#5B8B6B")}
+            {statCard("Room Types", Object.keys(roomCounts).length, "Supported rooms")}
+            {statCard("Saved Projects", savedProjects, currentSelCount + " products selected")}
+          </div>
+
+          {/* Charts Grid */}
+          <div className="aura-admin-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 32 }}>
+            {/* Products by Category */}
+            <div style={{ background: "#fff", borderRadius: 16, padding: "28px 28px", border: "1px solid #EDE8E2" }}>
+              <h3 style={{ fontFamily: "Georgia,serif", fontSize: 18, fontWeight: 400, marginBottom: 20, color: "#1A1815" }}>Products by Category</h3>
+              {barChart(sortedCats, sortedCats[0]?.[1] || 1, "#C17550")}
+            </div>
+
+            {/* Products by Retailer */}
+            <div style={{ background: "#fff", borderRadius: 16, padding: "28px 28px", border: "1px solid #EDE8E2" }}>
+              <h3 style={{ fontFamily: "Georgia,serif", fontSize: 18, fontWeight: 400, marginBottom: 20, color: "#1A1815" }}>Products by Retailer</h3>
+              {barChart(sortedRetailers, sortedRetailers[0]?.[1] || 1, "#8B7355")}
+            </div>
+
+            {/* Products by Style */}
+            <div style={{ background: "#fff", borderRadius: 16, padding: "28px 28px", border: "1px solid #EDE8E2" }}>
+              <h3 style={{ fontFamily: "Georgia,serif", fontSize: 18, fontWeight: 400, marginBottom: 20, color: "#1A1815" }}>Products by Style</h3>
+              {barChart(sortedStyles, sortedStyles[0]?.[1] || 1, "#5B8B6B")}
+            </div>
+
+            {/* Products by Room */}
+            <div style={{ background: "#fff", borderRadius: 16, padding: "28px 28px", border: "1px solid #EDE8E2" }}>
+              <h3 style={{ fontFamily: "Georgia,serif", fontSize: 18, fontWeight: 400, marginBottom: 20, color: "#1A1815" }}>Products by Room Compatibility</h3>
+              {barChart(sortedRooms, sortedRooms[0]?.[1] || 1, "#6B5B8B")}
+            </div>
+
+            {/* Price Distribution */}
+            <div style={{ background: "#fff", borderRadius: 16, padding: "28px 28px", border: "1px solid #EDE8E2" }}>
+              <h3 style={{ fontFamily: "Georgia,serif", fontSize: 18, fontWeight: 400, marginBottom: 20, color: "#1A1815" }}>Price Distribution</h3>
+              {barChart(Object.entries(priceRanges).filter(([, c]) => c > 0), Math.max(...Object.values(priceRanges)), "#C17550")}
+            </div>
+
+            {/* Lead Times */}
+            <div style={{ background: "#fff", borderRadius: 16, padding: "28px 28px", border: "1px solid #EDE8E2" }}>
+              <h3 style={{ fontFamily: "Georgia,serif", fontSize: 18, fontWeight: 400, marginBottom: 20, color: "#1A1815" }}>Lead Times</h3>
+              {barChart(sortedLeadTimes, sortedLeadTimes[0]?.[1] || 1, "#8B6B55")}
+            </div>
+          </div>
+
+          {/* Retailer Revenue Table */}
+          <div style={{ background: "#fff", borderRadius: 16, padding: "28px 28px", border: "1px solid #EDE8E2", marginBottom: 32 }}>
+            <h3 style={{ fontFamily: "Georgia,serif", fontSize: 18, fontWeight: 400, marginBottom: 20, color: "#1A1815" }}>Retailer Breakdown</h3>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: "2px solid #EDE8E2" }}>
+                    <th style={{ textAlign: "left", padding: "10px 16px", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "#9B8B7B", fontWeight: 700 }}>Retailer</th>
+                    <th style={{ textAlign: "right", padding: "10px 16px", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "#9B8B7B", fontWeight: 700 }}>Products</th>
+                    <th style={{ textAlign: "right", padding: "10px 16px", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "#9B8B7B", fontWeight: 700 }}>% of Catalog</th>
+                    <th style={{ textAlign: "right", padding: "10px 16px", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "#9B8B7B", fontWeight: 700 }}>Total Value</th>
+                    <th style={{ textAlign: "right", padding: "10px 16px", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "#9B8B7B", fontWeight: 700 }}>Avg Price</th>
+                    <th style={{ textAlign: "right", padding: "10px 16px", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "#9B8B7B", fontWeight: 700 }}>Min</th>
+                    <th style={{ textAlign: "right", padding: "10px 16px", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "#9B8B7B", fontWeight: 700 }}>Max</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedRetailers.map(([retailer, count], i) => {
+                    const retailerProducts = DB.filter(p => p.r === retailer);
+                    const rAvg = Math.round(retailerRevenue[retailer] / count);
+                    const rMin = Math.min(...retailerProducts.map(p => p.p));
+                    const rMax = Math.max(...retailerProducts.map(p => p.p));
+                    return (
+                      <tr key={retailer} style={{ borderBottom: "1px solid #F5F0EB", background: i % 2 === 0 ? "#FDFCFA" : "#fff" }}>
+                        <td style={{ padding: "12px 16px", fontWeight: 600, color: "#1A1815" }}>{retailer}</td>
+                        <td style={{ padding: "12px 16px", textAlign: "right", color: "#5A5045" }}>{count}</td>
+                        <td style={{ padding: "12px 16px", textAlign: "right", color: "#9B8B7B" }}>{Math.round(count / DB.length * 100)}%</td>
+                        <td style={{ padding: "12px 16px", textAlign: "right", fontWeight: 600, color: "#C17550" }}>{fmt(retailerRevenue[retailer])}</td>
+                        <td style={{ padding: "12px 16px", textAlign: "right", color: "#5A5045" }}>{fmt(rAvg)}</td>
+                        <td style={{ padding: "12px 16px", textAlign: "right", color: "#9B8B7B" }}>{fmt(rMin)}</td>
+                        <td style={{ padding: "12px 16px", textAlign: "right", color: "#9B8B7B" }}>{fmt(rMax)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Current Session + User Stats */}
+          <div className="aura-admin-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 32 }}>
+            <div style={{ background: "#fff", borderRadius: 16, padding: "28px 28px", border: "1px solid #EDE8E2" }}>
+              <h3 style={{ fontFamily: "Georgia,serif", fontSize: 18, fontWeight: 400, marginBottom: 20, color: "#1A1815" }}>Current Session</h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {[
+                  ["Current User", user ? (user.name + " (" + user.email + ")") : "Not signed in"],
+                  ["Plan", user?.plan === "pro" ? "Pro" : "Free"],
+                  ["Selected Room", sessionRoom],
+                  ["Selected Style", sessionVibes],
+                  ["Budget Filter", budgets.find(b => b[0] === bud)?.[1] || bud],
+                  ["Products Selected", currentSelCount + " unique, " + currentSelQtyCount + " total qty"],
+                  ["Selection Value", fmt(currentSelTotal)],
+                  ["Active Project", activeProjectId ? (projects.find(p => p.id === activeProjectId)?.name || activeProjectId) : "None"],
+                  ["Room Dimensions", (roomW && roomL) ? roomW + "' x " + roomL + "'" : "Not set"],
+                  ["Square Footage", sqft || "Not set"],
+                  ["Room Photo", roomPhoto ? "Uploaded" : "None"],
+                  ["CAD File", cadFile ? cadFile.name : "None"],
+                  ["Visualizations", vizUrls.length + " generated"],
+                  ["Chat Messages", msgs.length],
+                  ["Mood Boards", boards ? boards.length + " generated" : "None"],
+                ].map(([k, v]) => (
+                  <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #F5F0EB" }}>
+                    <span style={{ fontSize: 13, color: "#9B8B7B" }}>{k}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "#1A1815", textAlign: "right", maxWidth: "60%" }}>{v}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ background: "#fff", borderRadius: 16, padding: "28px 28px", border: "1px solid #EDE8E2" }}>
+              <h3 style={{ fontFamily: "Georgia,serif", fontSize: 18, fontWeight: 400, marginBottom: 20, color: "#1A1815" }}>Saved Projects</h3>
+              {projects.length === 0 ? (
+                <p style={{ fontSize: 13, color: "#B8A898", textAlign: "center", padding: 32 }}>No saved projects yet</p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {projects.map(pr => (
+                    <div key={pr.id} style={{ padding: "14px 18px", borderRadius: 12, border: activeProjectId === pr.id ? "2px solid #C17550" : "1px solid #EDE8E2", background: activeProjectId === pr.id ? "#C1755008" : "#FDFCFA" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: "#1A1815" }}>{pr.name}</span>
+                        {activeProjectId === pr.id && <span style={{ fontSize: 9, background: "#C17550", color: "#fff", padding: "2px 8px", borderRadius: 8, fontWeight: 700 }}>ACTIVE</span>}
+                      </div>
+                      <div style={{ display: "flex", gap: 16, fontSize: 12, color: "#9B8B7B" }}>
+                        <span>{(pr.items || []).length} items</span>
+                        <span>{fmt(pr.total || 0)}</span>
+                        {pr.room && <span>{pr.room}</span>}
+                        {pr.sqft && <span>{pr.sqft} sqft</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Top Priced Products */}
+          <div style={{ background: "#fff", borderRadius: 16, padding: "28px 28px", border: "1px solid #EDE8E2", marginBottom: 32 }}>
+            <h3 style={{ fontFamily: "Georgia,serif", fontSize: 18, fontWeight: 400, marginBottom: 20, color: "#1A1815" }}>Top 15 Most Expensive Products</h3>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: "2px solid #EDE8E2" }}>
+                    <th style={{ textAlign: "left", padding: "10px 12px", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "#9B8B7B", fontWeight: 700 }}>#</th>
+                    <th style={{ textAlign: "left", padding: "10px 12px", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "#9B8B7B", fontWeight: 700 }}>Product</th>
+                    <th style={{ textAlign: "left", padding: "10px 12px", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "#9B8B7B", fontWeight: 700 }}>Retailer</th>
+                    <th style={{ textAlign: "left", padding: "10px 12px", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "#9B8B7B", fontWeight: 700 }}>Category</th>
+                    <th style={{ textAlign: "right", padding: "10px 12px", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "#9B8B7B", fontWeight: 700 }}>Price</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...DB].sort((a, b) => b.p - a.p).slice(0, 15).map((p, i) => (
+                    <tr key={p.id} style={{ borderBottom: "1px solid #F5F0EB", background: i % 2 === 0 ? "#FDFCFA" : "#fff" }}>
+                      <td style={{ padding: "10px 12px", color: "#B8A898" }}>{i + 1}</td>
+                      <td style={{ padding: "10px 12px", fontWeight: 600, color: "#1A1815", maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.n}</td>
+                      <td style={{ padding: "10px 12px", color: "#7A6B5B" }}>{p.r}</td>
+                      <td style={{ padding: "10px 12px" }}><span style={{ fontSize: 10, background: "#F5F0EB", padding: "3px 10px", borderRadius: 8, textTransform: "uppercase", fontWeight: 600, color: "#8B7355", letterSpacing: ".05em" }}>{p.c}</span></td>
+                      <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700, color: "#C17550" }}>{fmt(p.p)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Currently Selected Products */}
+          {sel.size > 0 && (
+            <div style={{ background: "#fff", borderRadius: 16, padding: "28px 28px", border: "1px solid #EDE8E2", marginBottom: 32 }}>
+              <h3 style={{ fontFamily: "Georgia,serif", fontSize: 18, fontWeight: 400, marginBottom: 20, color: "#1A1815" }}>Currently Selected Products ({selCount} items)</h3>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: "2px solid #EDE8E2" }}>
+                      <th style={{ textAlign: "left", padding: "10px 12px", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "#9B8B7B", fontWeight: 700 }}>Product</th>
+                      <th style={{ textAlign: "left", padding: "10px 12px", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "#9B8B7B", fontWeight: 700 }}>Retailer</th>
+                      <th style={{ textAlign: "left", padding: "10px 12px", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "#9B8B7B", fontWeight: 700 }}>Category</th>
+                      <th style={{ textAlign: "center", padding: "10px 12px", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "#9B8B7B", fontWeight: 700 }}>Qty</th>
+                      <th style={{ textAlign: "right", padding: "10px 12px", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "#9B8B7B", fontWeight: 700 }}>Unit Price</th>
+                      <th style={{ textAlign: "right", padding: "10px 12px", fontSize: 10, letterSpacing: ".1em", textTransform: "uppercase", color: "#9B8B7B", fontWeight: 700 }}>Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selItems.map((p, i) => {
+                      const qty = sel.get(p.id) || 1;
+                      return (
+                        <tr key={p.id} style={{ borderBottom: "1px solid #F5F0EB", background: i % 2 === 0 ? "#FDFCFA" : "#fff" }}>
+                          <td style={{ padding: "10px 12px", fontWeight: 600, color: "#1A1815" }}>{p.n}</td>
+                          <td style={{ padding: "10px 12px", color: "#7A6B5B" }}>{p.r}</td>
+                          <td style={{ padding: "10px 12px" }}><span style={{ fontSize: 10, background: "#F5F0EB", padding: "3px 10px", borderRadius: 8, textTransform: "uppercase", fontWeight: 600, color: "#8B7355" }}>{p.c}</span></td>
+                          <td style={{ padding: "10px 12px", textAlign: "center", fontWeight: 600 }}>{qty}</td>
+                          <td style={{ padding: "10px 12px", textAlign: "right", color: "#5A5045" }}>{fmt(p.p)}</td>
+                          <td style={{ padding: "10px 12px", textAlign: "right", fontWeight: 700, color: "#C17550" }}>{fmt(p.p * qty)}</td>
+                        </tr>
+                      );
+                    })}
+                    <tr style={{ borderTop: "2px solid #EDE8E2", background: "#F8F5F0" }}>
+                      <td colSpan={3} style={{ padding: "12px 12px", fontWeight: 700, color: "#1A1815" }}>Total</td>
+                      <td style={{ padding: "12px 12px", textAlign: "center", fontWeight: 700 }}>{selCount}</td>
+                      <td style={{ padding: "12px 12px" }} />
+                      <td style={{ padding: "12px 12px", textAlign: "right", fontWeight: 700, color: "#C17550", fontSize: 15 }}>{fmt(selTotal)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Category × Style Matrix */}
+          <div style={{ background: "#fff", borderRadius: 16, padding: "28px 28px", border: "1px solid #EDE8E2", marginBottom: 32 }}>
+            <h3 style={{ fontFamily: "Georgia,serif", fontSize: 18, fontWeight: 400, marginBottom: 20, color: "#1A1815" }}>Category × Style Coverage</h3>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                <thead>
+                  <tr>
+                    <th style={{ padding: "8px 10px", textAlign: "left", fontSize: 10, color: "#9B8B7B", fontWeight: 700, position: "sticky", left: 0, background: "#fff", zIndex: 1 }}>Category</th>
+                    {VIBES.map(v => <th key={v} style={{ padding: "8px 6px", textAlign: "center", fontSize: 9, color: "#9B8B7B", fontWeight: 600, writingMode: "vertical-rl", transform: "rotate(180deg)", height: 90 }}>{v}</th>)}
+                    <th style={{ padding: "8px 10px", textAlign: "center", fontSize: 10, color: "#9B8B7B", fontWeight: 700 }}>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedCats.map(([cat]) => {
+                    const catProducts = DB.filter(p => p.c === cat);
+                    return (
+                      <tr key={cat} style={{ borderBottom: "1px solid #F5F0EB" }}>
+                        <td style={{ padding: "8px 10px", fontWeight: 600, color: "#1A1815", textTransform: "capitalize", position: "sticky", left: 0, background: "#fff", zIndex: 1 }}>{cat}</td>
+                        {VIBES.map(v => {
+                          const ct = catProducts.filter(p => (p.v || []).includes(v)).length;
+                          return <td key={v} style={{ padding: "6px", textAlign: "center" }}>
+                            {ct > 0 ? <span style={{ display: "inline-block", minWidth: 24, padding: "2px 6px", borderRadius: 6, fontSize: 10, fontWeight: 600, background: ct > 20 ? "#C1755030" : ct > 10 ? "#C1755018" : "#F5F0EB", color: ct > 20 ? "#8B4520" : ct > 10 ? "#C17550" : "#9B8B7B" }}>{ct}</span> : <span style={{ color: "#E8E0D8" }}>-</span>}
+                          </td>;
+                        })}
+                        <td style={{ padding: "8px 10px", textAlign: "center", fontWeight: 700, color: "#C17550" }}>{catProducts.length}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <p style={{ textAlign: "center", fontSize: 12, color: "#B8A898", marginTop: 40 }}>AURA Admin Dashboard — Data computed from catalog of {DB.length} products</p>
+        </div>
+      </div>
+    );
+  }
+
   /* ─── AUTH PAGE ─── */
   if (pg === "auth") {
     const submit = async () => { if (!ae || !ap) { setAErr("Fill in all fields"); return; } if (authMode === "signup" && !an) { setAErr("Name required"); return; } setALd(true); setAErr(""); const e = doAuth(authMode, ae, ap, an); if (e) { setAErr(e); setALd(false); } };
@@ -1931,6 +2292,7 @@ export default function App() {
           .aura-purchase-header{display:none!important}
           .aura-purchase-footer{grid-template-columns:40px 1fr 60px 70px 60px!important}
           .aura-purchase-retailer,.aura-purchase-unit{display:none!important}
+          .aura-admin-grid{grid-template-columns:1fr!important}
         }
       `}</style>
 
@@ -2274,6 +2636,48 @@ export default function App() {
                 </ul>
                 <div style={{ marginTop: 20 }}>
                   <button onClick={() => go("pricing")} style={{ background: "#C17550", color: "#fff", padding: "14px 32px", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Get Pro</button>
+                </div>
+              </div>
+            </RevealSection>
+          </section>
+
+          {/* What You Get — Features Checklist */}
+          <section style={{ padding: "100px 6%", background: "#FDFCFA" }}>
+            <RevealSection>
+              <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+                <div style={{ textAlign: "center", marginBottom: 56 }}>
+                  <span style={{ display: "inline-block", background: "#5B8B6B15", color: "#5B8B6B", padding: "6px 16px", borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 20 }}>Everything You Need</span>
+                  <h2 style={{ fontFamily: "Georgia,serif", fontSize: "clamp(28px,3.5vw,42px)", fontWeight: 400, marginBottom: 14, lineHeight: 1.15 }}>Design smarter, not harder</h2>
+                  <p style={{ fontSize: 16, color: "#7A6B5B", lineHeight: 1.7, maxWidth: 560, margin: "0 auto" }}>Every tool a designer needs — powered by AI, accessible to everyone.</p>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20 }}>
+                  {[
+                    { icon: "🏠", title: "AI Room Analysis", desc: "Upload a photo and AI maps your walls, windows, doors, and dimensions automatically" },
+                    { icon: "🎨", title: "14 Curated Style Palettes", desc: "Hand-designed color and material combinations from Warm Modern to Art Deco" },
+                    { icon: "💬", title: "AI Design Assistant", desc: "Chat in plain language — get mood boards, product picks, and layout advice instantly" },
+                    { icon: "📐", title: "CAD Floor Plans", desc: "Professional floor plans with real dimensions, clearances, and traffic flow paths" },
+                    { icon: "🖼️", title: "Photorealistic Visualizations", desc: "See your exact products rendered in your room with AI-generated photography" },
+                    { icon: "🛋️", title: DB.length + " Curated Products", desc: "Every item hand-picked from premium brands with direct purchase links" },
+                    { icon: "📷", title: "Room Photo Integration", desc: "Upload your actual room and see AI place furniture directly into your space" },
+                    { icon: "💰", title: "Real Pricing & Purchase Links", desc: "No hidden costs — every product links to the exact page where you can buy it" },
+                    { icon: "📊", title: "Smart Fit Scoring", desc: "AI scores every product for style harmony, room compatibility, and budget fit" },
+                    { icon: "🔄", title: "Multi-Project Support", desc: "Save unlimited design projects and switch between rooms effortlessly" },
+                    { icon: "📦", title: "Quantity Control", desc: "Add multiples of the same item — 2 side tables, 4 dining chairs, your call" },
+                    { icon: "🏷️", title: "Premium Brand Partners", desc: "Lulu & Georgia, McGee & Co, Shoppe Amber Interiors, West Elm, and more" },
+                  ].map(f => (
+                    <div key={f.title} style={{ display: "flex", gap: 16, padding: "22px 24px", background: "#fff", borderRadius: 14, border: "1px solid #EDE8E2", transition: "box-shadow .3s, transform .3s" }}
+                      onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 8px 30px rgba(0,0,0,.06)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.transform = ""; }}
+                    >
+                      <div style={{ width: 40, height: 40, borderRadius: 10, background: "#5B8B6B10", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>
+                        <span style={{ color: "#5B8B6B", fontWeight: 800, fontSize: 16 }}>{"✓"}</span>
+                      </div>
+                      <div>
+                        <p style={{ fontSize: 14, fontWeight: 700, color: "#1A1815", margin: "0 0 4px", lineHeight: 1.3 }}>{f.title}</p>
+                        <p style={{ fontSize: 13, color: "#7A6B5B", lineHeight: 1.55, margin: 0 }}>{f.desc}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </RevealSection>
@@ -2855,7 +3259,7 @@ export default function App() {
       <footer style={{ background: "#fff", borderTop: "1px solid #F0EBE4", padding: "28px 5%", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}><AuraLogo size={22} /><span style={{ fontFamily: "Georgia,serif", fontSize: 18 }}>AURA</span></div>
         <div style={{ display: "flex", gap: 24 }}>
-          {[["Design", () => { go("design"); setTab("studio"); }], ["Catalog", () => { go("design"); setTab("catalog"); }], ["Pricing", () => go("pricing")]].map(([l, fn]) => (
+          {[["Design", () => { go("design"); setTab("studio"); }], ["Catalog", () => { go("design"); setTab("catalog"); }], ["Pricing", () => go("pricing")], ["Admin", () => go("admin")]].map(([l, fn]) => (
             <span key={l} onClick={fn} style={{ fontSize: 12, cursor: "pointer", color: "#B8A898" }}>{l}</span>
           ))}
         </div>
