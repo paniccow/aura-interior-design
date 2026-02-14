@@ -1449,81 +1449,42 @@ export default function App() {
       const matStr = palette.materials.slice(0, 4).join(", ");
       const roomNeeds = ROOM_NEEDS[room] || ROOM_NEEDS["Living Room"];
 
-      // Build room dimensions string
-      let dimsStr = "";
-      if (roomWidth && roomLength) {
-        dimsStr = "\nROOM DIMENSIONS: " + roomWidth + " feet wide × " + roomLength + " feet long (" + roomSqft + " sq ft). Use these exact proportions for the room shape and scale all furniture placement accordingly.";
-      } else if (roomSqft) {
-        dimsStr = "\nROOM SIZE: approximately " + roomSqft + " square feet.";
-      }
-
-      // Build room context from uploaded photo analysis
-      let roomContext = "";
-      if (roomPhotoAnalysis) {
-        const wallMatch = roomPhotoAnalysis.match(/wall[s]?\s*(?:color|paint|colour)?[:\s]*([^.\n,]{3,40})/i);
-        const floorMatch = roomPhotoAnalysis.match(/floor(?:ing)?[:\s]*([^.\n,]{3,40})/i);
-        const windowMatch = roomPhotoAnalysis.match(/(\d+)\s*window/i);
-        const ceilingMatch = roomPhotoAnalysis.match(/ceiling[:\s]*([^.\n,]{3,30})/i);
-        const archMatch = roomPhotoAnalysis.match(/(?:fireplace|built-in|crown molding|beam|arch|bay window)[^.\n]{0,30}/i);
-        const doorMatch = roomPhotoAnalysis.match(/(\d+)\s*door/i);
-        const parts = [];
-        if (wallMatch) parts.push("walls: " + wallMatch[1].trim());
-        if (floorMatch) parts.push("flooring: " + floorMatch[1].trim());
-        if (windowMatch) parts.push(windowMatch[0]);
-        if (doorMatch) parts.push(doorMatch[0]);
-        if (ceilingMatch) parts.push("ceiling: " + ceilingMatch[1].trim());
-        if (archMatch) parts.push(archMatch[0].trim());
-        if (parts.length > 0) {
-          roomContext = "\n\nROOM PHOTO REFERENCE — YOU MUST MATCH THIS ROOM EXACTLY: " + parts.join(", ") + ". Keep the EXACT same walls, floor, windows, doors, ceiling, and architectural features visible in the reference photo. Place furniture INTO this room, do NOT redesign the room itself.";
-        } else {
-          roomContext = "\n\nROOM PHOTO REFERENCE — MATCH THIS ROOM: " + roomPhotoAnalysis.slice(0, 400) + ". The reference photo shows the actual room. Keep all walls, floor, windows, and architecture EXACTLY as shown. Only add the listed furniture.";
-        }
-      }
-
-      // Build CAD/floor plan context
-      let cadContext = "";
-      if (cadAnalysis) {
-        cadContext = "\n\nFLOOR PLAN / CAD ANALYSIS — USE THIS LAYOUT: " + cadAnalysis.slice(0, 500) + "\nPlace furniture according to this floor plan. Respect wall positions, door locations (keep clearance), window placements (don't block), and any built-in features. The floor plan defines WHERE items go in the room.";
-      }
-
-      // ─── STEP 3: EXTRACT USER CONTEXT FROM CHAT ───
-      // Pull relevant info the user shared in the AI chat (doors, windows, preferences, etc.)
-      const userMessages = msgs.filter(m => m.role === "user").map(m => m.text).join(" ");
-      let userContext = "";
-      if (userMessages.length > 10) {
-        // Extract spatial/preference details the user mentioned
-        const contextParts = [];
-        if (/door/i.test(userMessages)) contextParts.push("has door(s)");
-        if (/window/i.test(userMessages)) contextParts.push("has windows");
-        if (/fireplace/i.test(userMessages)) contextParts.push("has a fireplace");
-        if (/stairs|staircase/i.test(userMessages)) contextParts.push("near stairs");
-        if (/open.*(?:plan|concept|floor)/i.test(userMessages)) contextParts.push("open floor plan");
-        if (/small|compact|tiny/i.test(userMessages)) contextParts.push("compact space");
-        if (/large|spacious|big/i.test(userMessages)) contextParts.push("spacious room");
-        if (/dark|moody/i.test(userMessages)) contextParts.push("moody/dark atmosphere");
-        if (/bright|airy|light/i.test(userMessages)) contextParts.push("bright and airy feel");
-        if (/cozy|warm/i.test(userMessages)) contextParts.push("cozy warm feel");
-        // Include a summary of what the user said (truncated)
-        const lastUserMsg = msgs.filter(m => m.role === "user").slice(-2).map(m => m.text).join(". ");
-        if (lastUserMsg.length > 5) {
-          userContext = "\n\nUSER'S DESIGN NOTES: " + (contextParts.length > 0 ? contextParts.join(", ") + ". " : "") + "User said: \"" + lastUserMsg.slice(0, 300) + "\"";
-        }
-      }
-
       // ─── STEP 4: BUILD IMAGE GENERATION PROMPT ───
       const numItems = items.slice(0, 17).length;
       const hasRoomRef = !!(roomPhoto?.data);
       const hasCadImg = !!(cadFile?.data);
 
-      const prompt = (hasRoomRef
-        ? "Place furniture into the provided room photo. Keep the room exactly as-is — same walls, floor, windows, lighting."
-        : "Photorealistic interior photo of a " + styleName + " " + roomName + ". " + colorStr + " palette. " + matStr + " materials.") +
-        (roomWidth && roomLength ? " Room: " + roomWidth + "×" + roomLength + "ft." : (roomSqft ? " ~" + roomSqft + " sqft." : "")) +
-        (hasCadImg ? " Use the provided floor plan for placement." : "") +
-        (cadAnalysis ? " Layout: " + cadAnalysis.slice(0, 200) : "") +
-        "\n\nFurniture to render — exactly " + numItems + " item" + (numItems > 1 ? "s" : "") + ", nothing else:\n" + productSpecs +
-        "\n\nRender ONLY the " + numItems + " items listed above. Do NOT add any extra furniture, decor, plants, vases, pillows, or accessories not in the list. Match each item's exact color shade, shape, material, arm style, and leg style from its description. " + roomNeeds.layout +
-        " High resolution, eye-level, natural daylight, wide-angle, sharp detail, 4K quality, Architectural Digest editorial photography. No text or labels.";
+      // Build the prompt — room context first, then furniture list
+      let prompt = "";
+
+      // Room context
+      if (hasRoomRef) {
+        prompt += "Place furniture into the provided room photo. Keep the room exactly as-is — same walls, floor, windows, lighting.";
+        // Include the full room analysis so AI knows what it's looking at
+        if (roomPhotoAnalysis) {
+          prompt += "\nRoom details: " + roomPhotoAnalysis.slice(0, 500);
+        }
+      } else {
+        prompt += "Photorealistic interior photo of a " + styleName + " " + roomName + ". " + colorStr + " palette. " + matStr + " materials.";
+      }
+
+      // Dimensions
+      if (roomWidth && roomLength) {
+        prompt += " Room: " + roomWidth + "×" + roomLength + "ft (" + roomSqft + " sqft).";
+      } else if (roomSqft) {
+        prompt += " ~" + roomSqft + " sqft.";
+      }
+
+      // CAD context
+      if (hasCadImg) prompt += " Use the provided floor plan for placement.";
+      if (cadAnalysis) prompt += "\nFloor plan notes: " + cadAnalysis.slice(0, 250);
+
+      // Furniture list — numbered, one per line
+      prompt += "\n\nFurniture — exactly " + numItems + " item" + (numItems > 1 ? "s" : "") + ", one of each unless noted:\n" + productSpecs;
+
+      // Rules — short and direct
+      prompt += "\n\nRender ONLY these " + numItems + " items. No extra furniture, decor, plants, vases, or pillows. Each item appears exactly once unless a quantity is noted. Match each item's exact color shade, shape, material, arm style, and leg style. " + roomNeeds.layout;
+      prompt += " High resolution, eye-level, natural daylight, wide-angle, sharp detail, 4K quality, Architectural Digest editorial photography. No text or labels.";
 
       // Pass room photo and CAD as reference images so AI edits the actual room
       const refImg = roomPhoto?.data || null;
