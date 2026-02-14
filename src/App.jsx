@@ -1406,56 +1406,56 @@ export default function App() {
       // If AI vision worked, use its descriptions; otherwise fall back to keyword extraction
       const dims_cache = items.slice(0, 8).map(i => getProductDims(i));
 
-      let productSpecs;
-      if (aiProductDescriptions) {
-        // Parse AI vision output and merge with known data
-        productSpecs = items.slice(0, 8).map((item, idx) => {
-          const dims = dims_cache[idx];
-          const widthIn = Math.round(dims.w * 12);
-          const depthIn = Math.round(dims.d * 12);
-          // Try to find the AI's description for this product
+      // Helper: extract color/material keywords from product name
+      const COLOR_WORDS = ["white","cream","ivory","beige","tan","sand","camel","cognac","brown","walnut","oak","teak","mahogany","espresso","charcoal","gray","grey","slate","black","navy","blue","green","sage","olive","emerald","teal","blush","pink","coral","rust","terracotta","gold","brass","bronze","silver","chrome","copper","natural","amber","honey","wheat","linen","oatmeal","mushroom","taupe","dune","alabaster","stone","cement","marble","onyx","haze","driftwood"];
+      const MAT_WORDS = ["leather","velvet","boucle","bouclé","linen","cotton","wool","silk","jute","rattan","wicker","cane","marble","travertine","granite","concrete","wood","oak","walnut","teak","metal","iron","steel","brass","bronze","glass","ceramic","fabric","upholstered","performance","slipcovered","woven"];
+      const extractKw = (text, words) => words.filter(w => (text || "").toLowerCase().includes(w.toLowerCase()));
+
+      // Build rich product specs — merge AI vision analysis + all database fields
+      const productSpecs = items.slice(0, 8).map((item, idx) => {
+        const dims = dims_cache[idx];
+        const widthIn = Math.round(dims.w * 12);
+        const depthIn = Math.round(dims.d * 12);
+        const qty = sel.get(item.id) || 1;
+        const fullText = (item.n || "") + " " + (item.pr || "");
+        const name = (item.n || "").toLowerCase();
+
+        // Detect shape from name
+        let shape = dims.shape || item.c;
+        if (name.includes("round") || name.includes("circular")) shape = "round";
+        else if (name.includes("oval")) shape = "oval";
+        else if (name.includes("l-shaped") || name.includes("l shaped") || name.includes("sectional")) shape = "L-shaped";
+        else if (name.includes("u-shaped") || name.includes("u shaped")) shape = "U-shaped";
+        else if (shape === "rect") shape = "rectangular";
+
+        // Extract color and material from product name
+        const colors = extractKw(fullText, COLOR_WORDS);
+        const mats = extractKw(fullText, MAT_WORDS);
+
+        // Try to find AI vision description for this product
+        let aiDesc = "";
+        if (aiProductDescriptions) {
           const regex = new RegExp("PRODUCT\\s*" + (idx + 1) + "\\s*:(.+)", "i");
           const match = aiProductDescriptions.match(regex);
-          const aiDesc = match ? match[1].trim() : "";
+          aiDesc = match ? match[1].trim() : "";
+        }
 
-          const qty = sel.get(item.id) || 1;
-          let spec = (idx + 1) + ". " + (item.n || "Unknown") + " (by " + (item.r || "Unknown") + ")" + (qty > 1 ? " x" + qty : "");
-          if (aiDesc) {
-            spec += "\n   AI Analysis: " + aiDesc;
-          }
-          spec += "\n   Estimated footprint: " + widthIn + '"W x ' + depthIn + '"D (' + Math.round(dims.w * 10) / 10 + "ft x " + Math.round(dims.d * 10) / 10 + "ft)";
-          spec += "\n   Category: " + item.c;
-          if (qty > 1) spec += "\n   Quantity: " + qty + " (place " + qty + " of these in the room)";
-          return spec;
-        }).join("\n\n");
-      } else {
-        // Fallback: keyword extraction from product names
-        const COLOR_WORDS = ["white","cream","ivory","beige","tan","sand","camel","cognac","brown","walnut","oak","teak","mahogany","espresso","charcoal","gray","grey","slate","black","navy","blue","green","sage","olive","emerald","teal","blush","pink","coral","rust","terracotta","gold","brass","bronze","silver","chrome","copper","natural","amber","honey","wheat","linen","oatmeal","mushroom","taupe","dune","alabaster","stone","cement","marble","onyx","haze","driftwood"];
-        const MAT_WORDS = ["leather","velvet","boucle","bouclé","linen","cotton","wool","silk","jute","rattan","wicker","cane","marble","travertine","granite","concrete","wood","oak","walnut","teak","metal","iron","steel","brass","bronze","glass","ceramic","fabric","upholstered","performance","slipcovered","woven"];
-        const extractKw = (text, words) => words.filter(w => (text || "").toLowerCase().includes(w.toLowerCase()));
-
-        productSpecs = items.slice(0, 8).map((item, idx) => {
-          const dims = dims_cache[idx];
-          const fullText = (item.n || "") + " " + (item.pr || "");
-          const colors = extractKw(fullText, COLOR_WORDS);
-          const mats = extractKw(fullText, MAT_WORDS);
-          const name = (item.n || "").toLowerCase();
-          let shape = item.c;
-          if (name.includes("round") || name.includes("circular")) shape = "round " + item.c;
-          else if (name.includes("oval")) shape = "oval " + item.c;
-          else if (name.includes("l-shaped") || name.includes("l shaped") || name.includes("sectional")) shape = "L-shaped " + item.c;
-          else if (name.includes("u-shaped") || name.includes("u shaped")) shape = "U-shaped " + item.c;
-
-          const qty = sel.get(item.id) || 1;
-          let spec = (idx + 1) + ". " + (item.n || "Unknown") + " (by " + (item.r || "Unknown") + ")" + (qty > 1 ? " x" + qty : "");
-          spec += "\n   Shape: " + shape;
-          spec += "\n   Size: " + Math.round(dims.w * 12) + '"W x ' + Math.round(dims.d * 12) + '"D';
-          if (colors.length > 0) spec += "\n   Color: " + colors.slice(0, 3).join(", ");
-          if (mats.length > 0) spec += "\n   Material: " + mats.slice(0, 2).join(", ");
-          if (qty > 1) spec += "\n   Quantity: " + qty + " (place " + qty + " of these in the room)";
-          return spec;
-        }).join("\n\n");
-      }
+        // Build comprehensive spec
+        let spec = (idx + 1) + ". " + (item.n || "Unknown") + " by " + (item.r || "Unknown") + " — $" + (item.p || 0);
+        spec += (qty > 1 ? " × " + qty : "");
+        spec += "\n   [Reference photo: IMAGE #" + (idx + 1 + (roomPhoto?.data ? 1 : 0) + (cadFile?.data ? 1 : 0)) + " — match this product's appearance EXACTLY]";
+        if (aiDesc) {
+          spec += "\n   AI Vision Analysis: " + aiDesc;
+        }
+        spec += "\n   Category: " + item.c + " | Shape: " + shape;
+        spec += "\n   Size: " + widthIn + '"W × ' + depthIn + '"D (' + Math.round(dims.w * 10) / 10 + "ft × " + Math.round(dims.d * 10) / 10 + "ft)";
+        if (colors.length > 0) spec += "\n   Colors: " + colors.slice(0, 4).join(", ");
+        if (mats.length > 0) spec += "\n   Materials: " + mats.slice(0, 3).join(", ");
+        if (item.v && item.v.length > 0) spec += "\n   Design style: " + item.v.join(", ");
+        if (item.rm && item.rm.length > 0) spec += "\n   Designed for: " + item.rm.join(", ");
+        if (qty > 1) spec += "\n   ⚠ QUANTITY: " + qty + " — you MUST place exactly " + qty + " of this item in the room";
+        return spec;
+      }).join("\n\n");
 
       const colorStr = palette.colors.slice(0, 5).join(", ");
       const matStr = palette.materials.slice(0, 4).join(", ");
@@ -1525,32 +1525,37 @@ export default function App() {
       // ─── STEP 4: BUILD IMAGE GENERATION PROMPT ───
       const numItems = items.slice(0, 8).length;
       const hasRoomRef = !!(roomPhoto?.data);
-      const hasCad = !!cadAnalysis;
+      const hasCadImg = !!(cadFile?.data);
+      const hasCadText = !!cadAnalysis;
 
       const prompt = (hasRoomRef
-        ? "EDIT THIS ROOM PHOTO: Place furniture into the provided room photograph. Do NOT generate a new room. The output MUST be the SAME room from the photo with the listed furniture added. Preserve EVERY detail of the original photo: exact wall paint color, exact flooring material and color, exact window positions and style, exact door locations, exact ceiling height, exact architectural features, exact lighting conditions. The result should look like a real photo of THIS room after the furniture was delivered and arranged."
+        ? "TASK: EDIT THE PROVIDED ROOM PHOTO. Place the listed furniture into the user's actual room photograph.\n" +
+          "- The output MUST be the SAME room from the photo with new furniture added.\n" +
+          "- Preserve EVERY architectural detail: exact wall paint color/texture, exact flooring material/color, exact window positions/size/style, exact door locations, exact ceiling height/features, exact lighting conditions, exact trim/molding.\n" +
+          "- The result should look like a real photograph taken after furniture delivery — same camera angle, same room, just with new pieces placed in it."
         : "Generate a photorealistic interior design photograph of a " + styleName + " " + roomName + ".") +
         dimsStr +
-        // CAD/floor plan instructions
-        (hasCad ? "\n\nFLOOR PLAN PROVIDED: A CAD/floor plan image of this room is included. Use it to determine the exact room layout, wall positions, door locations (maintain clearance), window placements (don't block), and optimal furniture positions." : "") +
-        cadContext +
-        // Room photo features from analysis
-        (hasRoomRef && roomContext ? "\n\nROOM DETAILS FROM ANALYSIS:" + roomContext : (!hasRoomRef ? roomContext : "")) +
+        // CAD/floor plan instructions — reference the actual image if we have it
+        (hasCadImg ? "\n\nFLOOR PLAN IMAGE PROVIDED: A CAD/floor plan image of this room is included as a reference image. Use it to determine the exact room layout, wall positions, door locations (maintain clearance), window placements (don't block), and optimal furniture positions." : "") +
+        // Also include text analysis of CAD if available
+        (hasCadText ? "\n\nFLOOR PLAN ANALYSIS: " + cadAnalysis.slice(0, 500) + "\nPlace furniture according to this layout. Respect wall positions, door clearances, window sightlines, and built-in features." : "") +
+        // Room photo analysis — include the full analysis text so AI knows what it's looking at
+        (roomPhotoAnalysis ? "\n\nROOM ANALYSIS (from AI vision of the uploaded photo): " + roomPhotoAnalysis.slice(0, 600) + "\nUse these details to understand the room's current state. Your job is to place furniture into this exact space." : "") +
         // User chat context
         userContext +
-        "\n\nFURNITURE TO PLACE IN THIS ROOM (render ONLY these " + numItems + " pieces, NOTHING else):\n\n" + productSpecs +
-        "\n\nRULES:" +
-        (hasRoomRef ? "\n- THIS IS A ROOM EDITING TASK. The provided room photo IS the room. Output the SAME room with furniture placed in it. Do NOT change walls, floor, windows, doors, lighting, or any architectural element." : "") +
-        "\n- Show EXACTLY " + numItems + " piece" + (numItems > 1 ? "s" : "") + " of furniture. Do NOT add any extra furniture, accessories, throw pillows, vases, plants, books, or decor items that are not in the list above." +
-        (numItems === 1 ? " This is a SINGLE product visualization — just this ONE item in an otherwise empty " + roomName.toLowerCase() + ". Do not add anything else." : "") +
-        "\n- MATCH each product's exact shape, color, material, and proportions as described above" + (aiProductDescriptions ? " (the AI Analysis lines are the most accurate descriptions — follow them closely)" : "") + "." +
-        "\n- If a product is described as ROUND, it must be circular. If OVAL, show an oval. If L-SHAPED, show an L-shape. Shape accuracy is critical." +
-        "\n- Each product's width and depth dimensions are provided — make sure proportions between items are realistic." +
-        (roomWidth && roomLength ? "\n- The room is " + roomWidth + "ft × " + roomLength + "ft. Scale furniture placement to fit these real dimensions — a 7ft sofa should take up about " + Math.round(7 / parseFloat(roomWidth) * 100) + "% of the room width." : "") +
-        (hasCad ? "\n- Follow the floor plan image for furniture placement positions. Place items where the CAD layout indicates, respecting door clearances and window sightlines." : "") +
+        "\n\nFURNITURE TO PLACE (render ONLY these " + numItems + " pieces — NOTHING extra):\n\n" + productSpecs +
+        "\n\nSTRICT RULES:" +
+        (hasRoomRef ? "\n1. THIS IS AN IMAGE EDITING TASK — the room photo IS the room. Output the SAME room with furniture placed in it. Do NOT change walls, floor, windows, doors, lighting, or any architectural element." : "") +
+        "\n" + (hasRoomRef ? "2" : "1") + ". Render EXACTLY " + numItems + " piece" + (numItems > 1 ? "s" : "") + " of furniture. NO extra items, accessories, throw pillows, vases, plants, books, or decor." +
+        (numItems === 1 ? " This is a SINGLE product — just this ONE item in the room." : "") +
+        "\n" + (hasRoomRef ? "3" : "2") + ". Each product has a reference photo (numbered IMAGE above). MATCH each product's EXACT appearance from its photo: same shape, same color, same material, same proportions." +
+        "\n" + (hasRoomRef ? "4" : "3") + ". Shape accuracy is critical: ROUND = circular, OVAL = oval, L-SHAPED = L-shape, RECTANGULAR = rectangle." +
+        "\n" + (hasRoomRef ? "5" : "4") + ". Respect the size dimensions listed — proportions between items must be realistic." +
+        (roomWidth && roomLength ? "\n" + (hasRoomRef ? "6" : "5") + ". Room is " + roomWidth + "ft × " + roomLength + "ft. Scale furniture to fit — a 7ft sofa ≈ " + Math.round(7 / parseFloat(roomWidth) * 100) + "% of room width." : "") +
+        (hasCadImg || hasCadText ? "\n- Follow the floor plan for placement positions. Respect door clearances and window sightlines." : "") +
         (!hasRoomRef ? "\n- Room style: " + styleName + ". Wall/accent colors: " + colorStr + ". Floor materials: " + matStr + "." : "") +
-        "\n- Layout: " + roomNeeds.layout +
-        "\n- Output a high-resolution, wide-angle interior architecture photograph at landscape orientation, eye-level, natural daylight, Architectural Digest quality." +
+        "\n- Layout strategy: " + roomNeeds.layout +
+        "\n- Output: high-resolution, wide-angle interior architecture photograph, landscape orientation, eye-level, natural daylight, Architectural Digest quality." +
         "\n- NO text, labels, watermarks, or annotations.";
 
       // Pass room photo and CAD as reference images so AI edits the actual room
