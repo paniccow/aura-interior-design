@@ -1963,22 +1963,25 @@ export default function App() {
         const previewProducts = DB.filter(p => p.img && p.img.includes("shopify")).filter((_, i) => i % 47 === 0).slice(0, 8);
         return (
         <div>
-          {/* Hero — clean text on light background, AI image below */}
-          <section style={{ minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", position: "relative", background: "linear-gradient(180deg, #FDFCFA 0%, #F8F5F0 100%)" }}>
-            <div style={{ padding: "0 6%", maxWidth: 800, margin: "0 auto", textAlign: "center", animation: "fadeUp .8s ease" }}>
-              <p style={{ fontSize: 12, letterSpacing: ".3em", textTransform: "uppercase", color: "#C17550", fontWeight: 600, marginBottom: 28 }}>AI-Powered Interior Design</p>
-              <h1 style={{ fontFamily: "Georgia,serif", fontSize: "clamp(40px,6vw,72px)", fontWeight: 400, lineHeight: 1.05, marginBottom: 24, color: "#1A1815" }}>Design spaces<br />that feel like you</h1>
-              <p style={{ fontSize: 17, color: "#7A6B5B", lineHeight: 1.7, maxWidth: 520, margin: "0 auto 32px" }}>{DB.length} designer-curated products paired with AI that understands your room, style, and how every piece fits together.</p>
-              <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap", marginBottom: 48 }}>
-                <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#C17550", color: "#fff", padding: "18px 44px", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 20px rgba(193,117,80,.25)" }}>Start designing</button>
-                <button onClick={() => { go("design"); setTab("catalog"); }} style={{ background: "transparent", border: "1px solid #D8D0C8", padding: "18px 44px", borderRadius: 12, fontSize: 15, color: "#7A6B5B", cursor: "pointer", fontFamily: "inherit" }}>Browse catalog</button>
+          {/* Hero — wide side-by-side layout */}
+          <section style={{ minHeight: "100vh", display: "flex", alignItems: "center", position: "relative", background: "linear-gradient(135deg, #FDFCFA 0%, #F5F0E8 100%)" }}>
+            <div className="aura-grid-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40, alignItems: "center", padding: "0 6%", maxWidth: 1300, margin: "0 auto", width: "100%" }}>
+              {/* Left — text */}
+              <div style={{ animation: "fadeUp .8s ease" }}>
+                <p style={{ fontSize: 11, letterSpacing: ".3em", textTransform: "uppercase", color: "#C17550", fontWeight: 600, marginBottom: 20 }}>AI-Powered Interior Design</p>
+                <h1 style={{ fontFamily: "Georgia,serif", fontSize: "clamp(36px,4.5vw,64px)", fontWeight: 400, lineHeight: 1.08, marginBottom: 20, color: "#1A1815" }}>Design spaces<br />that feel like you</h1>
+                <p style={{ fontSize: 16, color: "#7A6B5B", lineHeight: 1.7, maxWidth: 460, marginBottom: 28 }}>{DB.length} designer-curated products paired with AI that understands your room, style, and how every piece fits together.</p>
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                  <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#C17550", color: "#fff", padding: "16px 36px", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 20px rgba(193,117,80,.25)" }}>Start designing</button>
+                  <button onClick={() => { go("design"); setTab("catalog"); }} style={{ background: "transparent", border: "1px solid #D8D0C8", padding: "16px 36px", borderRadius: 12, fontSize: 15, color: "#7A6B5B", cursor: "pointer", fontFamily: "inherit" }}>Browse catalog</button>
+                </div>
               </div>
-              {/* AI-generated room image as a showcase card */}
-              <div style={{ maxWidth: 680, margin: "0 auto", borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 80px rgba(0,0,0,.12)", border: "1px solid #E8E0D8", animation: "fadeUp 1s ease .2s both" }}>
+              {/* Right — AI image */}
+              <div style={{ borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 80px rgba(0,0,0,.1)", border: "1px solid #E8E0D8", animation: "fadeUp 1s ease .15s both" }}>
                 {homeHeroImg ? (
-                  <img src={homeHeroImg} alt="AI-generated room visualization" style={{ width: "100%", display: "block", height: "auto", maxHeight: 380, objectFit: "cover", transition: "opacity .8s ease" }} />
+                  <img src={homeHeroImg} alt="AI-generated room visualization" style={{ width: "100%", display: "block", height: "auto", minHeight: 320, maxHeight: 480, objectFit: "cover", transition: "opacity .8s ease" }} />
                 ) : (
-                  <div style={{ width: "100%", height: 320, background: "linear-gradient(135deg, #F0EBE4 25%, #F8F5F0 50%, #F0EBE4 75%)", backgroundSize: "400% 100%", animation: "shimmer 2s ease infinite", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <div style={{ width: "100%", height: 380, background: "linear-gradient(135deg, #F0EBE4 25%, #F8F5F0 50%, #F0EBE4 75%)", backgroundSize: "400% 100%", animation: "shimmer 2s ease infinite", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <div style={{ textAlign: "center" }}>
                       <div style={{ width: 28, height: 28, border: "2.5px solid #D8D0C8", borderTopColor: "#C17550", borderRadius: "50%", animation: "spin .8s linear infinite", margin: "0 auto 10px" }} />
                       <p style={{ fontSize: 12, color: "#B8A898", margin: 0 }}>Generating room preview...</p>
@@ -2356,6 +2359,7 @@ export default function App() {
                     { label: "Set Up", sub: "Room & Style", icon: "1", done: !!(room && vibe) },
                     { label: "Design", sub: "AI + Products", icon: "2", done: sel.size > 0 },
                     { label: "Visualize", sub: "See Your Room", icon: "3", done: vizUrls.length > 0 },
+                    { label: "Purchase", sub: "Buy Items", icon: "4", done: false },
                   ].map((s, i) => (
                     <div key={i} style={{ display: "flex", alignItems: "center", flex: i < 2 ? 1 : "none" }}>
                       <button onClick={() => setDesignStep(i)} style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", padding: "4px 0", fontFamily: "inherit" }}>
@@ -2622,11 +2626,47 @@ export default function App() {
                     </div>
                   </div>
 
-                  {/* Pro CAD Layout */}
+                  {/* Viz images — ABOVE floor plan */}
+                  {vizErr && <p style={{ fontSize: 12, color: "#C17550", marginBottom: 16, background: "#FFF8F0", padding: "12px 16px", borderRadius: 10, border: "1px solid #F0D8C0" }}>{vizErr}</p>}
+                  <div ref={vizAreaRef}>
+                  {vizSt === "loading" && (
+                    <div style={{ marginBottom: 24, borderRadius: 14, border: "1px solid #EDE8E0", padding: "48px 32px", textAlign: "center", background: "#fff" }}>
+                      <div style={{ width: 36, height: 36, border: "2.5px solid #E8E0D8", borderTopColor: "#1A1815", borderRadius: "50%", animation: "spin .8s linear infinite", margin: "0 auto 16px" }} />
+                      <p style={{ fontSize: 15, color: "#1A1815", margin: 0, fontWeight: 500 }}>Generating visualization</p>
+                      <p style={{ fontSize: 13, color: "#9B8B7B", margin: "6px 0 0" }}>{selItems.length} products · {roomPhotoAnalysis ? "Matching your room photo" : "Creating scene"}</p>
+                      <p style={{ fontSize: 11, color: "#C8BEB4", margin: "4px 0 0" }}>This may take up to a minute</p>
+                    </div>
+                  )}
+                  </div>
+                  {vizUrls.length > 0 && (
+                    <div className="aura-viz-grid" style={{ display: "grid", gridTemplateColumns: vizUrls.length === 1 ? "1fr" : "repeat(auto-fit,minmax(280px,1fr))", gap: 16, marginBottom: 24 }}>
+                      {vizUrls.map((v, i) => (
+                        <div key={i} style={{ borderRadius: 16, overflow: "hidden", border: "1px solid #F0EBE4" }}>
+                          {v.concept ? (
+                            <div style={{ width: "100%", minHeight: 220, background: `linear-gradient(135deg, ${["#E8DDD0","#D4CFC8","#E0D8CC"][i]}, ${["#D8C8B8","#C8C0B4","#C8BFB0"][i]})`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 24px", position: "relative" }}>
+                              <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, opacity: 0.06, background: `repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(0,0,0,.1) 35px, rgba(0,0,0,.1) 36px)` }} />
+                              <div style={{ fontSize: 28, marginBottom: 12, opacity: 0.3 }}>{["\u2600\uFE0F","\uD83C\uDF05","\uD83C\uDF19"][i]}</div>
+                              <div style={{ fontFamily: "Georgia,serif", fontSize: 18, color: "#6B5B4B", textAlign: "center", marginBottom: 8, fontStyle: "italic" }}>{v.label}</div>
+                              <div style={{ fontSize: 11, color: "#8B7B6B", textAlign: "center", lineHeight: 1.5, maxWidth: 240 }}>{(v.products || []).slice(0, 3).join(" \u00B7 ")}</div>
+                              <div style={{ marginTop: 12, display: "flex", gap: 6 }}>{(v.colors || []).map((c, ci) => <span key={ci} style={{ fontSize: 9, background: "rgba(255,255,255,.6)", padding: "3px 10px", borderRadius: 12, color: "#7A6B5B" }}>{c}</span>)}</div>
+                              <div style={{ marginTop: 16, fontSize: 10, color: "#A09080", letterSpacing: ".1em", textTransform: "uppercase" }}>Design Concept</div>
+                            </div>
+                          ) : (
+                            <img src={v.url || v} alt={"Room visualization " + (i + 1)} loading="lazy" style={{ width: "100%", height: "auto", minHeight: 200, objectFit: "cover", display: "block", background: "#F0EBE4" }} />
+                          )}
+                          <div style={{ padding: "10px 16px", background: "#fff" }}>
+                            <p style={{ fontSize: 12, fontWeight: 600, color: "#C17550", margin: 0 }}>{v.label || ["Morning Light", "Golden Hour", "Evening Ambiance"][i] || "Variation " + (i + 1)}</p>
+                            <p style={{ fontSize: 10, color: "#B8A898", margin: 0 }}>{room || "Room"} — {vibe || "Modern"}{roomPhotoAnalysis ? " — based on your room" : ""}{v.concept ? " — concept preview" : ""}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Pro CAD Layout — below viz */}
                   {cadLayout && user?.plan === "pro" && (
                     <div style={{ marginBottom: 24 }}>
                       <CADFloorPlan layout={cadLayout} roomType={room || "Living Room"} style={vibe || "Modern"} />
-                      {/* Placement Notes */}
                       <div style={{ marginTop: 12, padding: "14px 18px", background: "#F8F5F0", borderRadius: 12, border: "1px solid #E8E0D8" }}>
                         <p style={{ fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", color: "#C17550", fontWeight: 700, marginBottom: 8 }}>Placement Notes</p>
                         <p style={{ fontSize: 12, color: "#5A5045", lineHeight: 1.7, margin: 0 }}>{(ROOM_NEEDS[room] || ROOM_NEEDS["Living Room"]).layout}</p>
@@ -2650,121 +2690,16 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* Viz info */}
-                  {vizErr && <p style={{ fontSize: 12, color: "#C17550", marginBottom: 16, background: "#FFF8F0", padding: "12px 16px", borderRadius: 10, border: "1px solid #F0D8C0" }}>{vizErr}</p>}
-                  <div ref={vizAreaRef}>
-                  {vizSt === "loading" && (
-                    <div style={{ marginBottom: 24, borderRadius: 14, border: "1px solid #EDE8E0", padding: "48px 32px", textAlign: "center", background: "#fff" }}>
-                      <div style={{ width: 36, height: 36, border: "2.5px solid #E8E0D8", borderTopColor: "#1A1815", borderRadius: "50%", animation: "spin .8s linear infinite", margin: "0 auto 16px" }} />
-                      <p style={{ fontSize: 15, color: "#1A1815", margin: 0, fontWeight: 500 }}>Generating visualization</p>
-                      <p style={{ fontSize: 13, color: "#9B8B7B", margin: "6px 0 0" }}>{selItems.length} products · {roomPhotoAnalysis ? "Matching your room photo" : "Creating scene"}</p>
-                      <p style={{ fontSize: 11, color: "#C8BEB4", margin: "4px 0 0" }}>This may take up to a minute</p>
-                    </div>
-                  )}
-                  </div>
-                  {vizUrls.length > 0 && (
-                    <div className="aura-viz-grid" style={{ display: "grid", gridTemplateColumns: vizUrls.length === 1 ? "1fr" : "repeat(auto-fit,minmax(280px,1fr))", gap: 16, marginBottom: 24 }}>
-                      {vizUrls.map((v, i) => (
-                        <div key={i} style={{ borderRadius: 16, overflow: "hidden", border: "1px solid #F0EBE4" }}>
-                          {v.concept ? (
-                            /* Beautiful concept card fallback when AI images aren't available */
-                            <div style={{ width: "100%", minHeight: 220, background: `linear-gradient(135deg, ${["#E8DDD0","#D4CFC8","#E0D8CC"][i]}, ${["#D8C8B8","#C8C0B4","#C8BFB0"][i]})`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 24px", position: "relative" }}>
-                              <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, opacity: 0.06, background: `repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(0,0,0,.1) 35px, rgba(0,0,0,.1) 36px)` }} />
-                              <div style={{ fontSize: 28, marginBottom: 12, opacity: 0.3 }}>{["\u2600\uFE0F","\uD83C\uDF05","\uD83C\uDF19"][i]}</div>
-                              <div style={{ fontFamily: "Georgia,serif", fontSize: 18, color: "#6B5B4B", textAlign: "center", marginBottom: 8, fontStyle: "italic" }}>{v.label}</div>
-                              <div style={{ fontSize: 11, color: "#8B7B6B", textAlign: "center", lineHeight: 1.5, maxWidth: 240 }}>
-                                {(v.products || []).slice(0, 3).join(" \u00B7 ")}
-                              </div>
-                              <div style={{ marginTop: 12, display: "flex", gap: 6 }}>
-                                {(v.colors || []).map((c, ci) => <span key={ci} style={{ fontSize: 9, background: "rgba(255,255,255,.6)", padding: "3px 10px", borderRadius: 12, color: "#7A6B5B" }}>{c}</span>)}
-                              </div>
-                              <div style={{ marginTop: 16, fontSize: 10, color: "#A09080", letterSpacing: ".1em", textTransform: "uppercase" }}>Design Concept</div>
-                            </div>
-                          ) : (
-                            <img src={v.url || v} alt={"Room visualization " + (i + 1)} loading="lazy" style={{ width: "100%", height: "auto", minHeight: 200, objectFit: "cover", display: "block", background: "#F0EBE4" }} />
-                          )}
-                          <div style={{ padding: "10px 16px", background: "#fff" }}>
-                            <p style={{ fontSize: 12, fontWeight: 600, color: "#C17550", margin: 0 }}>{v.label || ["Morning Light", "Golden Hour", "Evening Ambiance"][i] || "Variation " + (i + 1)}</p>
-                            <p style={{ fontSize: 10, color: "#B8A898", margin: 0 }}>{room || "Room"} — {vibe || "Modern"}{roomPhotoAnalysis ? " — based on your room" : ""}{v.concept ? " — concept preview" : ""}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {/* ═══ PURCHASE LIST — PCPartPicker style ═══ */}
-                  <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #E8E0D8", overflow: "hidden", marginBottom: 24 }}>
-                    <div style={{ padding: "16px 20px", borderBottom: "1px solid #F0EBE4", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <span style={{ fontSize: 18 }}>🛒</span>
-                        <div>
-                          <p style={{ fontSize: 14, fontWeight: 700, color: "#1A1815", margin: 0 }}>Purchase List</p>
-                          <p style={{ fontSize: 11, color: "#9B8B7B", margin: 0 }}>{selCount} items from {[...new Set(selItems.map(p => p.r))].length} retailers</p>
-                        </div>
-                      </div>
-                      <div style={{ textAlign: "right" }}>
-                        <p style={{ fontSize: 18, fontWeight: 700, color: "#1A1815", margin: 0, fontFamily: "Georgia,serif" }}>{fmt(selTotal)}</p>
-                        <p style={{ fontSize: 10, color: "#9B8B7B", margin: 0 }}>estimated total</p>
-                      </div>
-                    </div>
-                    {/* Table header */}
-                    <div className="aura-purchase-header" style={{ display: "grid", gridTemplateColumns: "52px 1fr 120px 60px 90px 90px 80px", gap: 0, padding: "8px 16px", borderBottom: "1px solid #F0EBE4", background: "#FAFAF8" }}>
-                      {["", "Product", "Retailer", "Qty", "Unit Price", "Total", ""].map((h, i) => (
-                        <span key={i} style={{ fontSize: 10, fontWeight: 600, color: "#9B8B7B", letterSpacing: ".08em", textTransform: "uppercase", padding: "4px 4px" }}>{h}</span>
-                      ))}
-                    </div>
-                    {/* Product rows */}
-                    {selItems.map((p, idx) => {
-                      const qty = sel.get(p.id) || 1;
-                      const lineTotal = p.p * qty;
-                      return (
-                        <div key={p.id} className="aura-purchase-row" style={{ display: "grid", gridTemplateColumns: "52px 1fr 120px 60px 90px 90px 80px", gap: 0, padding: "10px 16px", borderBottom: idx < selItems.length - 1 ? "1px solid #F5F2ED" : "none", alignItems: "center", transition: "background .15s" }}
-                          onMouseEnter={e => e.currentTarget.style.background = "#FAFAF8"}
-                          onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                          {/* Thumbnail */}
-                          <div style={{ width: 40, height: 40, borderRadius: 8, overflow: "hidden", border: "1px solid #EDE8E2" }}>
-                            <img src={p.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} referrerPolicy="no-referrer" loading="lazy" />
-                          </div>
-                          {/* Name + category */}
-                          <div style={{ padding: "0 8px", overflow: "hidden" }}>
-                            <p style={{ fontSize: 13, fontWeight: 500, color: "#1A1815", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.n}</p>
-                            <p style={{ fontSize: 10, color: "#B8A898", margin: 0, textTransform: "capitalize" }}>{p.c}</p>
-                          </div>
-                          {/* Retailer */}
-                          <span className="aura-purchase-retailer" style={{ fontSize: 11, color: "#7A6B5B", padding: "0 4px" }}>{p.r}</span>
-                          {/* Quantity */}
-                          <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "0 4px" }}>
-                            <button onClick={() => setQty(p.id, qty - 1)} style={{ width: 22, height: 22, borderRadius: "50%", border: "1px solid #E8E0D8", background: "#fff", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", color: "#5A5045", padding: 0 }}>−</button>
-                            <span style={{ fontSize: 12, fontWeight: 600, minWidth: 16, textAlign: "center" }}>{qty}</span>
-                            <button onClick={() => setQty(p.id, qty + 1)} style={{ width: 22, height: 22, borderRadius: "50%", border: "1px solid #E8E0D8", background: "#fff", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", color: "#5A5045", padding: 0 }}>+</button>
-                          </div>
-                          {/* Unit price */}
-                          <span className="aura-purchase-unit" style={{ fontSize: 12, color: "#7A6B5B", padding: "0 4px" }}>{fmt(p.p)}</span>
-                          {/* Line total */}
-                          <span style={{ fontSize: 13, fontWeight: 700, color: "#1A1815", padding: "0 4px" }}>{fmt(lineTotal)}</span>
-                          {/* Buy button */}
-                          <a href={p.u} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", background: "#C17550", color: "#fff", fontSize: 11, fontWeight: 600, padding: "6px 12px", borderRadius: 6, textDecoration: "none", whiteSpace: "nowrap", transition: "opacity .15s" }}
-                            onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
-                            onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Buy →</a>
-                        </div>
-                      );
-                    })}
-                    {/* Total footer */}
-                    <div className="aura-purchase-footer" style={{ display: "grid", gridTemplateColumns: "52px 1fr 120px 60px 90px 90px 80px", gap: 0, padding: "14px 16px", borderTop: "2px solid #E8E0D8", background: "#FAFAF8" }}>
-                      <span />
-                      <span style={{ fontSize: 13, fontWeight: 700, color: "#1A1815", padding: "0 8px" }}>Total ({selCount} items)</span>
-                      <span className="aura-purchase-retailer" style={{ fontSize: 11, color: "#9B8B7B", padding: "0 4px" }}>{[...new Set(selItems.map(p => p.r))].length} retailers</span>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: "#5A5045", padding: "0 4px" }}>{selItems.reduce((s, p) => s + (sel.get(p.id) || 1), 0)}</span>
-                      <span className="aura-purchase-unit" />
-                      <span style={{ fontSize: 15, fontWeight: 700, color: "#1A1815", padding: "0 4px", fontFamily: "Georgia,serif" }}>{fmt(selTotal)}</span>
-                      <span />
-                    </div>
-                  </div>
-
-                  {/* Compact card grid for visual reference */}
-                  <div className="aura-card-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))", gap: 10 }}>
+                  {/* Selected items grid */}
+                  <div className="aura-card-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))", gap: 10, marginBottom: 24 }}>
                     {selItems.map((p) => (
                       <Card key={p.id} p={p} sel toggle={toggle} small />
                     ))}
+                  </div>
+
+                  {/* Continue to Purchase */}
+                  <div style={{ textAlign: "center", padding: "8px 0 12px" }}>
+                    <button onClick={() => setDesignStep(3)} style={{ background: "#1A1815", color: "#fff", padding: "14px 36px", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Continue to Purchase →</button>
                   </div>
                 </div>
               ) : (
@@ -2776,6 +2711,94 @@ export default function App() {
                 </div>
               )}
               </div>
+              )}
+
+              {/* ═══════ STEP 3: PURCHASE ═══════ */}
+              {designStep === 3 && (
+                <div>
+                  {/* Back bar */}
+                  <div style={{ padding: "10px 5%", background: "#fff", borderBottom: "1px solid #EDE8E0", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: "#1A1815", background: "#F5F0EB", padding: "4px 12px", borderRadius: 6 }}>{room || "Room"}</span>
+                      <span style={{ fontSize: 12, color: "#9B8B7B", background: "#F5F0EB", padding: "4px 12px", borderRadius: 6 }}>{vibe || "Style"}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "#1A1815", background: "#F5F0EB", padding: "4px 12px", borderRadius: 6 }}>{selCount} items</span>
+                    </div>
+                    <button onClick={() => setDesignStep(2)} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 6, padding: "4px 12px", fontSize: 11, color: "#9B8B7B", cursor: "pointer", fontFamily: "inherit" }}>{"←"} Visualize</button>
+                  </div>
+
+                  {sel.size > 0 ? (
+                  <div style={{ padding: "28px 5%", background: "#FDFCFA" }}>
+                    {/* Purchase List */}
+                    <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #E8E0D8", overflow: "hidden" }}>
+                      <div style={{ padding: "20px 24px", borderBottom: "1px solid #F0EBE4", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+                        <div>
+                          <h2 style={{ fontFamily: "Georgia,serif", fontSize: 24, fontWeight: 400, color: "#1A1815", margin: 0 }}>Purchase List</h2>
+                          <p style={{ fontSize: 12, color: "#9B8B7B", margin: "4px 0 0" }}>{selCount} items from {[...new Set(selItems.map(p => p.r))].length} retailers · Click "Buy" to open each product page</p>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <p style={{ fontSize: 24, fontWeight: 700, color: "#1A1815", margin: 0, fontFamily: "Georgia,serif" }}>{fmt(selTotal)}</p>
+                          <p style={{ fontSize: 11, color: "#9B8B7B", margin: 0 }}>estimated total</p>
+                        </div>
+                      </div>
+                      {/* Table header */}
+                      <div className="aura-purchase-header" style={{ display: "grid", gridTemplateColumns: "52px 1fr 120px 80px 90px 90px 80px", gap: 0, padding: "10px 20px", borderBottom: "1px solid #F0EBE4", background: "#FAFAF8" }}>
+                        {["", "Product", "Retailer", "Qty", "Price", "Total", ""].map((h, i) => (
+                          <span key={i} style={{ fontSize: 10, fontWeight: 600, color: "#9B8B7B", letterSpacing: ".08em", textTransform: "uppercase" }}>{h}</span>
+                        ))}
+                      </div>
+                      {/* Product rows */}
+                      {selItems.map((p, idx) => {
+                        const qty = sel.get(p.id) || 1;
+                        const lineTotal = p.p * qty;
+                        return (
+                          <div key={p.id} className="aura-purchase-row" style={{ display: "grid", gridTemplateColumns: "52px 1fr 120px 80px 90px 90px 80px", gap: 0, padding: "12px 20px", borderBottom: idx < selItems.length - 1 ? "1px solid #F5F2ED" : "none", alignItems: "center", transition: "background .15s" }}
+                            onMouseEnter={e => e.currentTarget.style.background = "#FAFAF8"}
+                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                            {/* Thumbnail */}
+                            <div style={{ width: 40, height: 40, borderRadius: 8, overflow: "hidden", border: "1px solid #EDE8E2" }}>
+                              <img src={p.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} referrerPolicy="no-referrer" loading="lazy" />
+                            </div>
+                            {/* Name + category */}
+                            <div style={{ padding: "0 10px", overflow: "hidden" }}>
+                              <p style={{ fontSize: 13, fontWeight: 500, color: "#1A1815", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.n}</p>
+                              <p style={{ fontSize: 10, color: "#B8A898", margin: 0, textTransform: "capitalize" }}>{p.c}</p>
+                            </div>
+                            {/* Retailer */}
+                            <span className="aura-purchase-retailer" style={{ fontSize: 11, color: "#7A6B5B" }}>{p.r}</span>
+                            {/* Quantity — clean inline stepper */}
+                            <div style={{ display: "inline-flex", alignItems: "center", border: "1px solid #E8E0D8", borderRadius: 6, overflow: "hidden", height: 28 }}>
+                              <button onClick={() => setQty(p.id, qty - 1)} style={{ width: 28, height: 28, border: "none", borderRight: "1px solid #E8E0D8", background: "#FAFAF8", fontSize: 14, cursor: "pointer", fontFamily: "inherit", color: "#5A5045", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>−</button>
+                              <span style={{ width: 28, textAlign: "center", fontSize: 12, fontWeight: 600, color: "#1A1815" }}>{qty}</span>
+                              <button onClick={() => setQty(p.id, qty + 1)} style={{ width: 28, height: 28, border: "none", borderLeft: "1px solid #E8E0D8", background: "#FAFAF8", fontSize: 14, cursor: "pointer", fontFamily: "inherit", color: "#5A5045", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>+</button>
+                            </div>
+                            {/* Unit price */}
+                            <span className="aura-purchase-unit" style={{ fontSize: 12, color: "#7A6B5B" }}>{fmt(p.p)}</span>
+                            {/* Line total */}
+                            <span style={{ fontSize: 13, fontWeight: 700, color: "#1A1815" }}>{fmt(lineTotal)}</span>
+                            {/* Buy button */}
+                            <a href={p.u} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", background: "#C17550", color: "#fff", fontSize: 11, fontWeight: 600, padding: "6px 14px", borderRadius: 6, textDecoration: "none", whiteSpace: "nowrap" }}>Buy →</a>
+                          </div>
+                        );
+                      })}
+                      {/* Total footer */}
+                      <div className="aura-purchase-footer" style={{ display: "grid", gridTemplateColumns: "52px 1fr 120px 80px 90px 90px 80px", gap: 0, padding: "16px 20px", borderTop: "2px solid #E8E0D8", background: "#FAFAF8" }}>
+                        <span />
+                        <span style={{ fontSize: 14, fontWeight: 700, color: "#1A1815", padding: "0 10px" }}>Total ({selCount} items)</span>
+                        <span className="aura-purchase-retailer" style={{ fontSize: 11, color: "#9B8B7B" }}>{[...new Set(selItems.map(p => p.r))].length} retailers</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: "#5A5045" }}>{selItems.reduce((s, p) => s + (sel.get(p.id) || 1), 0)}</span>
+                        <span className="aura-purchase-unit" />
+                        <span style={{ fontSize: 16, fontWeight: 700, color: "#1A1815", fontFamily: "Georgia,serif" }}>{fmt(selTotal)}</span>
+                        <span />
+                      </div>
+                    </div>
+                  </div>
+                  ) : (
+                    <div style={{ padding: "80px 5%", textAlign: "center" }}>
+                      <p style={{ fontSize: 14, color: "#9B8B7B" }}>No items selected yet.</p>
+                      <button onClick={() => setDesignStep(1)} style={{ background: "#1A1815", color: "#fff", padding: "14px 28px", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", marginTop: 16 }}>{"←"} Back to Design</button>
+                    </div>
+                  )}
+                </div>
               )}
 
           </div>
