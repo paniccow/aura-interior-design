@@ -1376,11 +1376,11 @@ export default function App() {
         const visionContent = [];
         items.slice(0, 17).forEach((item, idx) => {
           if (item.img) {
-            visionContent.push({ type: "image_url", image_url: { url: item.img } });
+            visionContent.push({ type: "image_url", image_url: { url: item.img, detail: "high" } });
           }
           visionContent.push({ type: "text", text: "Product " + (idx + 1) + ": \"" + (item.n || "") + "\" (" + item.c + ")" });
         });
-        visionContent.push({ type: "text", text: "An AI image generator CANNOT see these photos. Your text descriptions are its ONLY reference. Be precise.\n\nFor EACH product write EXACTLY this format:\nPRODUCT [number]: shape=[exact shape: rectangular/round/oval/L-shaped/curved/square], color=[exact color with shade, e.g. 'warm honey oak brown' not just 'brown'], material=[exact material+texture, e.g. 'nubby cream boucle fabric' or 'smooth matte black metal'], legs=[leg style+color, e.g. 'tapered walnut wood legs' or 'matte black metal hairpin legs' or 'no visible legs/platform base'], arms=[arm style if applicable: 'wide padded track arms' or 'thin rolled arms' or 'no arms'], details=[one sentence with the most distinctive visual feature: cushion style, tufting pattern, slat design, shade shape, weave pattern, etc.]" });
+        visionContent.push({ type: "text", text: "An AI image generator CANNOT see these photos. Your text is its ONLY reference for what each product looks like. COLOR ACCURACY IS CRITICAL — look closely at each image.\n\nFor EACH product write this format on ONE line:\nPRODUCT [number]: shape=[rectangular/round/oval/L-shaped/curved/square], color=[EXACT hex-level color description — e.g. 'light warm sand beige' or 'deep charcoal grey' or 'rich cognac brown' — be very specific about the shade and tone], material=[material+texture e.g. 'nubby cream boucle' or 'smooth black metal'], legs=[style+color e.g. 'tapered walnut legs' or 'none/platform'], arms=[if sofa/chair: 'wide track arms' or 'rolled arms' or 'no arms'], details=[key distinguishing feature in <10 words]" });
 
         const visionResp = await Promise.race([
           fetch(AI_API, {
@@ -1522,8 +1522,8 @@ export default function App() {
         (hasCadImg ? " Use the provided floor plan for placement." : "") +
         (cadAnalysis ? " Layout: " + cadAnalysis.slice(0, 200) : "") +
         "\n\nFurniture to render — exactly " + numItems + " item" + (numItems > 1 ? "s" : "") + ", nothing else:\n" + productSpecs +
-        "\n\nRender ONLY the " + numItems + " items listed above. Do NOT add any extra furniture, decor, plants, vases, pillows, or accessories not in the list. Match each item's shape, color, material, arm style, and leg style from its description. " + roomNeeds.layout +
-        " Eye-level, natural daylight, wide-angle, Architectural Digest quality. No text or labels.";
+        "\n\nRender ONLY the " + numItems + " items listed above. Do NOT add any extra furniture, decor, plants, vases, pillows, or accessories not in the list. Match each item's exact color shade, shape, material, arm style, and leg style from its description. " + roomNeeds.layout +
+        " High resolution, eye-level, natural daylight, wide-angle, sharp detail, 4K quality, Architectural Digest editorial photography. No text or labels.";
 
       // Pass room photo and CAD as reference images so AI edits the actual room
       const refImg = roomPhoto?.data || null;

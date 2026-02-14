@@ -104,7 +104,7 @@ export default async function handler(req, res) {
             body: JSON.stringify({
               model: imageModel,
               messages: [{ role: "user", content: messageContent }],
-              max_tokens: 4096
+              max_tokens: 8192
             })
           });
 
