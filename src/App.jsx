@@ -1136,7 +1136,35 @@ export default function App() {
   const chatEnd = useRef(null);
   const chatBoxRef = useRef(null);
   const vizAreaRef = useRef(null);
+  // Homepage AI-generated images
+  const [homeHeroImg, setHomeHeroImg] = useState(null);
+  const [homeVizImg, setHomeVizImg] = useState(null);
+  const homeImgRequested = useRef(false);
   const PAGE_SIZE = 40;
+
+  // Generate AI images for homepage on first load
+  useEffect(() => {
+    if (pg !== "home" || homeImgRequested.current) return;
+    homeImgRequested.current = true;
+    // Check sessionStorage cache first
+    const cachedHero = sessionStorage.getItem("aura_heroImg");
+    const cachedViz = sessionStorage.getItem("aura_vizImg");
+    if (cachedHero) { setHomeHeroImg(cachedHero); }
+    if (cachedViz) { setHomeVizImg(cachedViz); }
+    if (cachedHero && cachedViz) return;
+    // Generate hero image
+    if (!cachedHero) {
+      generateAIImage("A photorealistic wide-angle interior design photograph of a stunning warm modern living room. Natural oak hardwood floors, warm white walls, floor-to-ceiling windows with sheer linen curtains letting in golden afternoon light. A large cream boucle sectional sofa with cognac leather throw pillows, a round walnut coffee table, a woven jute area rug, brass floor lamp, and a large abstract art piece on the wall. Architectural Digest quality, eye-level perspective, no text or watermarks. Ultra high resolution, cinematic lighting, warm tones.")
+        .then(url => { if (url && url !== "__CREDITS_REQUIRED__") { setHomeHeroImg(url); try { sessionStorage.setItem("aura_heroImg", url); } catch {} } })
+        .catch(() => {});
+    }
+    // Generate viz image
+    if (!cachedViz) {
+      generateAIImage("A photorealistic interior design photograph of a beautiful Japandi bedroom. Low platform bed with white linen bedding, light oak nightstands, paper pendant lamp, dried pampas grass in a ceramic vase, soft gray wool throw, minimalist wall art. Warm natural light from a large window, clean lines, organic textures. Architectural Digest quality, wide-angle, eye-level, no text or watermarks.")
+        .then(url => { if (url && url !== "__CREDITS_REQUIRED__") { setHomeVizImg(url); try { sessionStorage.setItem("aura_vizImg", url); } catch {} } })
+        .catch(() => {});
+    }
+  }, [pg]);
 
   // Persist user, projects, and selection to localStorage
   useEffect(() => {
@@ -1886,6 +1914,7 @@ export default function App() {
         @keyframes slideInLeft{from{opacity:0;transform:translateX(-60px)}to{opacity:1;transform:translateX(0)}}
         @keyframes slideInRight{from{opacity:0;transform:translateX(60px)}to{opacity:1;transform:translateX(0)}}
         @keyframes scaleIn{from{opacity:0;transform:scale(.5)}to{opacity:1;transform:scale(1)}}
+        @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
         *{-webkit-tap-highlight-color:transparent}
         input,button,select,textarea{font-size:16px!important}
         @media(max-width:768px){
@@ -1930,95 +1959,28 @@ export default function App() {
         const previewProducts = DB.filter(p => p.img && p.img.includes("shopify")).filter((_, i) => i % 47 === 0).slice(0, 8);
         return (
         <div>
-          {/* Hero — elegant centered layout with architectural illustration */}
-          <section style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 6%", position: "relative", background: "linear-gradient(180deg, #FDFCFA 0%, #F8F5F0 100%)" }}>
-            <div style={{ maxWidth: 800, textAlign: "center", animation: "fadeUp .8s ease" }}>
-              <p style={{ fontSize: 12, letterSpacing: ".3em", textTransform: "uppercase", color: "#C17550", fontWeight: 600, marginBottom: 28 }}>AI-Powered Interior Design</p>
-              <h1 style={{ fontFamily: "Georgia,serif", fontSize: "clamp(40px,6vw,72px)", fontWeight: 400, lineHeight: 1.05, marginBottom: 28, color: "#1A1815" }}>Design spaces<br />that feel like you</h1>
-              <p style={{ fontSize: 18, color: "#7A6B5B", lineHeight: 1.8, maxWidth: 560, margin: "0 auto 16px" }}>AURA pairs {DB.length} designer-curated products with an AI spatial engine that understands your room, your style, and how every piece should fit together.</p>
-              <p style={{ fontSize: 13, color: "#A89880", lineHeight: 1.6, maxWidth: 480, margin: "0 auto 40px", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><span style={{ color: "#C17550", fontSize: 8 }}>{"●"}</span>Every product hand-selected by professional interior designers</p>
+          {/* Hero — elegant centered layout with AI-generated room background */}
+          <section style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 6%", position: "relative", overflow: "hidden" }}>
+            {/* AI-generated background image */}
+            {homeHeroImg ? (
+              <div style={{ position: "absolute", inset: 0, backgroundImage: `url(${homeHeroImg})`, backgroundSize: "cover", backgroundPosition: "center", filter: "brightness(0.55) saturate(0.9)", transition: "opacity 1s ease", zIndex: 0 }} />
+            ) : (
+              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, #E8E0D8 25%, #D4C8B8 50%, #E8E0D8 75%)", backgroundSize: "400% 100%", animation: "shimmer 2s ease infinite", zIndex: 0 }} />
+            )}
+            {/* Gradient overlay for text readability */}
+            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(26,24,21,0.3) 0%, rgba(26,24,21,0.15) 40%, rgba(26,24,21,0.4) 100%)", zIndex: 1 }} />
+            <div style={{ maxWidth: 800, textAlign: "center", animation: "fadeUp .8s ease", position: "relative", zIndex: 2 }}>
+              <p style={{ fontSize: 12, letterSpacing: ".3em", textTransform: "uppercase", color: "#F0D8C4", fontWeight: 600, marginBottom: 28 }}>AI-Powered Interior Design</p>
+              <h1 style={{ fontFamily: "Georgia,serif", fontSize: "clamp(40px,6vw,72px)", fontWeight: 400, lineHeight: 1.05, marginBottom: 28, color: "#FFFFFF" }}>Design spaces<br />that feel like you</h1>
+              <p style={{ fontSize: 18, color: "rgba(255,255,255,.85)", lineHeight: 1.8, maxWidth: 560, margin: "0 auto 16px" }}>{DB.length} designer-curated products paired with AI that understands your room, style, and how every piece fits together.</p>
+              <p style={{ fontSize: 13, color: "rgba(255,255,255,.6)", lineHeight: 1.6, maxWidth: 480, margin: "0 auto 40px", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><span style={{ color: "#F0C4A0", fontSize: 8 }}>{"●"}</span>Every product hand-selected by professional designers</p>
               <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
                 <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#C17550", color: "#fff", padding: "18px 44px", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Start designing</button>
-                <button onClick={() => { go("design"); setTab("catalog"); }} style={{ background: "transparent", border: "1px solid #D8D0C8", padding: "18px 44px", borderRadius: 12, fontSize: 15, color: "#7A6B5B", cursor: "pointer", fontFamily: "inherit" }}>Browse catalog</button>
-              </div>
-              {/* Abstract room illustration */}
-              <div style={{ marginTop: 60, animation: "fadeUp 1s ease .3s both" }}>
-                <svg width="100%" viewBox="0 0 720 280" style={{ display: "block", maxWidth: 720, margin: "0 auto" }}>
-                  {/* Background */}
-                  <rect width="720" height="280" fill="none" />
-                  {/* Floor */}
-                  <rect x="60" y="200" width="600" height="80" fill="#F0EBE4" rx="4" />
-                  {/* Back wall */}
-                  <rect x="60" y="40" width="600" height="160" fill="#FAF8F4" stroke="#E8E0D8" strokeWidth="1" />
-                  {/* Window */}
-                  <rect x="260" y="50" width="200" height="100" fill="#E8F0F4" stroke="#C8D8E0" strokeWidth="1.5" rx="2" />
-                  <line x1="360" y1="50" x2="360" y2="150" stroke="#C8D8E0" strokeWidth="1" />
-                  <line x1="260" y1="100" x2="460" y2="100" stroke="#C8D8E0" strokeWidth="1" />
-                  {/* Curtain left */}
-                  <path d="M245 45 Q240 100 245 160 Q248 100 250 45" fill="#D8D0C4" opacity="0.4" />
-                  <path d="M250 45 Q245 100 250 160 Q253 100 255 45" fill="#D8D0C4" opacity="0.3" />
-                  {/* Curtain right */}
-                  <path d="M465 45 Q468 100 465 160 Q470 100 475 45" fill="#D8D0C4" opacity="0.4" />
-                  <path d="M470 45 Q473 100 470 160 Q475 100 480 45" fill="#D8D0C4" opacity="0.3" />
-                  {/* Rug */}
-                  <ellipse cx="360" cy="240" rx="200" ry="30" fill="#D4B896" opacity="0.25" />
-                  {/* Sofa */}
-                  <rect x="220" y="185" width="280" height="50" fill="#C4A882" rx="8" />
-                  <rect x="224" y="178" width="272" height="12" fill="#B89870" rx="6" />
-                  <rect x="220" y="175" width="16" height="60" fill="#B89870" rx="4" />
-                  <rect x="484" y="175" width="16" height="60" fill="#B89870" rx="4" />
-                  {/* Cushions */}
-                  <rect x="235" y="192" width="80" height="36" fill="#D4C4A8" rx="6" opacity="0.6" />
-                  <rect x="325" y="192" width="80" height="36" fill="#C8B898" rx="6" opacity="0.6" />
-                  <rect x="415" y="192" width="80" height="36" fill="#D4C4A8" rx="6" opacity="0.6" />
-                  {/* Throw pillows */}
-                  <ellipse cx="260" cy="194" rx="16" ry="14" fill="#C17550" opacity="0.5" />
-                  <ellipse cx="470" cy="194" rx="16" ry="14" fill="#8B7355" opacity="0.5" />
-                  {/* Coffee table */}
-                  <ellipse cx="360" cy="250" rx="60" ry="14" fill="#8B7355" opacity="0.35" />
-                  <ellipse cx="360" cy="248" rx="58" ry="12" fill="#A89070" />
-                  <ellipse cx="360" cy="247" rx="55" ry="11" fill="#B8A080" />
-                  {/* Items on table */}
-                  <circle cx="345" cy="245" r="5" fill="#D4CEC4" />
-                  <rect x="358" y="240" width="8" height="12" fill="#7B9B6B" rx="2" opacity="0.6" />
-                  {/* Side table left */}
-                  <rect x="160" y="205" width="36" height="30" fill="#8B7355" rx="3" />
-                  <rect x="162" y="203" width="32" height="4" fill="#A08B68" rx="2" />
-                  {/* Lamp on side table */}
-                  <rect x="173" y="170" width="10" height="33" fill="#D4CEC4" rx="2" />
-                  <path d="M162 170 L194 170 L183 145 L173 145 Z" fill="#F5EDE0" stroke="#E8E0D8" strokeWidth="0.5" />
-                  <circle cx="178" cy="160" r="3" fill="#FFD700" opacity="0.4" />
-                  {/* Chair right */}
-                  <rect x="530" y="195" width="60" height="45" fill="#6B5B75" opacity="0.2" rx="6" />
-                  <rect x="532" y="188" width="56" height="12" fill="#6B5B75" opacity="0.25" rx="6" />
-                  <rect x="530" y="186" width="12" height="54" fill="#6B5B75" opacity="0.3" rx="3" />
-                  {/* Plant */}
-                  <rect x="110" y="170" width="16" height="30" fill="#D4A882" rx="3" />
-                  <circle cx="118" cy="162" r="14" fill="#7B9B6B" opacity="0.5" />
-                  <circle cx="112" cy="156" r="10" fill="#6B8B5B" opacity="0.4" />
-                  <circle cx="124" cy="158" r="11" fill="#8BAB7B" opacity="0.45" />
-                  {/* Art on wall */}
-                  <rect x="140" y="70" width="80" height="60" fill="#E8DDD0" stroke="#D4CEC4" strokeWidth="1" rx="2" />
-                  <circle cx="180" cy="95" r="18" fill="#C17550" opacity="0.15" />
-                  <circle cx="170" cy="100" r="10" fill="#8B7355" opacity="0.12" />
-                  {/* Art on wall right */}
-                  <rect x="500" y="75" width="60" height="50" fill="#E8DDD0" stroke="#D4CEC4" strokeWidth="1" rx="2" />
-                  <line x1="510" y1="90" x2="550" y2="90" stroke="#C17550" strokeWidth="1" opacity="0.3" />
-                  <line x1="510" y1="100" x2="540" y2="100" stroke="#8B7355" strokeWidth="1" opacity="0.2" />
-                  <line x1="510" y1="110" x2="548" y2="110" stroke="#C17550" strokeWidth="1" opacity="0.3" />
-                  {/* Light from window */}
-                  <rect x="270" y="155" width="180" height="45" fill="url(#lightGrad)" opacity="0.08" />
-                  <defs>
-                    <linearGradient id="lightGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#FFF8E8" />
-                      <stop offset="100%" stopColor="#FFF8E8" stopOpacity="0" />
-                    </linearGradient>
-                  </defs>
-                </svg>
+                <button onClick={() => { go("design"); setTab("catalog"); }} style={{ background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.3)", padding: "18px 44px", borderRadius: 12, fontSize: 15, color: "#fff", cursor: "pointer", fontFamily: "inherit", backdropFilter: "blur(8px)" }}>Browse catalog</button>
               </div>
             </div>
-            <div style={{ position: "absolute", bottom: 40, left: "50%", transform: "translateX(-50%)", animation: "pulse 2s ease infinite" }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#B8A898" strokeWidth="1.5"><path d="M12 5v14m0 0l-6-6m6 6l6-6"/></svg>
+            <div style={{ position: "absolute", bottom: 40, left: "50%", transform: "translateX(-50%)", animation: "pulse 2s ease infinite", zIndex: 2 }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.6)" strokeWidth="1.5"><path d="M12 5v14m0 0l-6-6m6 6l6-6"/></svg>
             </div>
           </section>
 
@@ -2029,7 +1991,7 @@ export default function App() {
                 <div>
                   <span style={{ display: "inline-block", background: "#C1755015", color: "#C17550", padding: "6px 16px", borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 20 }}>Step 1</span>
                   <h2 style={{ fontFamily: "Georgia,serif", fontSize: "clamp(28px,3.5vw,42px)", fontWeight: 400, marginBottom: 18, lineHeight: 1.15 }}>Define your space</h2>
-                  <p style={{ fontSize: 16, color: "#7A6B5B", lineHeight: 1.8, marginBottom: 24 }}>Upload a floor plan, enter room dimensions, or snap a photo. Our AI identifies windows, doors, focal walls, and maps out traffic flow to build a spatial model of your exact space.</p>
+                  <p style={{ fontSize: 16, color: "#7A6B5B", lineHeight: 1.8, marginBottom: 24 }}>Upload a floor plan, enter dimensions, or snap a photo. AI maps out your windows, doors, and traffic flow automatically.</p>
                   <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
                     {[["Room dimensions", "Enter width, length, and square footage"], ["Photo upload", "Snap a photo and AI analyzes your room"], ["CAD support", "Upload floor plans for precision layouts"]].map(([t, d]) => (
                       <div key={t} style={{ flex: "1 1 140px" }}>
@@ -2108,7 +2070,7 @@ export default function App() {
                 <div>
                   <span style={{ display: "inline-block", background: "#8B735515", color: "#8B7355", padding: "6px 16px", borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 20 }}>Step 2</span>
                   <h2 style={{ fontFamily: "Georgia,serif", fontSize: "clamp(28px,3.5vw,42px)", fontWeight: 400, marginBottom: 18, lineHeight: 1.15 }}>Discover your style</h2>
-                  <p style={{ fontSize: 16, color: "#7A6B5B", lineHeight: 1.8, marginBottom: 20 }}>Explore 14 curated design palettes with matched colors and materials. Every one of our {DB.length} products is scored for harmony, material compatibility, and proportional fit to your room.</p>
+                  <p style={{ fontSize: 16, color: "#7A6B5B", lineHeight: 1.8, marginBottom: 20 }}>Explore 14 curated palettes with matched colors and materials. Every product is scored for harmony and fit to your room.</p>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                     {["Warm Modern", "California Cool", "Japandi", "Scandinavian", "Bohemian", "Transitional", "Art Deco", "+7 more"].map(s => (
                       <span key={s} style={{ fontSize: 11, padding: "6px 14px", borderRadius: 20, background: "#fff", border: "1px solid #E8E0D8", color: "#7A6B5B" }}>{s}</span>
@@ -2126,7 +2088,7 @@ export default function App() {
                 <div>
                   <span style={{ display: "inline-block", background: "#5B7B6B15", color: "#5B7B6B", padding: "6px 16px", borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 20 }}>Step 3</span>
                   <h2 style={{ fontFamily: "Georgia,serif", fontSize: "clamp(28px,3.5vw,42px)", fontWeight: 400, marginBottom: 18, lineHeight: 1.15 }}>Chat with your AI designer</h2>
-                  <p style={{ fontSize: 16, color: "#7A6B5B", lineHeight: 1.8, marginBottom: 20 }}>Describe your vision in natural language. AURA generates personalized mood boards from your conversation, recommends products that match your style, and verifies every piece actually fits your space.</p>
+                  <p style={{ fontSize: 16, color: "#7A6B5B", lineHeight: 1.8, marginBottom: 20 }}>Describe your vision in plain language. AURA generates mood boards, recommends matching products, and verifies everything fits your space.</p>
                   <p style={{ fontSize: 14, color: "#9B8B7B", fontStyle: "italic", lineHeight: 1.6 }}>{"\"I want a warm, inviting living room with a large sofa, a round coffee table, and ambient lighting — earthy tones, nothing too modern.\""}</p>
                 </div>
                 {/* Mockup: Chat interface with product cards */}
@@ -2213,7 +2175,7 @@ export default function App() {
               <div style={{ textAlign: "center", marginBottom: 48 }}>
                 <span style={{ display: "inline-block", background: "#6B5B8B15", color: "#6B5B8B", padding: "6px 16px", borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 20 }}>Step 4</span>
                 <h2 style={{ fontFamily: "Georgia,serif", fontSize: "clamp(28px,3.5vw,42px)", fontWeight: 400, marginBottom: 14, lineHeight: 1.15 }}>See it come to life</h2>
-                <p style={{ fontSize: 16, color: "#7A6B5B", lineHeight: 1.7, maxWidth: 600, margin: "0 auto" }}>AURA generates photorealistic AI visualizations of your room with your exact products placed in context, plus precise CAD floor plans with real dimensions and clearances.</p>
+                <p style={{ fontSize: 16, color: "#7A6B5B", lineHeight: 1.7, maxWidth: 600, margin: "0 auto" }}>Photorealistic AI visualizations with your exact products in context, plus precise CAD floor plans with real dimensions.</p>
               </div>
               <div className="aura-grid-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, alignItems: "start" }}>
                 {/* Visualization Example */}
@@ -2222,96 +2184,15 @@ export default function App() {
                     <span style={{ fontSize: 11, fontWeight: 600, color: "#1A1815" }}>AI Room Visualization</span>
                     <span style={{ fontSize: 10, color: "#5B8B6B", fontWeight: 600 }}>Generated</span>
                   </div>
-                  {/* SVG illustration of a rendered room */}
-                  <div style={{ position: "relative" }}>
-                    <svg width="100%" viewBox="0 0 500 340" style={{ display: "block" }}>
-                      {/* Sky / ambient */}
-                      <defs>
-                        <linearGradient id="wallGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#F5F0E8" />
-                          <stop offset="100%" stopColor="#EDE6DA" />
-                        </linearGradient>
-                        <linearGradient id="floorGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#D8C8B4" />
-                          <stop offset="100%" stopColor="#C8B8A0" />
-                        </linearGradient>
-                        <linearGradient id="sunGrad" x1="0" y1="0" x2="1" y2="1">
-                          <stop offset="0%" stopColor="#FFF8E0" stopOpacity="0.3" />
-                          <stop offset="100%" stopColor="#FFF8E0" stopOpacity="0" />
-                        </linearGradient>
-                      </defs>
-                      {/* Wall */}
-                      <rect width="500" height="200" fill="url(#wallGrad)" />
-                      {/* Floor */}
-                      <rect y="200" width="500" height="140" fill="url(#floorGrad)" />
-                      {/* Floor boards */}
-                      <line x1="0" y1="230" x2="500" y2="230" stroke="#C4B498" strokeWidth="0.5" opacity="0.3" />
-                      <line x1="0" y1="260" x2="500" y2="260" stroke="#C4B498" strokeWidth="0.5" opacity="0.3" />
-                      <line x1="0" y1="290" x2="500" y2="290" stroke="#C4B498" strokeWidth="0.5" opacity="0.3" />
-                      {/* Window with light */}
-                      <rect x="170" y="30" width="160" height="120" fill="#D8E4EC" stroke="#B8C8D4" strokeWidth="2" rx="2" />
-                      <line x1="250" y1="30" x2="250" y2="150" stroke="#B8C8D4" strokeWidth="1.5" />
-                      <line x1="170" y1="90" x2="330" y2="90" stroke="#B8C8D4" strokeWidth="1.5" />
-                      {/* Sunlight patch */}
-                      <polygon points="200,150 300,150 360,280 140,280" fill="url(#sunGrad)" />
-                      {/* Curtains */}
-                      <path d="M155 25 Q150 85 155 155 Q158 85 160 25" fill="#D8D0C4" opacity="0.5" />
-                      <path d="M160 25 Q155 85 160 155 Q163 85 165 25" fill="#D4CBC0" opacity="0.4" />
-                      <path d="M335 25 Q338 85 335 155 Q340 85 345 25" fill="#D8D0C4" opacity="0.5" />
-                      <path d="M340 25 Q343 85 340 155 Q345 85 350 25" fill="#D4CBC0" opacity="0.4" />
-                      {/* Area rug */}
-                      <rect x="80" y="230" width="340" height="90" fill="#C4A882" opacity="0.2" rx="4" />
-                      <rect x="90" y="238" width="320" height="74" fill="none" stroke="#B89870" strokeWidth="0.5" rx="2" opacity="0.3" />
-                      {/* Sofa - warm fabric sectional */}
-                      <rect x="120" y="175" width="260" height="65" fill="#B8A080" rx="8" />
-                      <rect x="124" y="168" width="252" height="14" fill="#A89070" rx="7" />
-                      {/* Sofa arms */}
-                      <rect x="115" y="165" width="18" height="75" fill="#A89070" rx="5" />
-                      <rect x="367" y="165" width="18" height="75" fill="#A89070" rx="5" />
-                      {/* Sofa cushion divisions */}
-                      <line x1="210" y1="182" x2="210" y2="235" stroke="#A08868" strokeWidth="0.5" opacity="0.5" />
-                      <line x1="300" y1="182" x2="300" y2="235" stroke="#A08868" strokeWidth="0.5" opacity="0.5" />
-                      {/* Throw pillows */}
-                      <ellipse cx="155" cy="188" rx="18" ry="15" fill="#C17550" opacity="0.6" />
-                      <ellipse cx="345" cy="188" rx="18" ry="15" fill="#6B7B5B" opacity="0.5" />
-                      <ellipse cx="190" cy="185" rx="15" ry="13" fill="#D4C4A8" opacity="0.5" />
-                      {/* Coffee table - round walnut */}
-                      <ellipse cx="250" cy="270" rx="55" ry="16" fill="#705840" opacity="0.15" />
-                      <ellipse cx="250" cy="267" rx="52" ry="14" fill="#8B6B48" />
-                      <ellipse cx="250" cy="266" rx="50" ry="13" fill="#9B7B58" />
-                      {/* Items on coffee table */}
-                      <circle cx="235" cy="264" r="6" fill="#D4D0C8" opacity="0.7" />
-                      <rect x="248" y="258" width="6" height="14" fill="#7B9B68" rx="3" opacity="0.7" />
-                      <rect x="262" y="261" width="12" height="8" fill="#A09080" rx="1" opacity="0.5" />
-                      {/* Accent chair right */}
-                      <rect x="410" y="185" width="55" height="50" fill="#6B6860" rx="6" />
-                      <rect x="412" y="178" width="51" height="14" fill="#5B5850" rx="6" />
-                      <rect x="407" y="175" width="14" height="60" fill="#5B5850" rx="4" />
-                      {/* Side table left */}
-                      <rect x="68" y="208" width="34" height="28" fill="#705840" rx="2" />
-                      <rect x="70" y="206" width="30" height="4" fill="#8B6B48" rx="2" />
-                      {/* Table lamp */}
-                      <rect x="80" y="175" width="8" height="31" fill="#D4CEC4" rx="2" />
-                      <path d="M70 175 L98 175 L90 155 L78 155 Z" fill="#F0E8D8" stroke="#E0D8C8" strokeWidth="0.5" />
-                      <circle cx="84" cy="167" r="4" fill="#FFE08A" opacity="0.5" />
-                      {/* Plant in corner */}
-                      <rect x="26" y="195" width="22" height="40" fill="#C4A070" rx="4" />
-                      <circle cx="37" cy="186" r="16" fill="#6B8B58" opacity="0.5" />
-                      <circle cx="30" cy="180" r="12" fill="#5B7B48" opacity="0.45" />
-                      <circle cx="44" cy="182" r="13" fill="#7B9B68" opacity="0.4" />
-                      {/* Art on wall */}
-                      <rect x="60" y="55" width="75" height="55" fill="#EAE2D4" stroke="#D4CCC0" strokeWidth="1" rx="1" />
-                      <circle cx="98" cy="78" r="14" fill="#C17550" opacity="0.12" />
-                      <rect x="70" y="68" width="30" height="20" fill="#B89870" opacity="0.08" rx="2" />
-                      {/* Art on wall right */}
-                      <rect x="370" y="50" width="90" height="65" fill="#EAE2D4" stroke="#D4CCC0" strokeWidth="1" rx="1" />
-                      <rect x="380" y="60" width="70" height="45" fill="#E0D8CC" rx="1" />
-                      <circle cx="415" cy="82" r="10" fill="#A08868" opacity="0.15" />
-                      {/* Pendant light */}
-                      <line x1="250" y1="0" x2="250" y2="50" stroke="#1A1815" strokeWidth="0.8" />
-                      <path d="M232 50 Q250 60 268 50 Q260 70 250 72 Q240 70 232 50" fill="#1A1815" opacity="0.15" />
-                      <circle cx="250" cy="55" r="3" fill="#FFE08A" opacity="0.6" />
-                    </svg>
+                  {/* AI-generated room visualization */}
+                  <div style={{ position: "relative", minHeight: 280 }}>
+                    {homeVizImg ? (
+                      <img src={homeVizImg} alt="AI-generated room visualization" style={{ width: "100%", display: "block", objectFit: "cover", minHeight: 280, maxHeight: 380, transition: "opacity .6s ease" }} />
+                    ) : (
+                      <div style={{ width: "100%", height: 320, background: "linear-gradient(135deg, #E8E0D8 25%, #D4C8B8 50%, #E8E0D8 75%)", backgroundSize: "400% 100%", animation: "shimmer 2s ease infinite", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <span style={{ fontSize: 13, color: "#9B8B7B", fontWeight: 500 }}>Generating preview...</span>
+                      </div>
+                    )}
                     <div style={{ position: "absolute", bottom: 12, left: 12, right: 12, display: "flex", gap: 6, flexWrap: "wrap" }}>
                       {["Warm Modern", "Living Room", "18' x 22'"].map(t => (
                         <span key={t} style={{ fontSize: 10, background: "rgba(255,255,255,.85)", backdropFilter: "blur(8px)", padding: "4px 10px", borderRadius: 8, color: "#5A5045", fontWeight: 600 }}>{t}</span>
@@ -2319,7 +2200,7 @@ export default function App() {
                     </div>
                   </div>
                   <div style={{ padding: "14px 20px", borderTop: "1px solid #F0EBE4" }}>
-                    <p style={{ fontSize: 12, color: "#7A6B5B", margin: 0, lineHeight: 1.5 }}>AI renders your selected products in a photorealistic room scene based on your exact dimensions and style preferences.</p>
+                    <p style={{ fontSize: 12, color: "#7A6B5B", margin: 0, lineHeight: 1.5 }}>AI renders your products in a photorealistic room scene based on your dimensions and style.</p>
                   </div>
                 </div>
                 {/* CAD Floor Plan */}
