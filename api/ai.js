@@ -26,9 +26,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { action, messages, model, prompt, referenceImage, productImageUrls } = req.body;
+    const { action, messages, model, prompt, referenceImage, cadImage, productImageUrls } = req.body;
 
-    // Action: "image" — image generation (with optional reference room photo + product images)
+    // Action: "image" — image generation (with optional reference room photo + CAD + product images)
     if (action === "image") {
       // Model priority: Gemini Flash (cheapest, good quality), then Gemini Pro fallback
       const imageModels = [
@@ -41,13 +41,22 @@ export default async function handler(req, res) {
       const uniqueModels = [...new Set(imageModels)];
 
       // Build multimodal message content
-      // Priority: 1) Room photo reference, 2) Product reference images, 3) Detailed text prompt
+      // Priority: 1) Room photo reference, 2) CAD/floor plan, 3) Product reference images, 4) Text prompt
       let messageContent = [];
 
+      const hasRoomPhoto = referenceImage && referenceImage.startsWith("data:");
+      const hasCadImage = cadImage && cadImage.startsWith("data:");
+
       // Add room photo as primary visual reference if available
-      if (referenceImage && referenceImage.startsWith("data:")) {
+      if (hasRoomPhoto) {
         messageContent.push({ type: "image_url", image_url: { url: referenceImage } });
         console.log("Image gen: including room photo reference");
+      }
+
+      // Add CAD/floor plan image as layout reference
+      if (hasCadImage) {
+        messageContent.push({ type: "image_url", image_url: { url: cadImage } });
+        console.log("Image gen: including CAD/floor plan image");
       }
 
       // Add product reference images (up to 4 to stay within limits)
@@ -59,13 +68,17 @@ export default async function handler(req, res) {
         console.log("Image gen: including " + imgUrls.length + " product reference images");
       }
 
-      // Build the text instruction — use the detailed prompt directly
+      // Build the text instruction — tell the AI exactly what each image is
       let textInstruction = "";
-      if (referenceImage && referenceImage.startsWith("data:")) {
-        textInstruction = "The first image is a photo of the room to design in. Keep the SAME walls, floor, windows, and architecture. ";
+      if (hasRoomPhoto) {
+        textInstruction = "CRITICAL: The FIRST image is a photograph of the USER'S ACTUAL ROOM. You MUST use this EXACT room as the base. Do NOT create a new room. Edit THIS specific room by placing furniture into it. Keep EVERY detail: exact wall color, exact flooring, exact windows, exact doors, exact ceiling, exact lighting, exact architectural features. The output must look like the same room with new furniture added.\n\n";
+      }
+      if (hasCadImage) {
+        textInstruction += "A FLOOR PLAN / CAD DRAWING image is provided" + (hasRoomPhoto ? " (the image after the room photo)" : " (the first image)") + ". Use this layout to determine EXACT furniture placement positions, room proportions, door clearances, and window locations.\n\n";
       }
       if (imgUrls.length > 0) {
-        textInstruction += "The " + (referenceImage ? "next " : "") + imgUrls.length + " image(s) show the EXACT furniture products to place in the room. Match their appearance, shape, color, and material PRECISELY. ";
+        const imgOffset = (hasRoomPhoto ? 1 : 0) + (hasCadImage ? 1 : 0);
+        textInstruction += "The " + (imgOffset > 0 ? "next " : "") + imgUrls.length + " image(s) show the EXACT furniture products to place in the room. Match their appearance, shape, color, and material PRECISELY.\n\n";
       }
       // The detailed prompt from the frontend already includes all specifications
       textInstruction += (prompt || "Generate a photorealistic interior design photograph of a modern room.");

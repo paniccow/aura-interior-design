@@ -102,14 +102,14 @@ async function analyzeImage(base64Data, mimeType, prompt) {
   return null;
 }
 
-/* Image generation — OpenRouter via secure proxy. Optional referenceImage (data URL) for room matching. productImageUrls = array of product photo URLs for AI reference. */
-async function generateAIImage(prompt, referenceImage, productImageUrls) {
+/* Image generation — OpenRouter via secure proxy. referenceImage = room photo data URL, cadImage = floor plan data URL, productImageUrls = array of product photo URLs. */
+async function generateAIImage(prompt, referenceImage, productImageUrls, cadImage) {
   try {
     const resp = await Promise.race([
       fetch(AI_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "image", prompt, referenceImage: referenceImage || null, productImageUrls: productImageUrls || [] })
+        body: JSON.stringify({ action: "image", prompt, referenceImage: referenceImage || null, cadImage: cadImage || null, productImageUrls: productImageUrls || [] })
       }),
       new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 120000))
     ]);
@@ -1527,35 +1527,37 @@ export default function App() {
       const hasRoomRef = !!(roomPhoto?.data);
       const hasCad = !!cadAnalysis;
 
-      const prompt = "Generate a photorealistic interior design photograph of a " + styleName + " " + roomName + "." +
+      const prompt = (hasRoomRef
+        ? "EDIT THIS ROOM PHOTO: Place furniture into the provided room photograph. Do NOT generate a new room. The output MUST be the SAME room from the photo with the listed furniture added. Preserve EVERY detail of the original photo: exact wall paint color, exact flooring material and color, exact window positions and style, exact door locations, exact ceiling height, exact architectural features, exact lighting conditions. The result should look like a real photo of THIS room after the furniture was delivered and arranged."
+        : "Generate a photorealistic interior design photograph of a " + styleName + " " + roomName + ".") +
         dimsStr +
-        // Reference image instructions
-        (hasRoomRef ? "\n\nIMPORTANT — A reference photo of the ACTUAL room is provided. You MUST keep the room's architecture EXACTLY as shown: same walls, floor, windows, doors, ceiling height, and layout. Do NOT change the room structure. Your only job is to place the listed furniture INTO this existing room." : "") +
         // CAD/floor plan instructions
+        (hasCad ? "\n\nFLOOR PLAN PROVIDED: A CAD/floor plan image of this room is included. Use it to determine the exact room layout, wall positions, door locations (maintain clearance), window placements (don't block), and optimal furniture positions." : "") +
         cadContext +
-        // Room photo features
-        roomContext +
+        // Room photo features from analysis
+        (hasRoomRef && roomContext ? "\n\nROOM DETAILS FROM ANALYSIS:" + roomContext : (!hasRoomRef ? roomContext : "")) +
         // User chat context
         userContext +
         "\n\nFURNITURE TO PLACE IN THIS ROOM (render ONLY these " + numItems + " pieces, NOTHING else):\n\n" + productSpecs +
         "\n\nRULES:" +
+        (hasRoomRef ? "\n- THIS IS A ROOM EDITING TASK. The provided room photo IS the room. Output the SAME room with furniture placed in it. Do NOT change walls, floor, windows, doors, lighting, or any architectural element." : "") +
         "\n- Show EXACTLY " + numItems + " piece" + (numItems > 1 ? "s" : "") + " of furniture. Do NOT add any extra furniture, accessories, throw pillows, vases, plants, books, or decor items that are not in the list above." +
         (numItems === 1 ? " This is a SINGLE product visualization — just this ONE item in an otherwise empty " + roomName.toLowerCase() + ". Do not add anything else." : "") +
         "\n- MATCH each product's exact shape, color, material, and proportions as described above" + (aiProductDescriptions ? " (the AI Analysis lines are the most accurate descriptions — follow them closely)" : "") + "." +
         "\n- If a product is described as ROUND, it must be circular. If OVAL, show an oval. If L-SHAPED, show an L-shape. Shape accuracy is critical." +
         "\n- Each product's width and depth dimensions are provided — make sure proportions between items are realistic." +
         (roomWidth && roomLength ? "\n- The room is " + roomWidth + "ft × " + roomLength + "ft. Scale furniture placement to fit these real dimensions — a 7ft sofa should take up about " + Math.round(7 / parseFloat(roomWidth) * 100) + "% of the room width." : "") +
-        (hasRoomRef ? "\n- PRESERVE the reference room photo exactly. Same paint colors, same flooring, same windows, same lighting. Only ADD the listed furniture." : "") +
-        (hasCad ? "\n- Follow the floor plan for furniture placement positions. Place items where the CAD layout indicates, respecting door clearances and window sightlines." : "") +
-        "\n- Room style: " + styleName + ". Wall/accent colors: " + colorStr + ". Floor materials: " + matStr + "." +
+        (hasCad ? "\n- Follow the floor plan image for furniture placement positions. Place items where the CAD layout indicates, respecting door clearances and window sightlines." : "") +
+        (!hasRoomRef ? "\n- Room style: " + styleName + ". Wall/accent colors: " + colorStr + ". Floor materials: " + matStr + "." : "") +
         "\n- Layout: " + roomNeeds.layout +
         "\n- Output a high-resolution, wide-angle interior architecture photograph at landscape orientation, eye-level, natural daylight, Architectural Digest quality." +
         "\n- NO text, labels, watermarks, or annotations.";
 
-      // If user uploaded a room photo, pass it as reference so AI places furniture IN that room
+      // Pass room photo and CAD as reference images so AI edits the actual room
       const refImg = roomPhoto?.data || null;
-      console.log("Viz Step 4: generating image with " + numItems + " products, " + productImageUrls.length + " reference images" + (refImg ? ", room photo" : "") + (hasCad ? ", CAD layout" : "") + (roomWidth ? ", " + roomWidth + "x" + roomLength + "ft" : "") + (aiProductDescriptions ? ", AI-analyzed" : ", keyword-fallback"));
-      const imgUrl = await generateAIImage(prompt, refImg, productImageUrls);
+      const cadImg = cadFile?.data || null;
+      console.log("Viz Step 4: generating image with " + numItems + " products, " + productImageUrls.length + " reference images" + (refImg ? ", room photo" : "") + (cadImg ? ", CAD image" : "") + (roomWidth ? ", " + roomWidth + "x" + roomLength + "ft" : "") + (aiProductDescriptions ? ", AI-analyzed" : ", keyword-fallback"));
+      const imgUrl = await generateAIImage(prompt, refImg, productImageUrls, cadImg);
 
       if (imgUrl === "__CREDITS_REQUIRED__") {
         setVizErr("Image generation needs purchased credits on your OpenRouter account. Visit openrouter.ai/settings/credits to add funds.");
@@ -2374,7 +2376,7 @@ export default function App() {
                     { label: "Visualize", sub: "See Your Room", icon: "3", done: vizUrls.length > 0 },
                     { label: "Purchase", sub: "Buy Items", icon: "4", done: false },
                   ].map((s, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", flex: i < 2 ? 1 : "none" }}>
+                    <div key={i} style={{ display: "flex", alignItems: "center", flex: 1 }}>
                       <button onClick={() => setDesignStep(i)} style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", padding: "4px 0", fontFamily: "inherit" }}>
                         <div style={{ width: 32, height: 32, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, background: designStep === i ? "#1A1815" : s.done ? "#5B8B6B" : "#E8E0D8", color: designStep === i || s.done ? "#fff" : "#9B8B7B", transition: "all .3s", boxShadow: designStep === i ? "0 2px 8px rgba(26,24,21,.2)" : "none" }}>
                           {s.done && designStep !== i ? "\u2713" : s.icon}
@@ -2384,7 +2386,7 @@ export default function App() {
                           <div style={{ fontSize: 10, color: designStep === i ? "#9B8B7B" : "#C8BEB4", lineHeight: 1.2, marginTop: 1 }}>{s.sub}</div>
                         </div>
                       </button>
-                      {i < 2 && <div style={{ flex: 1, height: 1, background: s.done ? "linear-gradient(90deg, #5B8B6B60, #5B8B6B20)" : "#E8E0D8", margin: "0 16px", borderRadius: 1 }} />}
+                      {i < 3 && <div style={{ flex: 1, height: 1, background: s.done ? "linear-gradient(90deg, #5B8B6B60, #5B8B6B20)" : "#E8E0D8", margin: "0 16px", borderRadius: 1 }} />}
                     </div>
                   ))}
                 </div>
