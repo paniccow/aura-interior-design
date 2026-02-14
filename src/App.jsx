@@ -1326,7 +1326,7 @@ export default function App() {
       setVizSt("loading");
       setVizUrls([]);
       setVizErr("");
-      setTimeout(() => { if (vizAreaRef.current) vizAreaRef.current.scrollIntoView({ behavior: "smooth", block: "center" }); }, 100);
+      // No auto-scroll — user stays where they are
 
       const items = selItems;
       const roomName = room || "living room";
@@ -1959,28 +1959,32 @@ export default function App() {
         const previewProducts = DB.filter(p => p.img && p.img.includes("shopify")).filter((_, i) => i % 47 === 0).slice(0, 8);
         return (
         <div>
-          {/* Hero — elegant centered layout with AI-generated room background */}
-          <section style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 6%", position: "relative", overflow: "hidden" }}>
-            {/* AI-generated background image */}
-            {homeHeroImg ? (
-              <div style={{ position: "absolute", inset: 0, backgroundImage: `url(${homeHeroImg})`, backgroundSize: "cover", backgroundPosition: "center", filter: "brightness(0.55) saturate(0.9)", transition: "opacity 1s ease", zIndex: 0 }} />
-            ) : (
-              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, #E8E0D8 25%, #D4C8B8 50%, #E8E0D8 75%)", backgroundSize: "400% 100%", animation: "shimmer 2s ease infinite", zIndex: 0 }} />
-            )}
-            {/* Gradient overlay for text readability */}
-            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(26,24,21,0.3) 0%, rgba(26,24,21,0.15) 40%, rgba(26,24,21,0.4) 100%)", zIndex: 1 }} />
-            <div style={{ maxWidth: 800, textAlign: "center", animation: "fadeUp .8s ease", position: "relative", zIndex: 2 }}>
-              <p style={{ fontSize: 12, letterSpacing: ".3em", textTransform: "uppercase", color: "#F0D8C4", fontWeight: 600, marginBottom: 28 }}>AI-Powered Interior Design</p>
-              <h1 style={{ fontFamily: "Georgia,serif", fontSize: "clamp(40px,6vw,72px)", fontWeight: 400, lineHeight: 1.05, marginBottom: 28, color: "#FFFFFF" }}>Design spaces<br />that feel like you</h1>
-              <p style={{ fontSize: 18, color: "rgba(255,255,255,.85)", lineHeight: 1.8, maxWidth: 560, margin: "0 auto 16px" }}>{DB.length} designer-curated products paired with AI that understands your room, style, and how every piece fits together.</p>
-              <p style={{ fontSize: 13, color: "rgba(255,255,255,.6)", lineHeight: 1.6, maxWidth: 480, margin: "0 auto 40px", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><span style={{ color: "#F0C4A0", fontSize: 8 }}>{"●"}</span>Every product hand-selected by professional designers</p>
-              <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
-                <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#C17550", color: "#fff", padding: "18px 44px", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Start designing</button>
-                <button onClick={() => { go("design"); setTab("catalog"); }} style={{ background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.3)", padding: "18px 44px", borderRadius: 12, fontSize: 15, color: "#fff", cursor: "pointer", fontFamily: "inherit", backdropFilter: "blur(8px)" }}>Browse catalog</button>
+          {/* Hero — clean text on light background, AI image below */}
+          <section style={{ minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", position: "relative", background: "linear-gradient(180deg, #FDFCFA 0%, #F8F5F0 100%)" }}>
+            <div style={{ padding: "0 6%", maxWidth: 800, margin: "0 auto", textAlign: "center", animation: "fadeUp .8s ease" }}>
+              <p style={{ fontSize: 12, letterSpacing: ".3em", textTransform: "uppercase", color: "#C17550", fontWeight: 600, marginBottom: 28 }}>AI-Powered Interior Design</p>
+              <h1 style={{ fontFamily: "Georgia,serif", fontSize: "clamp(40px,6vw,72px)", fontWeight: 400, lineHeight: 1.05, marginBottom: 24, color: "#1A1815" }}>Design spaces<br />that feel like you</h1>
+              <p style={{ fontSize: 17, color: "#7A6B5B", lineHeight: 1.7, maxWidth: 520, margin: "0 auto 32px" }}>{DB.length} designer-curated products paired with AI that understands your room, style, and how every piece fits together.</p>
+              <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap", marginBottom: 48 }}>
+                <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#C17550", color: "#fff", padding: "18px 44px", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 20px rgba(193,117,80,.25)" }}>Start designing</button>
+                <button onClick={() => { go("design"); setTab("catalog"); }} style={{ background: "transparent", border: "1px solid #D8D0C8", padding: "18px 44px", borderRadius: 12, fontSize: 15, color: "#7A6B5B", cursor: "pointer", fontFamily: "inherit" }}>Browse catalog</button>
+              </div>
+              {/* AI-generated room image as a showcase card */}
+              <div style={{ maxWidth: 680, margin: "0 auto", borderRadius: 20, overflow: "hidden", boxShadow: "0 24px 80px rgba(0,0,0,.12)", border: "1px solid #E8E0D8", animation: "fadeUp 1s ease .2s both" }}>
+                {homeHeroImg ? (
+                  <img src={homeHeroImg} alt="AI-generated room visualization" style={{ width: "100%", display: "block", height: "auto", maxHeight: 380, objectFit: "cover", transition: "opacity .8s ease" }} />
+                ) : (
+                  <div style={{ width: "100%", height: 320, background: "linear-gradient(135deg, #F0EBE4 25%, #F8F5F0 50%, #F0EBE4 75%)", backgroundSize: "400% 100%", animation: "shimmer 2s ease infinite", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ width: 28, height: 28, border: "2.5px solid #D8D0C8", borderTopColor: "#C17550", borderRadius: "50%", animation: "spin .8s linear infinite", margin: "0 auto 10px" }} />
+                      <p style={{ fontSize: 12, color: "#B8A898", margin: 0 }}>Generating room preview...</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-            <div style={{ position: "absolute", bottom: 40, left: "50%", transform: "translateX(-50%)", animation: "pulse 2s ease infinite", zIndex: 2 }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.6)" strokeWidth="1.5"><path d="M12 5v14m0 0l-6-6m6 6l6-6"/></svg>
+            <div style={{ position: "absolute", bottom: 36, left: "50%", transform: "translateX(-50%)", animation: "pulse 2s ease infinite" }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#B8A898" strokeWidth="1.5"><path d="M12 5v14m0 0l-6-6m6 6l6-6"/></svg>
             </div>
           </section>
 
@@ -2200,7 +2204,7 @@ export default function App() {
                     </div>
                   </div>
                   <div style={{ padding: "14px 20px", borderTop: "1px solid #F0EBE4" }}>
-                    <p style={{ fontSize: 12, color: "#7A6B5B", margin: 0, lineHeight: 1.5 }}>AI renders your products in a photorealistic room scene based on your dimensions and style.</p>
+                    <p style={{ fontSize: 12, color: "#7A6B5B", margin: 0, lineHeight: 1.5 }}>Select your products, hit visualize, and AI places them into a photorealistic scene of your room.</p>
                   </div>
                 </div>
                 {/* CAD Floor Plan */}
@@ -2485,46 +2489,7 @@ export default function App() {
                     <button onClick={() => setDesignStep(0)} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 6, padding: "4px 12px", fontSize: 11, color: "#9B8B7B", cursor: "pointer", fontFamily: "inherit" }}>Edit</button>
                   </div>
 
-                  {/* Mood Boards */}
-                  {!boards && room && vibe && (
-                    <div style={{ padding: "14px 5%", background: "#FDFCFA", borderBottom: "1px solid #EDE8E0" }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-                        <p style={{ fontSize: 13, color: "#7A6B5B", margin: 0 }}>Get AI-curated product collections for your space</p>
-                        <button onClick={() => { triggerMoodBoards(room, vibe, bud, sqft); setBoardsGenHint("Mood boards generated from your selections"); }} style={{ background: "#1A1815", color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>Generate Mood Boards</button>
-                      </div>
-                    </div>
-                  )}
-                  {boards && (
-                    <div style={{ padding: "20px 5% 16px", background: "#FDFCFA", borderBottom: "1px solid #EDE8E0" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
-                        <div>
-                          <p style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "#1A1815", fontWeight: 700, margin: "0 0 2px" }}>Mood Boards</p>
-                          {boardsGenHint && <p style={{ fontSize: 11, color: "#B8A898", margin: 0 }}>{boardsGenHint}</p>}
-                        </div>
-                        <div className="aura-mood-tabs" style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                          {boards.map((b, i) => (
-                            <button key={i} onClick={() => setActiveBoard(i)} style={{ padding: "6px 14px", fontSize: 11, fontWeight: activeBoard === i ? 600 : 400, background: activeBoard === i ? "#1A1815" : "transparent", color: activeBoard === i ? "#fff" : "#7A6B5B", border: activeBoard === i ? "none" : "1px solid #E8E0D8", borderRadius: 6, cursor: "pointer", fontFamily: "inherit" }}>{b.name}</button>
-                          ))}
-                        </div>
-                      </div>
-                      {boards[activeBoard] && (
-                        <div>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
-                            <p style={{ fontSize: 12, color: "#7A6B5B", fontStyle: "italic", margin: 0 }}>{boards[activeBoard].desc}</p>
-                            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                              <span style={{ fontSize: 12, fontWeight: 600, color: "#1A1815" }}>{boards[activeBoard].items.length} pieces · {fmt(boards[activeBoard].totalBudget)}</span>
-                              <button onClick={() => addBoard(activeBoard)} style={{ background: "#1A1815", color: "#fff", border: "none", borderRadius: 6, padding: "6px 14px", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Add All</button>
-                            </div>
-                          </div>
-                          <div className="aura-card-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))", gap: 10 }}>
-                            {boards[activeBoard].items.map((p) => <Card key={p.id} p={p} sel={sel.has(p.id)} toggle={toggle} small />)}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* AI Chat — cleaner, more professional */}
+                  {/* AI Chat — above mood boards */}
                   <div style={{ padding: "20px 5%", background: "#F5F2ED" }}>
                     <div className="aura-chat-box" style={{ background: "#fff", borderRadius: 14, padding: 0, maxWidth: 900, boxShadow: "0 1px 4px rgba(0,0,0,.04)", border: "1px solid #EDE8E0", overflow: "hidden" }}>
                       <div style={{ padding: "14px 20px", borderBottom: "1px solid #F0EBE4", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -2573,6 +2538,45 @@ export default function App() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Mood Boards — below chat */}
+                  {!boards && room && vibe && (
+                    <div style={{ padding: "14px 5%", background: "#FDFCFA", borderBottom: "1px solid #EDE8E0" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+                        <p style={{ fontSize: 13, color: "#7A6B5B", margin: 0 }}>Get AI-curated product collections for your space</p>
+                        <button onClick={() => { triggerMoodBoards(room, vibe, bud, sqft); setBoardsGenHint("Mood boards generated from your selections"); }} style={{ background: "#1A1815", color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>Generate Mood Boards</button>
+                      </div>
+                    </div>
+                  )}
+                  {boards && (
+                    <div style={{ padding: "20px 5% 16px", background: "#FDFCFA", borderBottom: "1px solid #EDE8E0" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, flexWrap: "wrap", gap: 10 }}>
+                        <div>
+                          <p style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "#1A1815", fontWeight: 700, margin: "0 0 2px" }}>Mood Boards</p>
+                          {boardsGenHint && <p style={{ fontSize: 11, color: "#B8A898", margin: 0 }}>{boardsGenHint}</p>}
+                        </div>
+                        <div className="aura-mood-tabs" style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                          {boards.map((b, i) => (
+                            <button key={i} onClick={() => setActiveBoard(i)} style={{ padding: "6px 14px", fontSize: 11, fontWeight: activeBoard === i ? 600 : 400, background: activeBoard === i ? "#1A1815" : "transparent", color: activeBoard === i ? "#fff" : "#7A6B5B", border: activeBoard === i ? "none" : "1px solid #E8E0D8", borderRadius: 6, cursor: "pointer", fontFamily: "inherit" }}>{b.name}</button>
+                          ))}
+                        </div>
+                      </div>
+                      {boards[activeBoard] && (
+                        <div>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+                            <p style={{ fontSize: 12, color: "#7A6B5B", fontStyle: "italic", margin: 0 }}>{boards[activeBoard].desc}</p>
+                            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                              <span style={{ fontSize: 12, fontWeight: 600, color: "#1A1815" }}>{boards[activeBoard].items.length} pieces · {fmt(boards[activeBoard].totalBudget)}</span>
+                              <button onClick={() => addBoard(activeBoard)} style={{ background: "#1A1815", color: "#fff", border: "none", borderRadius: 6, padding: "6px 14px", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Add All</button>
+                            </div>
+                          </div>
+                          <div className="aura-card-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))", gap: 10 }}>
+                            {boards[activeBoard].items.map((p) => <Card key={p.id} p={p} sel={sel.has(p.id)} toggle={toggle} small />)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Continue to Visualize — sticky bottom bar */}
                   {sel.size > 0 && (
