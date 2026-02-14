@@ -59,8 +59,8 @@ export default async function handler(req, res) {
         console.log("Image gen: including CAD/floor plan image");
       }
 
-      // Add ALL product reference images (up to 8 — one per selected product)
-      const imgUrls = (productImageUrls || []).filter(Boolean).slice(0, 8);
+      // Add ALL product reference images (up to 17 — one per selected product)
+      const imgUrls = (productImageUrls || []).filter(Boolean).slice(0, 17);
       if (imgUrls.length > 0) {
         for (const imgUrl of imgUrls) {
           messageContent.push({ type: "image_url", image_url: { url: imgUrl } });
@@ -68,21 +68,17 @@ export default async function handler(req, res) {
         console.log("Image gen: including " + imgUrls.length + " product reference images");
       }
 
-      // Build the text instruction — tell the AI exactly what each image is
-      let imgIdx = 1;
+      // Build concise text instruction labeling each image
       let textInstruction = "";
       if (hasRoomPhoto) {
-        textInstruction = "IMAGE " + imgIdx + " — USER'S ACTUAL ROOM PHOTO:\nThis is the user's real room. You MUST use this EXACT room as the base. Do NOT create a new room. Edit THIS specific room by placing the listed furniture into it. Keep EVERY detail: exact wall color and texture, exact flooring material and color, exact window positions/size/style, exact door locations, exact ceiling height and features, exact lighting conditions, exact architectural details. The output must look like a real photograph of THIS SAME room after furniture was delivered.\n\n";
-        imgIdx++;
+        textInstruction += "First image: the user's actual room. Place furniture into this exact room.\n";
       }
       if (hasCadImage) {
-        textInstruction += "IMAGE " + imgIdx + " — FLOOR PLAN / CAD DRAWING:\nThis shows the room's layout from above. Use it to determine exact furniture placement positions, room proportions, wall angles, door swing clearances, and window locations. Place furniture according to this plan.\n\n";
-        imgIdx++;
+        textInstruction += (hasRoomPhoto ? "Next" : "First") + " image: floor plan/CAD — use for furniture placement.\n";
       }
       if (imgUrls.length > 0) {
-        textInstruction += "IMAGES " + imgIdx + "-" + (imgIdx + imgUrls.length - 1) + " — PRODUCT REFERENCE PHOTOS (one per furniture piece, in order):\nThese show the EXACT furniture products to place in the room. Product image " + imgIdx + " corresponds to furniture item #1 in the spec list below, image " + (imgIdx + 1) + " = item #2, etc. You MUST match each product's exact appearance: same shape, same color, same material, same style, same proportions as shown in its reference photo.\n\n";
+        textInstruction += "Product photos follow (one per item, in order) — match each product's look.\n\n";
       }
-      // The detailed prompt from the frontend already includes all specifications
       textInstruction += (prompt || "Generate a photorealistic interior design photograph of a modern room.");
 
       messageContent.push({ type: "text", text: textInstruction });
