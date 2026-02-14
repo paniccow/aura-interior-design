@@ -1325,7 +1325,7 @@ export default function App() {
           if (sqftMatch && !sqft) setSqft(sqftMatch[1]);
           setMsgs((prev) => [...prev, {
             role: "bot",
-            text: "**Room Photo Analyzed!** Here's what I see:\n\n" + text.slice(0, 1500) + (text.length > 1500 ? "..." : "") + "\n\nI'll use this for layouts and visualizations. Tell me what you'd like to do with this space!",
+            text: "**Room Photo Analyzed!** Here's what I see:\n\n" + text + "\n\nI'll use this for layouts and visualizations. Tell me what you'd like to do with this space!",
             recs: []
           }]);
         } else {
