@@ -26,7 +26,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { action, messages, model, prompt, referenceImage, cadImage, productImageUrls } = req.body;
+    const { action, messages, model, prompt, referenceImage, cadImage, productImageUrls, max_tokens: clientMaxTokens } = req.body;
 
     // Action: "image" — image generation (with optional reference room photo + CAD + product images)
     if (action === "image") {
@@ -173,7 +173,7 @@ export default async function handler(req, res) {
           model: chatModel,
           messages: messages || [],
           temperature: 0.7,
-          max_tokens: 1000
+          max_tokens: clientMaxTokens || 1000
         })
       });
 

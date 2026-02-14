@@ -1365,13 +1365,13 @@ export default function App() {
       const roomLength = roomL || (roomSqft ? String(Math.round(parseFloat(roomSqft) / Math.sqrt(parseFloat(roomSqft) * 1.3))) : "");
 
       // ─── STEP 1: AI VISION ANALYSIS OF PRODUCT IMAGES ───
-      // Use GPT-4o-mini to look at each product's actual photo and describe shape, color, material
+      // GPT-4o-mini looks at each product photo and writes a detailed visual description
+      // This is critical because Gemini image gen may not load the product URLs itself
       console.log("Viz Step 1: Analyzing " + items.slice(0, 17).length + " product images with AI vision...");
       const productImageUrls = items.slice(0, 17).map(item => item.img).filter(Boolean);
 
       let aiProductDescriptions = null;
       try {
-        // Build vision message with all product images
         const visionContent = [];
         items.slice(0, 17).forEach((item, idx) => {
           if (item.img) {
@@ -1379,7 +1379,7 @@ export default function App() {
           }
           visionContent.push({ type: "text", text: "Product " + (idx + 1) + ": \"" + (item.n || "") + "\" (" + item.c + ")" });
         });
-        visionContent.push({ type: "text", text: "\nFor EACH product above, describe in this EXACT format (one per line):\nPRODUCT [number]: shape=[exact shape like round/oval/rectangular/L-shaped/curved], color=[exact colors you see], material=[exact materials], height=[estimated inches], width=[estimated inches], depth=[estimated inches], style=[2-3 word style description]\n\nBe extremely specific about shape — is a table ROUND or RECTANGULAR? Is a sofa STRAIGHT or L-SHAPED? What is the EXACT color — not just 'brown' but 'warm walnut brown' or 'light cream white'. What material — 'nubby boucle fabric' or 'smooth leather' or 'natural oak wood'." });
+        visionContent.push({ type: "text", text: "You are describing furniture for an AI image generator that CANNOT see these photos. Your descriptions are the ONLY way it knows what each product looks like. Be extremely detailed and visual.\n\nFor EACH product, write:\nPRODUCT [number]: [2-3 sentence description covering: exact overall shape (round/rectangular/L-shaped/curved/etc), exact primary color with shade (not just 'brown' — say 'warm honey oak brown' or 'cool light grey'), exact secondary colors if any, exact material and texture (e.g. 'nubby cream boucle fabric' or 'smooth matte black metal frame with natural oak top'), leg style and color, any distinctive visual details like tufting/cushion style/arm shape/base type. End with approximate proportions: tall/low, wide/narrow, bulky/sleek.]" });
 
         const visionResp = await Promise.race([
           fetch(AI_API, {
@@ -1387,17 +1387,18 @@ export default function App() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               action: "chat",
-              messages: [{ role: "user", content: visionContent }]
+              messages: [{ role: "user", content: visionContent }],
+              max_tokens: 3000
             })
           }),
-          new Promise((_, rej) => setTimeout(() => rej(new Error("vision timeout")), 20000))
+          new Promise((_, rej) => setTimeout(() => rej(new Error("vision timeout")), 35000))
         ]);
         if (visionResp.ok) {
           const visionData = await visionResp.json();
           const visionText = visionData?.choices?.[0]?.message?.content;
           if (visionText && visionText.length > 20) {
             aiProductDescriptions = visionText;
-            console.log("Viz Step 1: AI vision analysis complete:\n" + visionText.slice(0, 500));
+            console.log("Viz Step 1: AI vision analysis complete:\n" + visionText.slice(0, 800));
           }
         }
       } catch (err) { console.log("Viz Step 1: AI vision failed (using fallback):", err?.message); }
@@ -1417,29 +1418,32 @@ export default function App() {
         const name = (item.n || "").toLowerCase();
         const fullText = (item.n || "") + " " + (item.pr || "");
 
-        // Shape from name
-        let shape = item.c;
-        if (name.includes("round") || name.includes("circular")) shape = "round " + item.c;
-        else if (name.includes("oval")) shape = "oval " + item.c;
-        else if (name.includes("sectional") || name.includes("l-shaped")) shape = "L-shaped " + item.c;
-
-        // Color + material from name
-        const colors = extractKw(fullText, COLOR_WORDS);
-        const mats = extractKw(fullText, MAT_WORDS);
-
-        // AI vision description if available
+        // AI vision description — this is the most important part
         let aiDesc = "";
         if (aiProductDescriptions) {
-          const regex = new RegExp("PRODUCT\\s*" + (idx + 1) + "\\s*:(.+)", "i");
+          // Match multi-line: everything from PRODUCT N: until the next PRODUCT or end
+          const regex = new RegExp("PRODUCT\\s*" + (idx + 1) + "\\s*:\\s*([\\s\\S]*?)(?=PRODUCT\\s*\\d|$)", "i");
           const match = aiProductDescriptions.match(regex);
           aiDesc = match ? match[1].trim() : "";
         }
 
-        let spec = (idx + 1) + ". " + (item.n || "Unknown") + " — " + shape + ", " + Math.round(dims.w * 12) + '"W × ' + Math.round(dims.d * 12) + '"D';
-        if (colors.length > 0) spec += ", " + colors.slice(0, 3).join("/");
-        if (mats.length > 0) spec += ", " + mats.slice(0, 2).join("/");
-        if (aiDesc) spec += " | " + aiDesc;
-        if (qty > 1) spec += " ×" + qty;
+        // Fallback: extract color/material from product name if no AI description
+        let fallbackDesc = "";
+        if (!aiDesc) {
+          const colors = extractKw(fullText, COLOR_WORDS);
+          const mats = extractKw(fullText, MAT_WORDS);
+          let shape = item.c;
+          if (name.includes("round") || name.includes("circular")) shape = "round " + item.c;
+          else if (name.includes("oval")) shape = "oval " + item.c;
+          else if (name.includes("sectional") || name.includes("l-shaped")) shape = "L-shaped " + item.c;
+          fallbackDesc = shape;
+          if (colors.length > 0) fallbackDesc += ", " + colors.slice(0, 3).join("/");
+          if (mats.length > 0) fallbackDesc += ", " + mats.slice(0, 2).join("/");
+        }
+
+        let spec = (idx + 1) + ". " + (item.n || "Unknown") + " (" + Math.round(dims.w * 12) + '"W × ' + Math.round(dims.d * 12) + '"D)';
+        spec += "\n   " + (aiDesc || fallbackDesc);
+        if (qty > 1) spec += "\n   Qty: " + qty;
         return spec;
       }).join("\n");
 
