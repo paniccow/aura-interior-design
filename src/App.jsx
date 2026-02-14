@@ -9,6 +9,45 @@ import { DB } from "./data.js";
 
 const AI_API = "/api/ai";
 
+/* Compress/resize an image file to stay under Vercel's 4.5MB body limit.
+   Returns { dataUrl, base64, mimeType } where base64 is under ~2MB */
+function compressImage(file, maxDim = 1200, quality = 0.7) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        // Scale down if either dimension exceeds maxDim
+        if (w > maxDim || h > maxDim) {
+          const ratio = Math.min(maxDim / w, maxDim / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+        // Use JPEG for photos (much smaller than PNG)
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        const base64 = dataUrl.split(",")[1];
+        // If still too large (>2.5MB base64), reduce further
+        if (base64.length > 2500000) {
+          const smallerUrl = canvas.toDataURL("image/jpeg", 0.4);
+          resolve({ dataUrl: smallerUrl, base64: smallerUrl.split(",")[1], mimeType: "image/jpeg" });
+        } else {
+          resolve({ dataUrl, base64, mimeType: "image/jpeg" });
+        }
+      };
+      img.onerror = () => reject(new Error("Failed to load image"));
+      img.src = ev.target.result;
+    };
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+}
+
 async function aiChat(messages) {
   // Strategy 1: OpenRouter via our secure proxy (GPT-4o-mini — fast, reliable, cheap)
   try {
@@ -1233,17 +1272,17 @@ export default function App() {
     setSel(newSel);
   };
 
-  // Analyze uploaded CAD/PDF for room dimensions (uses free Pollinations AI)
+  // Analyze uploaded CAD/PDF for room dimensions — compress then send to AI
   const handleCad = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     setCadLoading(true);
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      setCadFile({ name: file.name, data: ev.target.result, type: file.type });
+    try {
+      // Compress image to stay under Vercel body limit
+      const { dataUrl, base64, mimeType } = await compressImage(file, 1200, 0.75);
+      console.log("CAD compressed: " + Math.round(base64.length / 1024) + "KB (original: " + Math.round(file.size / 1024) + "KB)");
+      setCadFile({ name: file.name, data: dataUrl, type: mimeType });
       try {
-        const base64 = ev.target.result.split(",")[1];
-        const mimeType = file.type || "image/png";
         const text = await analyzeImage(base64, mimeType, "Analyze this floor plan/CAD drawing for interior design. Extract:\n1) Total square footage estimate\n2) Room dimensions (width x length)\n3) Number and location of windows\n4) Number and location of doors\n5) Built-in features\n6) Which wall is the focal wall\n7) Natural light direction\n8) Any structural constraints\n\nBe precise with measurements. Use bullet points.");
         if (text && text.length > 10) {
           setCadAnalysis(text);
@@ -1253,22 +1292,29 @@ export default function App() {
       } catch (err) {
         console.log("CAD analysis error:", err);
       }
-      setCadLoading(false);
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.log("CAD compression error:", err);
+      // Fallback: read without compression
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setCadFile({ name: file.name, data: ev.target.result, type: file.type });
+      };
+      reader.readAsDataURL(file);
+    }
+    setCadLoading(false);
   };
 
-  // Handle room photo upload — AI analyzes the actual room (free Pollinations AI)
+  // Handle room photo upload — compress then AI analyzes the actual room
   const handleRoomPhoto = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     setRoomPhotoLoading(true);
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      setRoomPhoto({ name: file.name, data: ev.target.result, type: file.type });
+    try {
+      // Compress image to stay under Vercel body limit (~4.5MB)
+      const { dataUrl, base64, mimeType } = await compressImage(file, 1200, 0.7);
+      console.log("Room photo compressed: " + Math.round(base64.length / 1024) + "KB (original: " + Math.round(file.size / 1024) + "KB)");
+      setRoomPhoto({ name: file.name, data: dataUrl, type: mimeType });
       try {
-        const base64 = ev.target.result.split(",")[1];
-        const mimeType = file.type || "image/jpeg";
         const text = await analyzeImage(base64, mimeType, "You are an expert interior designer analyzing a room photo. Provide a DETAILED analysis:\n\n1) Room type (living room, bedroom, etc.)\n2) Approximate dimensions (width x length in feet)\n3) Estimated square footage\n4) Wall colors and finishes\n5) Flooring type and color\n6) Windows: count, size, location\n7) Existing furniture: list each piece with location\n8) Lighting: natural light direction, existing fixtures\n9) Architectural features: crown molding, fireplace, built-ins, ceiling height\n10) Style assessment: current design style\n11) Focal wall identification\n12) Areas that feel empty or could benefit from furniture\n\nBe specific about positions and measurements.");
         if (text && text.length > 10) {
           setRoomPhotoAnalysis(text);
@@ -1282,16 +1328,23 @@ export default function App() {
             recs: []
           }]);
         } else {
-          // Vision not available — still save photo and give helpful response
           setMsgs((prev) => [...prev, { role: "bot", text: "**Room photo saved!** I can see you've uploaded a photo of your space. While AI image analysis is temporarily processing, go ahead and describe your room — tell me the room type, approximate size, and what style you're going for. I'll use your photo along with your description to create the perfect design!", recs: [] }]);
         }
       } catch (err) {
         console.log("Room photo analysis error:", err);
         setMsgs((prev) => [...prev, { role: "bot", text: "**Room photo saved!** Describe your space and I'll help design it using your photo as reference.", recs: [] }]);
       }
-      setRoomPhotoLoading(false);
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.log("Room photo compression error:", err);
+      // Fallback: try reading the file without compression
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setRoomPhoto({ name: file.name, data: ev.target.result, type: file.type });
+        setMsgs((prev) => [...prev, { role: "bot", text: "**Room photo saved!** The image is large so analysis may be limited. Describe your room and I'll use the photo for visualization.", recs: [] }]);
+      };
+      reader.readAsDataURL(file);
+    }
+    setRoomPhotoLoading(false);
   };
 
   // Generate single room visualization — OpenRouter, concept card fallback
