@@ -1152,6 +1152,19 @@ export default function App() {
   const [vizUrls, setVizUrls] = useState([]);
   const [vizSt, setVizSt] = useState("idle");
   const [vizErr, setVizErr] = useState("");
+  // Visualization usage tracking — { month: "2025-01", count: 3 }
+  const [vizUsage, setVizUsage] = useState(() => {
+    try {
+      const stored = localStorage.getItem("aura_viz_usage");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const now = new Date();
+        const currentMonth = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+        if (parsed.month === currentMonth) return parsed;
+      }
+      return { month: new Date().getFullYear() + "-" + String(new Date().getMonth() + 1).padStart(2, "0"), count: 0 };
+    } catch { return { month: new Date().getFullYear() + "-" + String(new Date().getMonth() + 1).padStart(2, "0"), count: 0 }; }
+  });
   const [cadFile, setCadFile] = useState(null);
   const [cadAnalysis, setCadAnalysis] = useState(null);
   const [cadLoading, setCadLoading] = useState(false);
@@ -1200,6 +1213,13 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem("aura_activeProject", JSON.stringify(activeProjectId)); } catch {}
   }, [activeProjectId]);
+  useEffect(() => {
+    try { localStorage.setItem("aura_viz_usage", JSON.stringify(vizUsage)); } catch {}
+  }, [vizUsage]);
+
+  // Viz limits: free = 1/month, pro = 100/month
+  const vizLimit = user?.plan === "pro" ? 100 : 1;
+  const vizRemaining = Math.max(0, vizLimit - vizUsage.count);
 
   // Auto-save active project every 8 seconds when state changes
   useEffect(() => {
@@ -1375,6 +1395,17 @@ export default function App() {
   // Generate single room visualization — OpenRouter, concept card fallback
   const generateViz = async () => {
     if (selItems.length === 0) return;
+    // Check monthly viz limit
+    const now = new Date();
+    const currentMonth = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+    const usage = vizUsage.month === currentMonth ? vizUsage : { month: currentMonth, count: 0 };
+    const limit = user?.plan === "pro" ? 100 : 1;
+    if (usage.count >= limit) {
+      setVizErr(user?.plan === "pro"
+        ? "You've used all 100 visualizations this month. Your limit resets next month."
+        : "You've used your free visualization for this month. Upgrade to Pro for 100 visualizations per month!");
+      return;
+    }
     try {
       setVizSt("loading");
       setVizUrls([]);
@@ -1522,6 +1553,11 @@ export default function App() {
       } else if (imgUrl) {
         setVizUrls([{ url: imgUrl, label: "AI Visualization" }]);
         setVizSt("ok");
+        // Increment monthly usage counter
+        setVizUsage(prev => {
+          const cm = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+          return prev.month === cm ? { month: cm, count: prev.count + 1 } : { month: cm, count: 1 };
+        });
         console.log("Viz: SUCCESS");
       } else {
         // Fallback concept card
@@ -1533,6 +1569,11 @@ export default function App() {
           products: items.slice(0, 4).map(p => p.n)
         }]);
         setVizSt("ok");
+        // Still counts as a use
+        setVizUsage(prev => {
+          const cm = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+          return prev.month === cm ? { month: cm, count: prev.count + 1 } : { month: cm, count: 1 };
+        });
       }
     } catch (err) {
       console.error("Visualization error:", err);
@@ -2010,6 +2051,7 @@ export default function App() {
                   ["Room Photo", roomPhoto ? "Uploaded" : "None"],
                   ["CAD File", cadFile ? cadFile.name : "None"],
                   ["Visualizations", vizUrls.length + " generated"],
+                  ["Viz Usage (month)", vizUsage.count + "/" + vizLimit + " (" + vizRemaining + " remaining)"],
                   ["Chat Messages", msgs.length],
                   ["Mood Boards", boards ? boards.length + " generated" : "None"],
                 ].map(([k, v]) => (
@@ -2187,13 +2229,13 @@ export default function App() {
             <div style={{ background: "#fff", borderRadius: 20, padding: "40px 32px", textAlign: "left" }}>
               <p style={{ fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", color: "#A89B8B", marginBottom: 8 }}>Free</p>
               <div style={{ fontFamily: "Georgia,serif", fontSize: 48, fontWeight: 400, marginBottom: 24 }}>$0<span style={{ fontSize: 16, color: "#B8A898" }}>/mo</span></div>
-              {["3 mood boards/month", "Core catalog", "AI design chat", "Room visualizations", "1 saved project"].map((f) => <p key={f} style={{ fontSize: 14, color: "#7A6B5B", padding: "10px 0", borderBottom: "1px solid #F5F0EB", margin: 0 }}>&#10003; {f}</p>)}
+              {["3 mood boards/month", "Core catalog", "AI design chat", "1 room visualization/month", "1 saved project"].map((f) => <p key={f} style={{ fontSize: 14, color: "#7A6B5B", padding: "10px 0", borderBottom: "1px solid #F5F0EB", margin: 0 }}>&#10003; {f}</p>)}
             </div>
             <div style={{ background: "#fff", borderRadius: 20, padding: "40px 32px", textAlign: "left", border: "2px solid #C17550", position: "relative" }}>
               <div style={{ position: "absolute", top: 0, right: 20, background: "#C17550", color: "#fff", fontSize: 10, fontWeight: 700, padding: "6px 16px", borderRadius: "0 0 12px 12px", letterSpacing: ".1em" }}>POPULAR</div>
               <p style={{ fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", color: "#C17550", marginBottom: 8 }}>Pro</p>
               <div style={{ fontFamily: "Georgia,serif", fontSize: 48, fontWeight: 400, marginBottom: 24 }}>$20<span style={{ fontSize: 16, color: "#B8A898" }}>/mo</span></div>
-              {["Unlimited mood boards", "Full " + DB.length + " product catalog", "3 AI Room Visualizations", "CAD/PDF floor plan analysis", "AI-powered furniture layout plans", "Exact placement with dimensions", "Spatial fit verification", "Unlimited projects", "All 14 design styles"].map((f) => <p key={f} style={{ fontSize: 14, color: "#7A6B5B", padding: "10px 0", borderBottom: "1px solid #F5F0EB", margin: 0 }}>&#10003; {f}</p>)}
+              {["Unlimited mood boards", "Full " + DB.length + " product catalog", "100 AI room visualizations/month", "CAD/PDF floor plan analysis", "AI-powered furniture layout plans", "Exact placement with dimensions", "Spatial fit verification", "Unlimited projects", "All 14 design styles"].map((f) => <p key={f} style={{ fontSize: 14, color: "#7A6B5B", padding: "10px 0", borderBottom: "1px solid #F5F0EB", margin: 0 }}>&#10003; {f}</p>)}
               <button onClick={() => { setUser({ ...(user || { email: "demo", name: "Demo" }), plan: "pro" }); go("success"); }} style={{ width: "100%", marginTop: 24, padding: "14px", background: "#C17550", color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Subscribe - $20/mo</button>
             </div>
           </div>
@@ -3033,13 +3075,25 @@ export default function App() {
                       <p style={{ fontSize: 13, color: "rgba(255,255,255,.55)", margin: 0 }}>Ready to see your room come to life?</p>
                     </div>
                     <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                      <button onClick={generateViz} disabled={vizSt === "loading"} style={{ background: "#C17550", color: "#fff", border: "none", borderRadius: 10, padding: "14px 32px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: vizSt === "loading" ? 0.6 : 1, transition: "all .2s", boxShadow: "0 4px 16px rgba(193,117,80,.35)", letterSpacing: ".02em" }}>{vizSt === "loading" ? "Generating..." : "✦ Visualize Room"}</button>
-                      <button onClick={() => { setSel(new Map()); setVizUrls([]); setVizSt("idle"); setVizErr(""); setCadLayout(null); setDesignStep(1); }} style={{ background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.2)", borderRadius: 10, padding: "10px 18px", fontSize: 12, color: "rgba(255,255,255,.7)", cursor: "pointer", fontFamily: "inherit" }}>Clear all</button>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+                        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                          {vizRemaining > 0 ? (
+                            <button onClick={generateViz} disabled={vizSt === "loading"} style={{ background: "#C17550", color: "#fff", border: "none", borderRadius: 10, padding: "14px 32px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: vizSt === "loading" ? 0.6 : 1, transition: "all .2s", boxShadow: "0 4px 16px rgba(193,117,80,.35)", letterSpacing: ".02em" }}>{vizSt === "loading" ? "Generating..." : "✦ Visualize Room"}</button>
+                          ) : (
+                            <button onClick={() => go("pricing")} style={{ background: "#C17550", color: "#fff", border: "none", borderRadius: 10, padding: "14px 32px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 16px rgba(193,117,80,.35)", letterSpacing: ".02em" }}>{user?.plan === "pro" ? "Limit Reached" : "Upgrade to Pro"}</button>
+                          )}
+                          <button onClick={() => { setSel(new Map()); setVizUrls([]); setVizSt("idle"); setVizErr(""); setCadLayout(null); setDesignStep(1); }} style={{ background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.2)", borderRadius: 10, padding: "10px 18px", fontSize: 12, color: "rgba(255,255,255,.7)", cursor: "pointer", fontFamily: "inherit" }}>Clear all</button>
+                        </div>
+                        <span style={{ fontSize: 11, color: vizRemaining <= 3 ? "#F0A080" : "rgba(255,255,255,.4)" }}>{vizUsage.count}/{vizLimit} used this month · {vizRemaining} remaining</span>
+                      </div>
                     </div>
                   </div>
 
                   {/* Viz images — ABOVE floor plan */}
-                  {vizErr && <p style={{ fontSize: 12, color: "#C17550", marginBottom: 16, background: "#FFF8F0", padding: "12px 16px", borderRadius: 10, border: "1px solid #F0D8C0" }}>{vizErr}</p>}
+                  {vizErr && <div style={{ fontSize: 12, color: "#C17550", marginBottom: 16, background: "#FFF8F0", padding: "14px 18px", borderRadius: 10, border: "1px solid #F0D8C0", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+                    <span>{vizErr}</span>
+                    {vizRemaining <= 0 && user?.plan !== "pro" && <button onClick={() => go("pricing")} style={{ background: "#C17550", color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>Upgrade to Pro</button>}
+                  </div>}
                   <div ref={vizAreaRef}>
                   {vizSt === "loading" && (
                     <div style={{ marginBottom: 24, borderRadius: 14, border: "1px solid #EDE8E0", padding: "48px 32px", textAlign: "center", background: "#fff" }}>
