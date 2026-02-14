@@ -1287,8 +1287,20 @@ export default function App() {
         const text = await analyzeImage(base64, mimeType, "Analyze this floor plan/CAD drawing for interior design. Extract:\n1) Total square footage estimate\n2) Room dimensions (width x length)\n3) Number and location of windows\n4) Number and location of doors\n5) Built-in features\n6) Which wall is the focal wall\n7) Natural light direction\n8) Any structural constraints\n\nBe precise with measurements. Use bullet points.");
         if (text && text.length > 10) {
           setCadAnalysis(text);
-          const sqftMatch = text.match(/(\d{2,5})\s*(?:sq|square|sf|ft)/i);
-          if (sqftMatch) setSqft(sqftMatch[1]);
+          // Extract width × length first
+          const dimsMatch = text.match(/(\d{1,3})\s*(?:feet|ft|')?\s*(?:wide|w)?\s*(?:by|x|×)\s*(\d{1,3})\s*(?:feet|ft|')?\s*(?:long|l)?/i);
+          if (dimsMatch) {
+            const w = dimsMatch[1];
+            const l = dimsMatch[2];
+            if (!roomW) setRoomW(w);
+            if (!roomL) setRoomL(l);
+            if (!sqft) setSqft(String(Math.round(parseFloat(w) * parseFloat(l))));
+          }
+          // Fallback: sqft only
+          if (!sqft && !dimsMatch) {
+            const sqftMatch = text.match(/(\d{2,5})\s*(?:sq(?:uare)?\s*(?:feet|ft)|sf)/i);
+            if (sqftMatch) setSqft(sqftMatch[1]);
+          }
         }
       } catch (err) {
         console.log("CAD analysis error:", err);
@@ -1321,8 +1333,20 @@ export default function App() {
           setRoomPhotoAnalysis(text);
           const rtMatch = text.match(/room\s*type[:\s]*(living room|bedroom|dining room|kitchen|office|bathroom|great room|outdoor)/i);
           if (rtMatch && !room) setRoom(rtMatch[1].split(" ").map(w => w[0].toUpperCase() + w.slice(1)).join(" "));
-          const sqftMatch = text.match(/(\d{2,5})\s*(?:sq|square|sf|ft)/i);
-          if (sqftMatch && !sqft) setSqft(sqftMatch[1]);
+          // Extract width × length (e.g. "15 feet wide by 20 feet long" or "15 x 20" or "15ft x 20ft")
+          const dimsMatch = text.match(/(\d{1,3})\s*(?:feet|ft|')?\s*(?:wide|w)?\s*(?:by|x|×)\s*(\d{1,3})\s*(?:feet|ft|')?\s*(?:long|l)?/i);
+          if (dimsMatch && !roomW && !roomL) {
+            const w = dimsMatch[1];
+            const l = dimsMatch[2];
+            setRoomW(w);
+            setRoomL(l);
+            if (!sqft) setSqft(String(Math.round(parseFloat(w) * parseFloat(l))));
+          }
+          // Fallback: extract sqft directly (only match "square feet" / "sq ft" patterns, not just "ft")
+          if (!sqft && !dimsMatch) {
+            const sqftMatch = text.match(/(\d{2,5})\s*(?:sq(?:uare)?\s*(?:feet|ft)|sf)/i);
+            if (sqftMatch) setSqft(sqftMatch[1]);
+          }
           setMsgs((prev) => [...prev, {
             role: "bot",
             text: "**Room Photo Analyzed!** Here's what I see:\n\n" + text + "\n\nI'll use this for layouts and visualizations. Tell me what you'd like to do with this space!",
