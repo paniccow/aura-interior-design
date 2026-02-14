@@ -1940,6 +1940,10 @@ export default function App() {
           .aura-sel-header{flex-direction:column!important;align-items:flex-start!important;gap:12px!important}
           .aura-sel-actions{width:100%!important}
           .aura-sel-actions button{flex:1!important}
+          .aura-purchase-row{grid-template-columns:40px 1fr 60px 70px 60px!important}
+          .aura-purchase-header{display:none!important}
+          .aura-purchase-footer{grid-template-columns:40px 1fr 60px 70px 60px!important}
+          .aura-purchase-retailer,.aura-purchase-unit{display:none!important}
         }
       `}</style>
 
@@ -2606,14 +2610,15 @@ export default function App() {
               {/* Selection + CAD Layout + Viz */}
               {sel.size > 0 ? (
                 <div style={{ padding: "28px 5%", background: "#FDFCFA" }}>
-                  <div className="aura-sel-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
+                  {/* Prominent Visualize banner */}
+                  <div style={{ background: "linear-gradient(135deg, #1A1815, #2A2520)", borderRadius: 16, padding: "28px 32px", marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
                     <div>
-                      <p style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "#1A1815", fontWeight: 700, marginBottom: 4 }}>Your Selection</p>
-                      <h2 style={{ fontFamily: "Georgia,serif", fontSize: 26, fontWeight: 400, letterSpacing: "-0.02em" }}>{selCount} items · {fmt(selTotal)}</h2>
+                      <h2 style={{ fontFamily: "Georgia,serif", fontSize: 22, fontWeight: 400, color: "#fff", marginBottom: 4 }}>{selCount} items · {fmt(selTotal)}</h2>
+                      <p style={{ fontSize: 13, color: "rgba(255,255,255,.55)", margin: 0 }}>Ready to see your room come to life?</p>
                     </div>
-                    <div className="aura-sel-actions" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                      <button onClick={generateViz} disabled={vizSt === "loading"} style={{ background: "#1A1815", color: "#fff", border: "none", borderRadius: 8, padding: "12px 28px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: vizSt === "loading" ? 0.5 : 1, transition: "opacity .2s" }}>{vizSt === "loading" ? "Generating..." : "Visualize Room →"}</button>
-                      <button onClick={() => { setSel(new Map()); setVizUrls([]); setVizSt("idle"); setVizErr(""); setCadLayout(null); setDesignStep(1); }} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 8, padding: "8px 16px", fontSize: 12, color: "#9B8B7B", cursor: "pointer", fontFamily: "inherit" }}>Clear</button>
+                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                      <button onClick={generateViz} disabled={vizSt === "loading"} style={{ background: "#C17550", color: "#fff", border: "none", borderRadius: 10, padding: "14px 32px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: vizSt === "loading" ? 0.6 : 1, transition: "all .2s", boxShadow: "0 4px 16px rgba(193,117,80,.35)", letterSpacing: ".02em" }}>{vizSt === "loading" ? "Generating..." : "✦ Visualize Room"}</button>
+                      <button onClick={() => { setSel(new Map()); setVizUrls([]); setVizSt("idle"); setVizErr(""); setCadLayout(null); setDesignStep(1); }} style={{ background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.2)", borderRadius: 10, padding: "10px 18px", fontSize: 12, color: "rgba(255,255,255,.7)", cursor: "pointer", fontFamily: "inherit" }}>Clear all</button>
                     </div>
                   </div>
 
@@ -2686,16 +2691,79 @@ export default function App() {
                       ))}
                     </div>
                   )}
-                  <div className="aura-card-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: 14 }}>
-                    {selItems.map((p) => (
-                      <div key={p.id}>
-                        <Card p={p} sel toggle={toggle} small />
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "6px 0" }}>
-                          <button onClick={() => setQty(p.id, (sel.get(p.id) || 1) - 1)} style={{ width: 26, height: 26, borderRadius: "50%", border: "1px solid #E8E0D8", background: "#fff", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", color: "#5A5045" }}>-</button>
-                          <span style={{ fontSize: 13, fontWeight: 600, minWidth: 20, textAlign: "center" }}>{sel.get(p.id) || 1}</span>
-                          <button onClick={() => setQty(p.id, (sel.get(p.id) || 1) + 1)} style={{ width: 26, height: 26, borderRadius: "50%", border: "1px solid #E8E0D8", background: "#fff", fontSize: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", color: "#5A5045" }}>+</button>
+                  {/* ═══ PURCHASE LIST — PCPartPicker style ═══ */}
+                  <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #E8E0D8", overflow: "hidden", marginBottom: 24 }}>
+                    <div style={{ padding: "16px 20px", borderBottom: "1px solid #F0EBE4", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ fontSize: 18 }}>🛒</span>
+                        <div>
+                          <p style={{ fontSize: 14, fontWeight: 700, color: "#1A1815", margin: 0 }}>Purchase List</p>
+                          <p style={{ fontSize: 11, color: "#9B8B7B", margin: 0 }}>{selCount} items from {[...new Set(selItems.map(p => p.r))].length} retailers</p>
                         </div>
                       </div>
+                      <div style={{ textAlign: "right" }}>
+                        <p style={{ fontSize: 18, fontWeight: 700, color: "#1A1815", margin: 0, fontFamily: "Georgia,serif" }}>{fmt(selTotal)}</p>
+                        <p style={{ fontSize: 10, color: "#9B8B7B", margin: 0 }}>estimated total</p>
+                      </div>
+                    </div>
+                    {/* Table header */}
+                    <div className="aura-purchase-header" style={{ display: "grid", gridTemplateColumns: "52px 1fr 120px 60px 90px 90px 80px", gap: 0, padding: "8px 16px", borderBottom: "1px solid #F0EBE4", background: "#FAFAF8" }}>
+                      {["", "Product", "Retailer", "Qty", "Unit Price", "Total", ""].map((h, i) => (
+                        <span key={i} style={{ fontSize: 10, fontWeight: 600, color: "#9B8B7B", letterSpacing: ".08em", textTransform: "uppercase", padding: "4px 4px" }}>{h}</span>
+                      ))}
+                    </div>
+                    {/* Product rows */}
+                    {selItems.map((p, idx) => {
+                      const qty = sel.get(p.id) || 1;
+                      const lineTotal = p.p * qty;
+                      return (
+                        <div key={p.id} className="aura-purchase-row" style={{ display: "grid", gridTemplateColumns: "52px 1fr 120px 60px 90px 90px 80px", gap: 0, padding: "10px 16px", borderBottom: idx < selItems.length - 1 ? "1px solid #F5F2ED" : "none", alignItems: "center", transition: "background .15s" }}
+                          onMouseEnter={e => e.currentTarget.style.background = "#FAFAF8"}
+                          onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                          {/* Thumbnail */}
+                          <div style={{ width: 40, height: 40, borderRadius: 8, overflow: "hidden", border: "1px solid #EDE8E2" }}>
+                            <img src={p.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} referrerPolicy="no-referrer" loading="lazy" />
+                          </div>
+                          {/* Name + category */}
+                          <div style={{ padding: "0 8px", overflow: "hidden" }}>
+                            <p style={{ fontSize: 13, fontWeight: 500, color: "#1A1815", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.n}</p>
+                            <p style={{ fontSize: 10, color: "#B8A898", margin: 0, textTransform: "capitalize" }}>{p.c}</p>
+                          </div>
+                          {/* Retailer */}
+                          <span className="aura-purchase-retailer" style={{ fontSize: 11, color: "#7A6B5B", padding: "0 4px" }}>{p.r}</span>
+                          {/* Quantity */}
+                          <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "0 4px" }}>
+                            <button onClick={() => setQty(p.id, qty - 1)} style={{ width: 22, height: 22, borderRadius: "50%", border: "1px solid #E8E0D8", background: "#fff", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", color: "#5A5045", padding: 0 }}>−</button>
+                            <span style={{ fontSize: 12, fontWeight: 600, minWidth: 16, textAlign: "center" }}>{qty}</span>
+                            <button onClick={() => setQty(p.id, qty + 1)} style={{ width: 22, height: 22, borderRadius: "50%", border: "1px solid #E8E0D8", background: "#fff", fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "inherit", color: "#5A5045", padding: 0 }}>+</button>
+                          </div>
+                          {/* Unit price */}
+                          <span className="aura-purchase-unit" style={{ fontSize: 12, color: "#7A6B5B", padding: "0 4px" }}>{fmt(p.p)}</span>
+                          {/* Line total */}
+                          <span style={{ fontSize: 13, fontWeight: 700, color: "#1A1815", padding: "0 4px" }}>{fmt(lineTotal)}</span>
+                          {/* Buy button */}
+                          <a href={p.u} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", background: "#C17550", color: "#fff", fontSize: 11, fontWeight: 600, padding: "6px 12px", borderRadius: 6, textDecoration: "none", whiteSpace: "nowrap", transition: "opacity .15s" }}
+                            onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
+                            onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Buy →</a>
+                        </div>
+                      );
+                    })}
+                    {/* Total footer */}
+                    <div className="aura-purchase-footer" style={{ display: "grid", gridTemplateColumns: "52px 1fr 120px 60px 90px 90px 80px", gap: 0, padding: "14px 16px", borderTop: "2px solid #E8E0D8", background: "#FAFAF8" }}>
+                      <span />
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#1A1815", padding: "0 8px" }}>Total ({selCount} items)</span>
+                      <span className="aura-purchase-retailer" style={{ fontSize: 11, color: "#9B8B7B", padding: "0 4px" }}>{[...new Set(selItems.map(p => p.r))].length} retailers</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: "#5A5045", padding: "0 4px" }}>{selItems.reduce((s, p) => s + (sel.get(p.id) || 1), 0)}</span>
+                      <span className="aura-purchase-unit" />
+                      <span style={{ fontSize: 15, fontWeight: 700, color: "#1A1815", padding: "0 4px", fontFamily: "Georgia,serif" }}>{fmt(selTotal)}</span>
+                      <span />
+                    </div>
+                  </div>
+
+                  {/* Compact card grid for visual reference */}
+                  <div className="aura-card-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))", gap: 10 }}>
+                    {selItems.map((p) => (
+                      <Card key={p.id} p={p} sel toggle={toggle} small />
                     ))}
                   </div>
                 </div>
