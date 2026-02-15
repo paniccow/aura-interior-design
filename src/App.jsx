@@ -2335,8 +2335,9 @@ export default function App() {
           .aura-purchase-footer{grid-template-columns:40px 1fr 60px 70px 60px!important}
           .aura-purchase-retailer,.aura-purchase-unit{display:none!important}
           .aura-admin-grid{grid-template-columns:1fr!important}
-          .aura-compare-header,.aura-compare-row{grid-template-columns:1fr repeat(3,56px)!important;gap:4px!important;padding:12px 16px!important}
+          .aura-compare-header,.aura-compare-row{grid-template-columns:1fr repeat(3,48px)!important;gap:2px!important;padding:12px 14px!important}
           .aura-compare-header>div:nth-child(n+5),.aura-compare-row>div:nth-child(n+5){display:none!important}
+          .aura-compare-row .aura-feat-icon{display:none!important}
         }
       `}</style>
 
@@ -2690,72 +2691,86 @@ export default function App() {
             <RevealSection>
               <div style={{ maxWidth: 1100, margin: "0 auto" }}>
                 <div style={{ textAlign: "center", marginBottom: 56 }}>
-                  <span style={{ display: "inline-block", background: "#5B8B6B15", color: "#5B8B6B", padding: "6px 16px", borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 20 }}>Why AURA</span>
+                  <span style={{ display: "inline-block", background: "#C1755012", color: "#C17550", padding: "6px 16px", borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 20 }}>Why AURA</span>
                   <h2 style={{ fontFamily: "Georgia,serif", fontSize: "clamp(28px,3.5vw,42px)", fontWeight: 400, marginBottom: 14, lineHeight: 1.15 }}>See how we compare</h2>
-                  <p style={{ fontSize: 16, color: "#7A6B5B", lineHeight: 1.7, maxWidth: 560, margin: "0 auto" }}>Every tool a designer needs — powered by AI, accessible to everyone.</p>
+                  <p style={{ fontSize: 16, color: "#7A6B5B", lineHeight: 1.7, maxWidth: 560, margin: "0 auto" }}>Everything you need to design your dream space — in one platform.</p>
                 </div>
                 {(() => {
                   const competitors = ["Havenly", "Modsy", "RoomGPT", "Pottery Barn", "Houzz"];
                   const features = [
-                    { name: "AI room visualization", desc: "Photorealistic renders of your space", aura: true, others: [true, false, true, false, false] },
-                    { name: "Real product links", desc: "Direct purchase from premium brands", aura: true, others: [true, true, false, true, true] },
-                    { name: "Room photo upload", desc: "Upload your actual room photo", aura: true, others: [false, true, true, false, false] },
-                    { name: "AI design assistant", desc: "Chat for personalized suggestions", aura: true, others: [false, false, true, false, false] },
-                    { name: "CAD floor plans", desc: "Professional layouts with dimensions", aura: true, others: [false, false, false, false, false] },
-                    { name: "Style library", desc: "14+ curated design palettes", aura: true, others: [true, false, false, false, true] },
-                    { name: "Beginner-friendly", desc: "No design skills needed", aura: true, others: [true, true, true, false, false] },
-                    { name: "Instant results", desc: "Designs generated in seconds", aura: true, others: [false, false, true, false, false] },
-                    { name: DB.length + " curated products", desc: "Hand-picked from top brands", aura: true, others: [false, false, false, false, false] },
-                    { name: "Smart fit scoring", desc: "AI checks style & room compatibility", aura: true, others: [false, false, false, false, false] },
-                    { name: "Multi-project support", desc: "Save unlimited design projects", aura: true, others: [true, true, false, false, true] },
-                    { name: "Quantity control", desc: "Add multiples of any item", aura: true, others: [false, false, false, true, false] },
-                    { name: "Mood board generation", desc: "AI-curated product collections", aura: true, others: [true, true, false, false, false] },
-                    { name: "Web-based", desc: "No installation required", aura: true, others: [true, true, true, true, true] },
-                    { name: "Free tier available", desc: "Start designing at no cost", aura: true, others: [false, false, true, false, false] },
+                    { icon: "\uD83D\uDDBC\uFE0F", name: "AI room visualization", desc: "Photorealistic renders of your space", aura: true, others: [true, false, true, false, false] },
+                    { icon: "\uD83D\uDED2", name: "Real product links", desc: "Direct purchase from premium brands", aura: true, others: [true, true, false, true, true] },
+                    { icon: "\uD83D\uDCF7", name: "Room photo upload", desc: "Upload your actual room photo", aura: true, others: [false, true, true, false, false] },
+                    { icon: "\uD83D\uDCAC", name: "AI design assistant", desc: "Chat for personalized suggestions", aura: true, others: [false, false, true, false, false] },
+                    { icon: "\uD83D\uDCD0", name: "CAD floor plans", desc: "Professional layouts with dimensions", aura: true, others: [false, false, false, false, false] },
+                    { icon: "\uD83C\uDFA8", name: "Style library", desc: "14+ curated design palettes", aura: true, others: [true, false, false, false, true] },
+                    { icon: "\u2728", name: "Beginner-friendly", desc: "No design skills needed", aura: true, others: [true, true, true, false, false] },
+                    { icon: "\u26A1", name: "Instant results", desc: "Designs generated in seconds", aura: true, others: [false, false, true, false, false] },
+                    { icon: "\uD83D\uDECB\uFE0F", name: DB.length + " curated products", desc: "Hand-picked from top brands", aura: true, others: [false, false, false, false, false] },
+                    { icon: "\uD83D\uDCCA", name: "Smart fit scoring", desc: "AI checks style & room compatibility", aura: true, others: [false, false, false, false, false] },
+                    { icon: "\uD83D\uDCC2", name: "Multi-project support", desc: "Save unlimited design projects", aura: true, others: [true, true, false, false, true] },
+                    { icon: "\uD83C\uDFB2", name: "Mood board generation", desc: "AI-curated product collections", aura: true, others: [true, true, false, false, false] },
+                    { icon: "\uD83C\uDF10", name: "Web-based", desc: "No installation required", aura: true, others: [true, true, true, true, true] },
+                    { icon: "\uD83C\uDD93", name: "Free tier available", desc: "Start designing at no cost", aura: true, others: [false, false, true, false, false] },
                   ];
-                  const Check = () => <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#E8F5EC", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#34A853" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg></div>;
-                  const Cross = () => <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#FDE8E8", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#EA4335" strokeWidth="2.5" strokeLinecap="round"/></svg></div>;
+                  const Check = () => <div style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg, #E8F5EC, #D4EDDA)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(52,168,83,.15)" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#34A853" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg></div>;
+                  const Cross = () => <div style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg, #FDE8E8, #FCDADA)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(234,67,53,.1)" }}><svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#EA4335" strokeWidth="2.5" strokeLinecap="round"/></svg></div>;
                   return (
-                    <div style={{ background: "#fff", borderRadius: 20, border: "1px solid #EDE8E2", overflow: "hidden", boxShadow: "0 4px 24px rgba(0,0,0,.04)" }}>
+                    <div style={{ background: "#fff", borderRadius: 24, border: "1px solid #EDE8E2", overflow: "hidden", boxShadow: "0 8px 40px rgba(0,0,0,.05)" }}>
                       {/* Header row */}
-                      <div className="aura-compare-header" style={{ display: "grid", gridTemplateColumns: "1fr repeat(6, 90px)", alignItems: "end", padding: "24px 28px 16px", borderBottom: "2px solid #F0EBE4", background: "#FDFCFA", position: "sticky", top: 60, zIndex: 5 }}>
-                        <div style={{ fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "#9B8B7B", fontWeight: 600 }}>Feature</div>
-                        <div style={{ textAlign: "center" }}>
-                          <div style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#C17550", padding: "5px 14px", borderRadius: 20 }}>
+                      <div className="aura-compare-header" style={{ display: "grid", gridTemplateColumns: "1.4fr repeat(6, 1fr)", alignItems: "end", padding: "28px 32px 18px", borderBottom: "2px solid #F0EBE4", background: "linear-gradient(180deg, #FDFCFA, #F8F5F0)" }}>
+                        <div style={{ fontSize: 10, letterSpacing: ".15em", textTransform: "uppercase", color: "#B8A898", fontWeight: 700 }}>Feature</div>
+                        <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                          <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "linear-gradient(135deg, #C17550, #A85D3A)", padding: "7px 18px", borderRadius: 24, boxShadow: "0 3px 12px rgba(193,117,80,.3)" }}>
                             <AuraLogo size={14} />
-                            <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", letterSpacing: ".05em" }}>AURA</span>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", letterSpacing: ".06em" }}>AURA</span>
                           </div>
                         </div>
-                        {competitors.map(c => <div key={c} style={{ textAlign: "center", fontSize: 11, fontWeight: 600, color: "#9B8B7B" }}>{c}</div>)}
+                        {competitors.map(c => <div key={c} style={{ textAlign: "center", fontSize: 11, fontWeight: 600, color: "#A89B8B", letterSpacing: ".02em" }}>{c}</div>)}
                       </div>
                       {/* Feature rows */}
                       {features.map((f, i) => (
-                        <div key={f.name} className="aura-compare-row" style={{ display: "grid", gridTemplateColumns: "1fr repeat(6, 90px)", alignItems: "center", padding: "18px 28px", borderBottom: i < features.length - 1 ? "1px solid #F5F0EB" : "none", background: i % 2 === 0 ? "#fff" : "#FDFCFA", transition: "background .15s" }}
-                          onMouseEnter={e => { e.currentTarget.style.background = "#F8F5F0"; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = i % 2 === 0 ? "#fff" : "#FDFCFA"; }}
+                        <div key={f.name} className="aura-compare-row" style={{ display: "grid", gridTemplateColumns: "1.4fr repeat(6, 1fr)", alignItems: "center", padding: "16px 32px", borderBottom: i < features.length - 1 ? "1px solid #F5F0EB" : "none", background: "#fff", transition: "background .2s" }}
+                          onMouseEnter={e => { e.currentTarget.style.background = "#FDFCFA"; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = "#fff"; }}
                         >
-                          <div>
-                            <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1815", margin: "0 0 2px" }}>{f.name}</p>
-                            <p style={{ fontSize: 12, color: "#9B8B7B", margin: 0 }}>{f.desc}</p>
+                          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                            <div style={{ width: 36, height: 36, borderRadius: 10, background: "#F8F5F0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>{f.icon}</div>
+                            <div>
+                              <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1815", margin: "0 0 1px", lineHeight: 1.3 }}>{f.name}</p>
+                              <p style={{ fontSize: 11.5, color: "#A89B8B", margin: 0, lineHeight: 1.3 }}>{f.desc}</p>
+                            </div>
                           </div>
                           <div style={{ display: "flex", justifyContent: "center" }}>{f.aura ? <Check /> : <Cross />}</div>
                           {f.others.map((has, ci) => <div key={ci} style={{ display: "flex", justifyContent: "center" }}>{has ? <Check /> : <Cross />}</div>)}
                         </div>
                       ))}
                       {/* Summary row */}
-                      <div className="aura-compare-row" style={{ display: "grid", gridTemplateColumns: "1fr repeat(6, 90px)", alignItems: "center", padding: "20px 28px", background: "#F8F5F0", borderTop: "2px solid #F0EBE4" }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "#1A1815" }}>Total features</div>
-                        <div style={{ textAlign: "center", fontSize: 20, fontWeight: 700, color: "#C17550", fontFamily: "Georgia,serif" }}>{features.filter(f => f.aura).length}/{features.length}</div>
+                      <div className="aura-compare-row" style={{ display: "grid", gridTemplateColumns: "1.4fr repeat(6, 1fr)", alignItems: "center", padding: "22px 32px", background: "linear-gradient(180deg, #F8F5F0, #F0EBE4)", borderTop: "2px solid #EDE8E2" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                          <div style={{ width: 36, height: 36, borderRadius: 10, background: "#C1755015", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>{"\uD83C\uDFC6"}</div>
+                          <span style={{ fontSize: 14, fontWeight: 700, color: "#1A1815" }}>Total features</span>
+                        </div>
+                        <div style={{ textAlign: "center" }}>
+                          <span style={{ fontSize: 22, fontWeight: 700, color: "#C17550", fontFamily: "Georgia,serif" }}>{features.filter(f => f.aura).length}</span>
+                          <span style={{ fontSize: 13, color: "#B8A898" }}>/{features.length}</span>
+                        </div>
                         {competitors.map((c, ci) => {
                           const ct = features.filter(f => f.others[ci]).length;
-                          return <div key={c} style={{ textAlign: "center", fontSize: 16, fontWeight: 600, color: ct > 5 ? "#5A5045" : "#B8A898", fontFamily: "Georgia,serif" }}>{ct}/{features.length}</div>;
+                          return <div key={c} style={{ textAlign: "center" }}>
+                            <span style={{ fontSize: 18, fontWeight: 600, color: ct > 5 ? "#5A5045" : "#C8BEB4", fontFamily: "Georgia,serif" }}>{ct}</span>
+                            <span style={{ fontSize: 12, color: "#C8BEB4" }}>/{features.length}</span>
+                          </div>;
                         })}
                       </div>
                     </div>
                   );
                 })()}
-                <div style={{ textAlign: "center", marginTop: 36 }}>
-                  <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#C17550", color: "#fff", padding: "16px 40px", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 20px rgba(193,117,80,.25)" }}>Start designing for free</button>
+                <div style={{ textAlign: "center", marginTop: 40 }}>
+                  <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "linear-gradient(135deg, #C17550, #A85D3A)", color: "#fff", padding: "16px 44px", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 24px rgba(193,117,80,.3)", transition: "transform .2s, box-shadow .2s" }}
+                    onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 8px 32px rgba(193,117,80,.4)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "0 4px 24px rgba(193,117,80,.3)"; }}
+                  >Start designing for free</button>
                 </div>
               </div>
             </RevealSection>
