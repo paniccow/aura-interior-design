@@ -525,316 +525,377 @@ function generateMoodBoards(roomType, style, budgetKey, sqft, cadData) {
 
 /* ─── PRO CAD LAYOUT GENERATOR ─── */
 function generateCADLayout(items, roomSqft, roomType, cadAnalysis) {
-  const roomW = Math.sqrt(roomSqft * 1.3);
+  // Room dimensions — use standard aspect ratios by room type
+  const aspectRatios = { "Living Room": 1.4, "Bedroom": 1.25, "Dining Room": 1.3, "Kitchen": 1.1, "Office": 1.2, "Great Room": 1.5 };
+  const aspect = aspectRatios[roomType] || 1.3;
+  const roomW = Math.sqrt(roomSqft * aspect);
   const roomH = roomSqft / roomW;
   const scale = 60; // px per foot
   const canvasW = Math.round(roomW * scale);
   const canvasH = Math.round(roomH * scale);
-  const margin = 2 * scale; // 2ft margin from walls
+  const wallGap = 0.25 * scale; // 3" from wall for flush pieces
+  const walkway = 2.5 * scale;  // 2.5ft walkway clearance
 
-  // Parse CAD analysis for features
+  // Parse CAD analysis for windows/doors
   let windows = [], doors = [];
   if (cadAnalysis) {
     const wMatch = cadAnalysis.match(/(\d+)\s*window/gi);
     const numWindows = wMatch ? parseInt(wMatch[0]) || 2 : 2;
-    for (let i = 0; i < numWindows; i++) windows.push({ x: (canvasW / (numWindows + 1)) * (i + 1), y: 0, w: 3 * scale, side: "top" });
-    if (/door|entry|entrance/i.test(cadAnalysis)) doors.push({ x: canvasW - 2 * scale, y: canvasH - 3 * scale, w: 3 * scale, side: "right" });
-    else doors.push({ x: canvasW / 2 - 1.5 * scale, y: canvasH, w: 3 * scale, side: "bottom" });
+    for (let i = 0; i < numWindows; i++) {
+      const wx = (canvasW / (numWindows + 1)) * (i + 1) - 1.5 * scale;
+      windows.push({ x: wx, y: 0, w: 3 * scale, side: "top" });
+    }
+    if (/door|entry|entrance/i.test(cadAnalysis)) doors.push({ x: canvasW - 3 * scale, y: canvasH - 3 * scale, w: 3 * scale, side: "right" });
+    else doors.push({ x: canvasW * 0.4, y: canvasH, w: 3 * scale, side: "bottom" });
   } else {
-    windows.push({ x: canvasW * 0.3, y: 0, w: 4 * scale, side: "top" });
-    doors.push({ x: canvasW - 2 * scale, y: canvasH - 3 * scale, w: 3 * scale, side: "right" });
+    windows.push({ x: canvasW * 0.25, y: 0, w: 4 * scale, side: "top" });
+    windows.push({ x: canvasW * 0.6, y: 0, w: 3 * scale, side: "top" });
+    doors.push({ x: canvasW - 3 * scale, y: canvasH - 3 * scale, w: 3 * scale, side: "right" });
   }
 
-  // Define zones based on room type for smarter placement
-  const needs = ROOM_NEEDS[roomType] || ROOM_NEEDS["Living Room"];
-  const zones = {};
-  const zoneDefs = {
-    "Living Room": {
-      conversation: { x: canvasW * 0.15, y: canvasH * 0.35, w: canvasW * 0.7, h: canvasH * 0.55 },
-      "reading nook": { x: margin, y: margin, w: canvasW * 0.3, h: canvasH * 0.3 },
-      entry: { x: canvasW * 0.6, y: canvasH * 0.8, w: canvasW * 0.35, h: canvasH * 0.18 },
-    },
-    "Dining Room": {
-      dining: { x: canvasW * 0.15, y: canvasH * 0.2, w: canvasW * 0.7, h: canvasH * 0.6 },
-      buffet: { x: margin, y: canvasH * 0.1, w: canvasW * 0.2, h: canvasH * 0.4 },
-    },
-    "Bedroom": {
-      sleep: { x: canvasW * 0.2, y: canvasH * 0.5, w: canvasW * 0.6, h: canvasH * 0.4 },
-      dressing: { x: canvasW * 0.7, y: margin, w: canvasW * 0.25, h: canvasH * 0.4 },
-      reading: { x: margin, y: margin, w: canvasW * 0.25, h: canvasH * 0.35 },
-    },
-    "Office": {
-      work: { x: canvasW * 0.2, y: margin * 2, w: canvasW * 0.6, h: canvasH * 0.4 },
-      storage: { x: margin, y: canvasH * 0.5, w: canvasW * 0.25, h: canvasH * 0.4 },
-    },
-    "Great Room": {
-      conversation: { x: canvasW * 0.05, y: canvasH * 0.45, w: canvasW * 0.55, h: canvasH * 0.5 },
-      dining: { x: canvasW * 0.55, y: canvasH * 0.15, w: canvasW * 0.4, h: canvasH * 0.45 },
-      entry: { x: canvasW * 0.3, y: canvasH * 0.85, w: canvasW * 0.4, h: canvasH * 0.12 },
-      reading: { x: margin, y: margin, w: canvasW * 0.3, h: canvasH * 0.35 },
-    },
-  };
-  const activeZones = zoneDefs[roomType] || zoneDefs["Living Room"];
-
-  // Place items using zone-based positioning
+  // Placement infrastructure
   const placed = [];
-  const occupied = [];
+  const occupied = []; // solid furniture collision boxes
   const catColors = { sofa: "#8B6840", bed: "#7B4870", table: "#4B7B50", chair: "#5B4B9B", stool: "#8B6B35", light: "#B8901A", rug: "#3878A0", art: "#985050", accent: "#607060" };
 
-  const collides = (x, y, w, h) => {
+  const collides = (x, y, w, h, padding) => {
+    const p = padding || 0;
     for (const o of occupied) {
-      if (x < o.x + o.w && x + w > o.x && y < o.y + o.h && y + h > o.y) return true;
+      if (x - p < o.x + o.w && x + w + p > o.x && y - p < o.y + o.h && y + h + p > o.y) return true;
     }
     return false;
   };
+  const inBounds = (x, y, w, h) => x >= wallGap && y >= wallGap && x + w <= canvasW - wallGap && y + h <= canvasH - wallGap;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(v, hi));
 
-  // Clamp coordinates to stay within room bounds
-  const clamp = (val, min, max) => Math.max(min, Math.min(val, max));
-
-  const placeAt = (item, x, y, w, h, rotation) => {
-    // Ensure within bounds
-    x = clamp(x, 2, canvasW - w - 2);
-    y = clamp(y, 2, canvasH - h - 2);
+  const placeAt = (item, x, y, w, h, rot) => {
+    x = clamp(x, wallGap, canvasW - w - wallGap);
+    y = clamp(y, wallGap, canvasH - h - wallGap);
     const dims = getProductDims(item);
-    placed.push({ item, x, y, w, h, rotation: rotation || 0, color: catColors[item.c] || "#6B685B", shape: dims.shape || "rect" });
-    if (!["rug","art","light"].includes(item.c)) occupied.push({ x, y, w, h });
+    placed.push({ item, x, y, w, h, rotation: rot || 0, color: catColors[item.c] || "#6B685B", shape: dims.shape || "rect" });
+    // Rugs, art, and lights don't block other items
+    if (!["rug", "art", "light"].includes(item.c)) occupied.push({ x, y, w, h });
   };
 
-  // Sort items for placement priority — anchor pieces first
-  const sortOrder = { rug: 0, bed: 1, sofa: 2, table: 3, chair: 4, stool: 5, accent: 6, light: 7, art: 8 };
-  const sortedItems = [...items].sort((a, b) => (sortOrder[a.c] ?? 5) - (sortOrder[b.c] ?? 5));
-  const margin2 = 1.5 * scale;
-
-  // Track anchor positions for relational placement
-  let sofaCenter = null;
-  let tableCenter = null;
-  let sofaW = 0;
-
-  // Helper: find best non-colliding position near a target
-  const findNear = (targetX, targetY, w, h, radius) => {
-    const step = scale * 1.5; // Larger steps to keep search fast
-    const r = Math.min(radius || scale * 4, scale * 8); // Cap radius to prevent huge searches
-    let bestDist = Infinity, bestPos = null;
-    let iterations = 0;
-    const maxIter = 400; // Hard cap on iterations
-    for (let dy = -r; dy <= r && iterations < maxIter; dy += step) {
-      for (let dx = -r; dx <= r && iterations < maxIter; dx += step) {
-        iterations++;
-        const nx = targetX + dx;
-        const ny = targetY + dy;
-        if (nx < 2 || ny < 2 || nx + w > canvasW - 2 || ny + h > canvasH - 2) continue;
-        if (!collides(nx, ny, w, h)) {
-          const dist = dx * dx + dy * dy; // skip sqrt for speed
-          if (dist < bestDist) { bestDist = dist; bestPos = { x: nx, y: ny }; }
+  // Fine-grained search: find nearest non-colliding position (1ft grid steps)
+  const findNear = (tx, ty, w, h, radius, pad) => {
+    const step = scale * 0.5; // half-foot precision
+    const r = Math.min(radius || scale * 5, scale * 10);
+    let best = null, bestD = Infinity;
+    for (let dy = -r; dy <= r; dy += step) {
+      for (let dx = -r; dx <= r; dx += step) {
+        const nx = tx + dx, ny = ty + dy;
+        if (!inBounds(nx, ny, w, h)) continue;
+        if (!collides(nx, ny, w, h, pad || 0)) {
+          const d = dx * dx + dy * dy;
+          if (d < bestD) { bestD = d; best = { x: nx, y: ny }; }
         }
       }
     }
-    return bestPos;
+    return best;
   };
 
-  for (const item of sortedItems) {
+  // Sort: rugs → beds → sofas → tables → chairs → stools → accents → lights → art
+  const sortOrder = { rug: 0, bed: 1, sofa: 2, table: 3, chair: 4, stool: 5, accent: 6, light: 7, art: 8 };
+  const sorted = [...items].sort((a, b) => (sortOrder[a.c] ?? 6) - (sortOrder[b.c] ?? 6));
+
+  // Anchor tracking — every subsequent piece positions relative to these
+  let sofaRect = null;  // { x, y, w, h, cx, cy }
+  let tableRect = null; // { x, y, w, h, cx, cy }
+  let bedRect = null;
+
+  // ─── ROOM-TYPE SPECIFIC FOCAL POINTS ───
+  // "Focal wall" = top wall (where TV/fireplace/headboard would go)
+  // Sofa faces focal wall; table goes between sofa and focal wall
+  const isLiving = roomType === "Living Room" || roomType === "Great Room";
+  const isDining = roomType === "Dining Room" || roomType === "Kitchen";
+  const isBedroom = roomType === "Bedroom";
+  const isOffice = roomType === "Office";
+
+  for (const item of sorted) {
     const dims = getProductDims(item);
-    const w = dims.w * scale;
-    const h = dims.d * scale;
+    let w = dims.w * scale;
+    let h = dims.d * scale;
+    const cat = item.c;
     const sofaCount = placed.filter(p => p.item.c === "sofa").length;
     const chairCount = placed.filter(p => p.item.c === "chair").length;
-    const artCount = placed.filter(p => p.item.c === "art").length;
-    const lightCount = placed.filter(p => p.item.c === "light").length;
+    const tableCount = placed.filter(p => p.item.c === "table").length;
 
-    if (item.c === "rug") {
-      // Rug: centered in the main conversation/dining zone
-      const zone = activeZones.conversation || activeZones.dining || { x: canvasW * 0.15, y: canvasH * 0.3, w: canvasW * 0.7, h: canvasH * 0.5 };
-      const rx = zone.x + (zone.w - w) / 2;
-      const ry = zone.y + (zone.h - h) / 2;
-      placeAt(item, rx, ry, w, h);
+    // ═══ RUG: center of the room, under the main seating/dining area ═══
+    if (cat === "rug") {
+      const cx = canvasW / 2 - w / 2;
+      const cy = canvasH * 0.35 - h / 2; // slightly toward focal wall
+      placeAt(item, cx, cy, w, h);
       continue;
     }
 
-    if (item.c === "bed") {
-      // Bed: centered against back wall (top), headboard against wall
-      const zone = activeZones.sleep || { x: canvasW * 0.2, y: margin, w: canvasW * 0.6, h: canvasH * 0.5 };
-      const bx = zone.x + (zone.w - w) / 2;
-      const by = margin + 0.5 * scale; // headboard against top wall
-      if (!collides(bx, by, w, h)) { placeAt(item, bx, by, w, h); continue; }
-      const pos = findNear(bx, by, w, h, scale * 4);
+    // ═══ BED: centered, headboard flush against top (focal) wall ═══
+    if (cat === "bed") {
+      const bx = (canvasW - w) / 2;
+      const by = wallGap; // headboard against top wall
+      if (!collides(bx, by, w, h)) {
+        placeAt(item, bx, by, w, h);
+        bedRect = { x: bx, y: by, w, h, cx: bx + w / 2, cy: by + h / 2 };
+      } else {
+        const pos = findNear(bx, by, w, h, scale * 4);
+        if (pos) { placeAt(item, pos.x, pos.y, w, h); bedRect = { x: pos.x, y: pos.y, w, h, cx: pos.x + w / 2, cy: pos.y + h / 2 }; }
+      }
+      continue;
+    }
+
+    // ═══ SOFA: primary faces focal wall from lower third; secondary faces primary ═══
+    if (cat === "sofa") {
+      if (sofaCount === 0) {
+        // Primary sofa: lower third of room, centered, facing top wall (TV/fireplace)
+        const sx = (canvasW - w) / 2;
+        const sy = canvasH * 0.62 - h / 2; // sit ~60% down the room, facing up
+        if (isBedroom && bedRect) {
+          // In bedroom, sofa goes at foot of bed
+          const footY = bedRect.y + bedRect.h + 2 * scale;
+          const footX = bedRect.cx - w / 2;
+          const pos = findNear(footX, footY, w, h, scale * 4);
+          if (pos) { placeAt(item, pos.x, pos.y, w, h); sofaRect = { x: pos.x, y: pos.y, w, h, cx: pos.x + w / 2, cy: pos.y + h / 2 }; continue; }
+        }
+        if (!collides(sx, sy, w, h, scale * 0.3)) {
+          placeAt(item, sx, sy, w, h);
+          sofaRect = { x: sx, y: sy, w, h, cx: sx + w / 2, cy: sy + h / 2 };
+        } else {
+          const pos = findNear(sx, sy, w, h, scale * 5, scale * 0.3);
+          if (pos) { placeAt(item, pos.x, pos.y, w, h); sofaRect = { x: pos.x, y: pos.y, w, h, cx: pos.x + w / 2, cy: pos.y + h / 2 }; }
+        }
+      } else if (sofaRect) {
+        // Secondary sofa: directly across from primary, facing it (conversation layout)
+        const sx = sofaRect.cx - w / 2;
+        const gap = 5 * scale; // ~5ft conversation distance
+        const sy = sofaRect.y - gap - h;
+        const pos = findNear(sx, Math.max(wallGap, sy), w, h, scale * 4);
+        if (pos) placeAt(item, pos.x, pos.y, w, h);
+      }
+      continue;
+    }
+
+    // ═══ TABLE ═══
+    if (cat === "table") {
+      if (isDining && tableCount === 0) {
+        // Dining table: dead center of room
+        const tx = (canvasW - w) / 2;
+        const ty = (canvasH - h) / 2;
+        if (!collides(tx, ty, w, h, scale * 0.5)) {
+          placeAt(item, tx, ty, w, h);
+          tableRect = { x: tx, y: ty, w, h, cx: tx + w / 2, cy: ty + h / 2 };
+        } else {
+          const pos = findNear(tx, ty, w, h, scale * 4, scale * 0.3);
+          if (pos) { placeAt(item, pos.x, pos.y, w, h); tableRect = { x: pos.x, y: pos.y, w, h, cx: pos.x + w / 2, cy: pos.y + h / 2 }; }
+        }
+      } else if (sofaRect && tableCount === 0) {
+        // Coffee table: 16-18" in front of sofa (between sofa and focal wall)
+        const tx = sofaRect.cx - w / 2;
+        const ty = sofaRect.y - 1.5 * scale - h; // 1.5ft gap from sofa front
+        if (!collides(tx, ty, w, h)) {
+          placeAt(item, tx, ty, w, h);
+          tableRect = { x: tx, y: ty, w, h, cx: tx + w / 2, cy: ty + h / 2 };
+        } else {
+          const pos = findNear(tx, ty, w, h, scale * 3);
+          if (pos) { placeAt(item, pos.x, pos.y, w, h); tableRect = { x: pos.x, y: pos.y, w, h, cx: pos.x + w / 2, cy: pos.y + h / 2 }; }
+        }
+      } else if (isOffice && tableCount === 0) {
+        // Desk: facing a wall, slightly off-center
+        const tx = canvasW * 0.3 - w / 2;
+        const ty = wallGap + 0.5 * scale; // near top wall
+        const pos = findNear(tx, ty, w, h, scale * 3);
+        if (pos) { placeAt(item, pos.x, pos.y, w, h); tableRect = { x: pos.x, y: pos.y, w, h, cx: pos.x + w / 2, cy: pos.y + h / 2 }; }
+      } else {
+        // Additional tables: side table near sofa or along wall
+        let tx = canvasW * 0.2, ty = canvasH * 0.3;
+        if (sofaRect) { tx = sofaRect.x + sofaRect.w + 0.5 * scale; ty = sofaRect.cy - h / 2; }
+        const pos = findNear(tx, ty, w, h, scale * 5);
+        if (pos) { placeAt(item, pos.x, pos.y, w, h); if (!tableRect) tableRect = { x: pos.x, y: pos.y, w, h, cx: pos.x + w / 2, cy: pos.y + h / 2 }; }
+      }
+      continue;
+    }
+
+    // ═══ CHAIR ═══
+    if (cat === "chair") {
+      if (isDining && tableRect) {
+        // Dining chairs: evenly around the table at correct distance
+        const tW = tableRect.w, tH = tableRect.h;
+        const gap = 0.2 * scale; // tucked close to table edge
+        // Positions: top-left, top-right, bottom-left, bottom-right, top-center, bottom-center, left-center, right-center
+        const seats = [
+          { x: tableRect.x - w - gap, y: tableRect.cy - h / 2 },                   // left
+          { x: tableRect.x + tW + gap, y: tableRect.cy - h / 2 },                  // right
+          { x: tableRect.cx - w / 2, y: tableRect.y - h - gap },                    // top
+          { x: tableRect.cx - w / 2, y: tableRect.y + tH + gap },                   // bottom
+          { x: tableRect.x - w - gap, y: tableRect.y + tH * 0.15 - h / 2 },        // left-upper
+          { x: tableRect.x + tW + gap, y: tableRect.y + tH * 0.15 - h / 2 },       // right-upper
+          { x: tableRect.x - w - gap, y: tableRect.y + tH * 0.85 - h / 2 },        // left-lower
+          { x: tableRect.x + tW + gap, y: tableRect.y + tH * 0.85 - h / 2 },       // right-lower
+        ];
+        const seat = seats[chairCount % seats.length];
+        if (seat && inBounds(seat.x, seat.y, w, h) && !collides(seat.x, seat.y, w, h)) {
+          placeAt(item, seat.x, seat.y, w, h); continue;
+        }
+        if (seat) { const pos = findNear(seat.x, seat.y, w, h, scale * 2); if (pos) { placeAt(item, pos.x, pos.y, w, h); continue; } }
+      }
+
+      if (sofaRect) {
+        // Accent chairs: perpendicular to sofa, forming conversation U-shape
+        const positions = [
+          // Left of sofa, pulled slightly forward
+          { x: sofaRect.x - w - 1.2 * scale, y: sofaRect.cy - h - 0.5 * scale },
+          // Right of sofa, pulled slightly forward
+          { x: sofaRect.x + sofaRect.w + 1.2 * scale, y: sofaRect.cy - h - 0.5 * scale },
+          // Across from sofa (reading chair)
+          { x: sofaRect.cx - w / 2 - 3 * scale, y: sofaRect.y - 5 * scale },
+          { x: sofaRect.cx - w / 2 + 3 * scale, y: sofaRect.y - 5 * scale },
+        ];
+        const target = positions[chairCount % positions.length];
+        if (target) {
+          const pos = findNear(target.x, target.y, w, h, scale * 3);
+          if (pos) { placeAt(item, pos.x, pos.y, w, h); continue; }
+        }
+      }
+
+      if (isOffice && tableRect) {
+        // Office chair behind desk
+        const cx = tableRect.cx - w / 2;
+        const cy = tableRect.y + tableRect.h + 0.3 * scale;
+        const pos = findNear(cx, cy, w, h, scale * 2);
+        if (pos) { placeAt(item, pos.x, pos.y, w, h); continue; }
+      }
+
+      if (isBedroom && bedRect) {
+        // Bedroom chair: corner reading nook
+        const pos = findNear(wallGap + scale, bedRect.y + bedRect.h + 2 * scale, w, h, scale * 4);
+        if (pos) { placeAt(item, pos.x, pos.y, w, h); continue; }
+      }
+    }
+
+    // ═══ STOOL ═══
+    if (cat === "stool") {
+      const stoolIdx = placed.filter(p => p.item.c === "stool").length;
+      if (isDining && tableRect) {
+        // Bar stools along one side of table/island
+        const sx = tableRect.x + stoolIdx * (w + 0.4 * scale);
+        const sy = tableRect.y - h - 0.2 * scale;
+        const pos = findNear(sx, sy, w, h, scale * 2);
+        if (pos) { placeAt(item, pos.x, pos.y, w, h); continue; }
+      }
+      // Default: along a wall, evenly spaced
+      const totalStools = sorted.filter(p => p.c === "stool").length;
+      const spacing = Math.min(w + 1 * scale, (canvasW - 4 * scale) / Math.max(totalStools, 1));
+      const sx = (canvasW - totalStools * spacing) / 2 + stoolIdx * spacing;
+      const pos = findNear(sx, wallGap + scale, w, h, scale * 3);
       if (pos) { placeAt(item, pos.x, pos.y, w, h); continue; }
     }
 
-    if (item.c === "sofa") {
-      let sx, sy;
-      if (sofaCount === 0) {
-        // Primary sofa: against back wall (bottom), centered in conversation zone
-        const zone = activeZones.conversation || { x: canvasW * 0.15, y: canvasH * 0.4, w: canvasW * 0.7, h: canvasH * 0.5 };
-        sx = zone.x + (zone.w - w) / 2;
-        sy = zone.y + zone.h - h; // against bottom of zone
-        sofaCenter = { x: sx + w / 2, y: sy + h / 2 };
-        sofaW = w;
-      } else {
-        // Second sofa: facing the first across the conversation zone
-        const zone = activeZones.conversation || { x: canvasW * 0.15, y: canvasH * 0.4, w: canvasW * 0.7, h: canvasH * 0.5 };
-        sx = zone.x + (zone.w - w) / 2;
-        sy = zone.y; // against top of zone, facing first sofa
-      }
-      if (!collides(sx, sy, w, h)) { placeAt(item, sx, sy, w, h); if (sofaCount === 0) { sofaCenter = { x: sx + w / 2, y: sy + h / 2 }; sofaW = w; } continue; }
-      // Fallback: try finding nearby
-      const pos = findNear(sx, sy, w, h);
-      if (pos) { placeAt(item, pos.x, pos.y, w, h); if (sofaCount === 0) { sofaCenter = { x: pos.x + w / 2, y: pos.y + h / 2 }; sofaW = w; } continue; }
-    }
-
-    if (item.c === "table") {
-      let tx, ty;
-      if (roomType === "Dining Room" || roomType === "Kitchen") {
-        // Dining: center of dining zone
-        const zone = activeZones.dining || { x: canvasW * 0.15, y: canvasH * 0.2, w: canvasW * 0.7, h: canvasH * 0.6 };
-        tx = zone.x + (zone.w - w) / 2;
-        ty = zone.y + (zone.h - h) / 2;
-      } else if (roomType === "Great Room" && placed.filter(p => p.item.c === "table").length > 0) {
-        // Second table in Great Room goes to dining zone
-        const zone = activeZones.dining || { x: canvasW * 0.55, y: canvasH * 0.15, w: canvasW * 0.4, h: canvasH * 0.45 };
-        tx = zone.x + (zone.w - w) / 2;
-        ty = zone.y + (zone.h - h) / 2;
-      } else if (sofaCenter) {
-        // Coffee table: 14-18" in front of sofa (toward room center)
-        tx = sofaCenter.x - w / 2;
-        ty = sofaCenter.y - (dims.d * scale) / 2 - 1.3 * scale - h; // 1.3ft (~16") gap
-      } else {
-        tx = (canvasW - w) / 2;
-        ty = (canvasH - h) / 2;
-      }
-      tableCenter = { x: tx + w / 2, y: ty + h / 2 };
-      if (!collides(tx, ty, w, h)) { placeAt(item, tx, ty, w, h); continue; }
-      const pos = findNear(tx, ty, w, h);
-      if (pos) { placeAt(item, pos.x, pos.y, w, h); tableCenter = { x: pos.x + w / 2, y: pos.y + h / 2 }; continue; }
-    }
-
-    if (item.c === "chair") {
-      if (roomType === "Dining Room" && tableCenter) {
-        // Dining chairs: evenly spaced around table with proper clearance
-        const tableW = (FURN_DIMS.table.w * scale);
-        const tableH = (FURN_DIMS.table.d * scale);
-        const gap = 0.3 * scale; // small gap between chair and table edge
-        const positions = [
-          { x: tableCenter.x - tableW / 2 - w - gap, y: tableCenter.y - h / 2 },          // left 1
-          { x: tableCenter.x + tableW / 2 + gap, y: tableCenter.y - h / 2 },               // right 1
-          { x: tableCenter.x - w / 2, y: tableCenter.y - tableH / 2 - h - gap },           // top center
-          { x: tableCenter.x - w / 2, y: tableCenter.y + tableH / 2 + gap },               // bottom center
-          { x: tableCenter.x - tableW / 2 - w - gap, y: tableCenter.y - h / 2 - h - gap }, // left 2
-          { x: tableCenter.x + tableW / 2 + gap, y: tableCenter.y - h / 2 - h - gap },     // right 2
-          { x: tableCenter.x - w - gap, y: tableCenter.y - tableH / 2 - h - gap },         // top left
-          { x: tableCenter.x + gap, y: tableCenter.y + tableH / 2 + gap },                 // bottom right
-        ];
-        const pos = positions[chairCount % positions.length];
-        if (pos && !collides(pos.x, pos.y, w, h)) { placeAt(item, pos.x, pos.y, w, h); continue; }
-        // Try finding near the intended position
-        if (pos) { const near = findNear(pos.x, pos.y, w, h, scale * 3); if (near) { placeAt(item, near.x, near.y, w, h); continue; } }
-      } else if (sofaCenter) {
-        // Accent chairs: flanking the sofa at conversational angles
-        const offsets = [
-          { x: sofaCenter.x - sofaW / 2 - w - 1.5 * scale, y: sofaCenter.y - h * 0.8 },  // left of sofa, angled in
-          { x: sofaCenter.x + sofaW / 2 + 1.5 * scale, y: sofaCenter.y - h * 0.8 },       // right of sofa, angled in
-          { x: sofaCenter.x - sofaW / 2 - w - 1.5 * scale, y: sofaCenter.y - h * 2.5 },   // far left
-          { x: sofaCenter.x + sofaW / 2 + 1.5 * scale, y: sofaCenter.y - h * 2.5 },       // far right
-        ];
-        const off = offsets[chairCount % offsets.length];
-        if (off.x > 2 && off.x + w < canvasW - 2 && off.y > 2 && off.y + h < canvasH - 2 && !collides(off.x, off.y, w, h)) {
-          placeAt(item, off.x, off.y, w, h); continue;
-        }
-        const near = findNear(off.x, off.y, w, h, scale * 4);
-        if (near) { placeAt(item, near.x, near.y, w, h); continue; }
-      }
-    }
-
-    if (item.c === "stool") {
-      // Stools: along the top wall (kitchen island area) with even spacing
-      const stoolCount = placed.filter(p => p.item.c === "stool").length;
-      const totalStools = sortedItems.filter(p => p.c === "stool").length;
-      const spacing = Math.min(w + 1.8 * scale, (canvasW - 4 * margin2) / totalStools);
-      const startX = (canvasW - totalStools * spacing) / 2;
-      const stoolX = startX + stoolCount * spacing;
-      const stoolY = margin2 + 0.5 * scale;
-      if (stoolX + w < canvasW - margin2 && !collides(stoolX, stoolY, w, h)) { placeAt(item, stoolX, stoolY, w, h); continue; }
-    }
-
-    if (item.c === "art") {
-      // Art: along the top wall (focal wall) with even spacing
-      const totalArtWidth = (artCount + 1) * (w + 2 * scale);
-      const startX = (canvasW - totalArtWidth) / 2;
-      const ax = startX + artCount * (w + 2 * scale);
-      placeAt(item, Math.max(margin2, Math.min(ax, canvasW - w - margin2)), margin2 * 0.3, w, h);
+    // ═══ ART: on the focal wall (top), spaced evenly above furniture ═══
+    if (cat === "art") {
+      const artIdx = placed.filter(p => p.item.c === "art").length;
+      const totalArt = sorted.filter(p => p.c === "art").length;
+      const artSpacing = (canvasW - 2 * scale) / (totalArt + 1);
+      const ax = scale + artSpacing * (artIdx + 1) - w / 2;
+      placeAt(item, clamp(ax, wallGap, canvasW - w - wallGap), wallGap, w, h);
       continue;
     }
 
-    if (item.c === "light") {
-      // Lights: distributed based on position — near windows, over table, flanking sofa
+    // ═══ LIGHT ═══
+    if (cat === "light") {
+      const lightIdx = placed.filter(p => p.item.c === "light").length;
       let lx, ly;
-      if (lightCount === 0 && tableCenter) {
-        // First light: above the table (pendant/chandelier position)
-        lx = tableCenter.x - w / 2;
-        ly = tableCenter.y - h - 0.5 * scale;
-      } else if (lightCount === 1 && sofaCenter) {
-        // Second light: beside the sofa (floor lamp)
-        lx = sofaCenter.x + (sofaW || 7 * scale) / 2 + 1 * scale;
-        ly = sofaCenter.y - h / 2;
+      if (lightIdx === 0 && tableRect) {
+        // Pendant/chandelier centered over table
+        lx = tableRect.cx - w / 2;
+        ly = tableRect.cy - h / 2;
+      } else if (lightIdx === 0 && sofaRect) {
+        // Floor lamp beside sofa end
+        lx = sofaRect.x + sofaRect.w + 0.5 * scale;
+        ly = sofaRect.y;
+      } else if (lightIdx === 1 && sofaRect) {
+        // Second lamp: other end of sofa
+        lx = sofaRect.x - w - 0.5 * scale;
+        ly = sofaRect.y;
+      } else if (isBedroom && bedRect) {
+        // Bedside lamp
+        lx = lightIdx === 0 ? bedRect.x - w - 0.5 * scale : bedRect.x + bedRect.w + 0.5 * scale;
+        ly = bedRect.y + 0.5 * scale;
       } else {
-        // Remaining: along walls/corners (sconces/floor lamps)
+        // Corners
         const corners = [
-          { x: margin2, y: margin2 },
-          { x: canvasW - w - margin2, y: margin2 },
-          { x: margin2, y: canvasH - h - margin2 },
-          { x: canvasW - w - margin2, y: canvasH - h - margin2 },
+          { x: wallGap + scale, y: wallGap + scale },
+          { x: canvasW - w - wallGap - scale, y: wallGap + scale },
+          { x: wallGap + scale, y: canvasH - h - wallGap - scale },
+          { x: canvasW - w - wallGap - scale, y: canvasH - h - wallGap - scale },
         ];
-        const c = corners[lightCount % corners.length];
+        const c = corners[lightIdx % corners.length];
         lx = c.x; ly = c.y;
       }
-      placeAt(item, Math.max(0, Math.min(lx, canvasW - w)), Math.max(0, Math.min(ly, canvasH - h)), w, h);
+      placeAt(item, clamp(lx, wallGap, canvasW - w - wallGap), clamp(ly, wallGap, canvasH - h - wallGap), w, h);
       continue;
     }
 
-    // Accent pieces: side tables, mirrors, ottomans — near walls or beside sofas
-    if (item.c === "accent") {
-      const accentCount = placed.filter(p => p.item.c === "accent").length;
+    // ═══ ACCENT (side tables, mirrors, ottomans, planters) ═══
+    if (cat === "accent") {
+      const accIdx = placed.filter(p => p.item.c === "accent").length;
+      const name = (item.n || "").toLowerCase();
+      const isEndTable = /end\s*table|side\s*table|nightstand/i.test(name);
+      const isOttoman = /ottoman|pouf|footstool/i.test(name);
+      const isMirror = /mirror/i.test(name);
+
       let ax, ay;
-      if (accentCount === 0 && sofaCenter) {
-        // First accent: side table next to sofa
-        ax = sofaCenter.x + (sofaW || 7 * scale) / 2 + 0.5 * scale;
-        ay = sofaCenter.y - h / 2;
-      } else if (accentCount === 1 && sofaCenter) {
-        // Second: other side of sofa
-        ax = sofaCenter.x - (sofaW || 7 * scale) / 2 - w - 0.5 * scale;
-        ay = sofaCenter.y - h / 2;
-      } else {
-        // Along walls with proper spacing
-        const wallPositions = [
-          { x: margin2, y: canvasH * 0.4 },
-          { x: canvasW - w - margin2, y: canvasH * 0.4 },
-          { x: canvasW * 0.3, y: margin2 },
-          { x: canvasW * 0.7 - w, y: margin2 },
+      if (isBedroom && bedRect && isEndTable) {
+        // Nightstands flanking bed
+        ax = accIdx === 0 ? bedRect.x - w - 0.3 * scale : bedRect.x + bedRect.w + 0.3 * scale;
+        ay = bedRect.y + 0.5 * scale;
+      } else if (sofaRect && isEndTable) {
+        // End tables flanking sofa
+        ax = accIdx === 0 ? sofaRect.x - w - 0.3 * scale : sofaRect.x + sofaRect.w + 0.3 * scale;
+        ay = sofaRect.cy - h / 2;
+      } else if (sofaRect && isOttoman) {
+        // Ottoman in front of sofa (between sofa and coffee table)
+        ax = sofaRect.cx - w / 2;
+        ay = sofaRect.y - 1 * scale - h;
+        if (tableRect && Math.abs(ay - tableRect.y) < 2 * scale) ay = tableRect.y + tableRect.h + 0.5 * scale;
+      } else if (isMirror) {
+        // Mirror on side wall
+        ax = wallGap;
+        ay = canvasH * 0.3;
+      } else if (sofaRect) {
+        // Generic accent near sofa
+        const sides = [
+          { x: sofaRect.x + sofaRect.w + 0.5 * scale, y: sofaRect.cy - h / 2 },
+          { x: sofaRect.x - w - 0.5 * scale, y: sofaRect.cy - h / 2 },
+          { x: sofaRect.cx - w / 2, y: sofaRect.y + sofaRect.h + 1 * scale },
         ];
-        const wp = wallPositions[accentCount % wallPositions.length];
-        ax = wp.x; ay = wp.y;
+        const s = sides[accIdx % sides.length];
+        ax = s.x; ay = s.y;
+      } else {
+        // Along walls
+        const wallSpots = [
+          { x: wallGap + scale, y: canvasH * 0.4 },
+          { x: canvasW - w - wallGap - scale, y: canvasH * 0.4 },
+          { x: canvasW * 0.3, y: wallGap + scale },
+        ];
+        const ws = wallSpots[accIdx % wallSpots.length];
+        ax = ws.x; ay = ws.y;
       }
-      if (ax > 0 && ax + w < canvasW && ay > 0 && ay + h < canvasH && !collides(ax, ay, w, h)) {
-        placeAt(item, ax, ay, w, h); continue;
-      }
-      // Fallback: find nearest non-colliding position
-      const near = findNear(ax || canvasW / 2, ay || canvasH / 2, w, h, scale * 5);
-      if (near) { placeAt(item, near.x, near.y, w, h); continue; }
+      const pos = findNear(ax, ay, w, h, scale * 4);
+      if (pos) { placeAt(item, pos.x, pos.y, w, h); continue; }
     }
 
-    // General fallback — place at first available grid position
+    // ═══ GENERAL FALLBACK: grid scan with 1ft steps ═══
     let didPlace = false;
-    const gridStep = scale * 2;
-    for (let gy = margin2; gy < canvasH - h - margin2 && !didPlace; gy += gridStep) {
-      for (let gx = margin2; gx < canvasW - w - margin2 && !didPlace; gx += gridStep) {
-        if (!collides(gx, gy, w, h)) {
+    const step = scale;
+    for (let gy = wallGap + scale; gy < canvasH - h - wallGap && !didPlace; gy += step) {
+      for (let gx = wallGap + scale; gx < canvasW - w - wallGap && !didPlace; gx += step) {
+        if (!collides(gx, gy, w, h, scale * 0.3)) {
           placeAt(item, gx, gy, w, h);
           didPlace = true;
         }
       }
     }
     if (!didPlace) {
-      // Last resort: place with slight random offset (allows overlap)
-      placeAt(item, margin2 + Math.random() * Math.max(1, canvasW - w - 2 * margin2), margin2 + Math.random() * Math.max(1, canvasH - h - 2 * margin2), w, h);
+      placeAt(item, wallGap + scale + Math.random() * Math.max(1, canvasW - w - 4 * scale), wallGap + scale + Math.random() * Math.max(1, canvasH - h - 4 * scale), w, h);
     }
   }
 
@@ -1168,6 +1229,14 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true); // true until Supabase session check completes
   const [confirmationPending, setConfirmationPending] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [adminAuthed, setAdminAuthed] = useState(false);
+  const [adminPassInput, setAdminPassInput] = useState("");
+  const [adminPassErr, setAdminPassErr] = useState("");
+  const [grantEmail, setGrantEmail] = useState("");
+  const [grantStatus, setGrantStatus] = useState(""); // "success", "error", or ""
+  const [grantMsg, setGrantMsg] = useState("");
+  const ADMIN_PASS = "aura2025admin";
+  const [adminStats, setAdminStats] = useState(null); // { totalUsers, proUsers, totalViz, recentUsers }
   const [projects, setProjects] = useState(() => {
     try { const p = localStorage.getItem("aura_projects"); return p ? JSON.parse(p) : []; } catch { return []; }
   });
@@ -1980,6 +2049,35 @@ export default function App() {
 
   /* ─── ADMIN ANALYTICS PAGE ─── */
   if (pg === "admin") {
+    // ─── Admin Password Gate ───
+    if (!adminAuthed) {
+      return (
+        <div style={{ fontFamily: "'Helvetica Neue',Helvetica,Arial,sans-serif", background: "#FDFCFA", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ maxWidth: 400, width: "100%", padding: "48px 32px", background: "#fff", borderRadius: 20, border: "1px solid #EDE8E2", textAlign: "center", boxShadow: "0 4px 24px rgba(0,0,0,.06)" }}>
+            <div style={{ marginBottom: 24 }}><AuraLogo size={36} /></div>
+            <h2 style={{ fontFamily: "Georgia,serif", fontSize: 24, fontWeight: 400, margin: "0 0 6px" }}>Admin Access</h2>
+            <p style={{ fontSize: 13, color: "#9B8B7B", margin: "0 0 28px" }}>Enter the admin password to continue</p>
+            <form onSubmit={e => { e.preventDefault(); if (adminPassInput === ADMIN_PASS) { setAdminAuthed(true); setAdminPassErr(""); } else { setAdminPassErr("Incorrect password"); } }}>
+              <input type="password" placeholder="Admin password" value={adminPassInput} onChange={e => { setAdminPassInput(e.target.value); setAdminPassErr(""); }}
+                style={{ width: "100%", padding: "14px 16px", border: "1px solid " + (adminPassErr ? "#D45B5B" : "#E8E0D8"), borderRadius: 10, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 12 }} />
+              {adminPassErr && <p style={{ fontSize: 12, color: "#D45B5B", margin: "0 0 12px" }}>{adminPassErr}</p>}
+              <button type="submit" style={{ width: "100%", padding: "14px 0", background: "#1A1815", color: "#fff", border: "none", borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Unlock Admin</button>
+            </form>
+            <button onClick={() => go("home")} style={{ marginTop: 16, background: "none", border: "none", fontSize: 12, color: "#9B8B7B", cursor: "pointer", fontFamily: "inherit" }}>← Back to site</button>
+          </div>
+        </div>
+      );
+    }
+
+    // Fetch user/usage stats from Supabase on first load
+    if (!adminStats) {
+      fetch("/api/admin-stats", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminPass: ADMIN_PASS })
+      }).then(r => r.json()).then(d => { if (!d.error) setAdminStats(d); }).catch(() => {});
+    }
+
     // Compute all analytics from DB and localStorage
     const catCounts = {};
     const retailerCounts = {};
@@ -2077,6 +2175,79 @@ export default function App() {
         <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 5% 60px" }}>
           <h1 style={{ fontFamily: "Georgia,serif", fontSize: 32, fontWeight: 400, marginBottom: 6, color: "#1A1815" }}>Analytics Dashboard</h1>
           <p style={{ fontSize: 14, color: "#9B8B7B", marginBottom: 32 }}>Catalog stats, user activity, and product breakdowns</p>
+
+          {/* ─── Grant Pro Panel ─── */}
+          <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #EDE8E2", padding: "24px 28px", marginBottom: 32 }}>
+            <h3 style={{ fontFamily: "Georgia,serif", fontSize: 18, fontWeight: 400, margin: "0 0 4px" }}>Grant Pro Access</h3>
+            <p style={{ fontSize: 12, color: "#9B8B7B", margin: "0 0 16px" }}>Enter a user's email to upgrade them to Pro</p>
+            <form onSubmit={async e => {
+              e.preventDefault();
+              if (!grantEmail.trim()) return;
+              setGrantStatus(""); setGrantMsg("");
+              try {
+                const token = await getAuthToken();
+                const resp = await fetch("/api/grant-pro", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) },
+                  body: JSON.stringify({ email: grantEmail.trim(), adminPass: ADMIN_PASS })
+                });
+                const data = await resp.json();
+                if (resp.ok) { setGrantStatus("success"); setGrantMsg(data.message || "User upgraded to Pro!"); setGrantEmail(""); }
+                else { setGrantStatus("error"); setGrantMsg(data.error || "Failed to grant Pro"); }
+              } catch (err) { setGrantStatus("error"); setGrantMsg("Network error: " + err.message); }
+            }} style={{ display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: 220 }}>
+                <input type="email" placeholder="user@example.com" value={grantEmail} onChange={e => { setGrantEmail(e.target.value); setGrantStatus(""); }}
+                  style={{ width: "100%", padding: "12px 14px", border: "1px solid #E8E0D8", borderRadius: 8, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box" }} />
+              </div>
+              <button type="submit" style={{ padding: "12px 24px", background: "#5B8B6B", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>Grant Pro</button>
+            </form>
+            {grantStatus === "success" && <p style={{ fontSize: 13, color: "#5B8B6B", margin: "12px 0 0", fontWeight: 500 }}>✓ {grantMsg}</p>}
+            {grantStatus === "error" && <p style={{ fontSize: 13, color: "#D45B5B", margin: "12px 0 0" }}>✗ {grantMsg}</p>}
+          </div>
+
+          {/* User & Usage Stats (from Supabase) */}
+          {adminStats && (
+            <>
+              <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
+                {statCard("Registered Users", adminStats.totalUsers, adminStats.proUsers + " Pro · " + adminStats.freeUsers + " Free", "#5B4B9B")}
+                {statCard("Pro Subscribers", adminStats.proUsers, adminStats.totalUsers > 0 ? Math.round(adminStats.proUsers / adminStats.totalUsers * 100) + "% conversion" : "—", "#5B8B6B")}
+                {statCard("Total Visualizations", adminStats.totalVizCount, "Across all users", "#C17550")}
+              </div>
+              {adminStats.userList && adminStats.userList.length > 0 && (
+                <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #EDE8E2", overflow: "hidden", marginBottom: 32 }}>
+                  <div style={{ padding: "18px 24px", borderBottom: "1px solid #F0EBE4" }}>
+                    <h3 style={{ fontFamily: "Georgia,serif", fontSize: 18, fontWeight: 400, margin: 0 }}>All Users</h3>
+                  </div>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                      <thead>
+                        <tr style={{ background: "#FAFAF8", borderBottom: "1px solid #F0EBE4" }}>
+                          {["Email", "Name", "Plan", "Viz Used", "Viz Month", "Signed Up"].map(h => (
+                            <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontWeight: 600, color: "#9B8B7B", letterSpacing: ".06em", textTransform: "uppercase", fontSize: 10 }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {adminStats.userList.map((u, i) => (
+                          <tr key={i} style={{ borderBottom: "1px solid #F5F2ED" }}>
+                            <td style={{ padding: "10px 16px", color: "#1A1815", fontWeight: 500 }}>{u.email}</td>
+                            <td style={{ padding: "10px 16px", color: "#5A5045" }}>{u.name || "—"}</td>
+                            <td style={{ padding: "10px 16px" }}>
+                              <span style={{ display: "inline-block", padding: "2px 10px", borderRadius: 10, fontSize: 10, fontWeight: 700, background: u.plan === "pro" ? "#5B8B6B18" : "#E8E0D8", color: u.plan === "pro" ? "#5B8B6B" : "#9B8B7B", textTransform: "uppercase", letterSpacing: ".08em" }}>{u.plan}</span>
+                            </td>
+                            <td style={{ padding: "10px 16px", color: "#5A5045", fontWeight: 600 }}>{u.vizCount}</td>
+                            <td style={{ padding: "10px 16px", color: "#9B8B7B" }}>{u.vizMonth || "—"}</td>
+                            <td style={{ padding: "10px 16px", color: "#9B8B7B" }}>{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
 
           {/* KPI Row */}
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 32 }}>
@@ -3045,15 +3216,15 @@ export default function App() {
             <div>
               {/* ─── Step Navigation Bar ─── */}
               <div style={{ padding: "0 5%", background: "linear-gradient(180deg, #FDFCFA, #F8F5F0)", borderBottom: "1px solid #EDE8E0" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 0, maxWidth: 600, margin: "0 auto", padding: "20px 0 18px" }}>
+                <div style={{ display: "flex", alignItems: "center", maxWidth: 640, margin: "0 auto", padding: "20px 0 18px" }}>
                   {[
                     { label: "Set Up", sub: "Room & Style", icon: "1", done: !!(room && vibe) },
                     { label: "Design", sub: "AI + Products", icon: "2", done: sel.size > 0 },
                     { label: "Visualize", sub: "See Your Room", icon: "3", done: vizUrls.length > 0 },
                     { label: "Purchase", sub: "Buy Items", icon: "4", done: false },
-                  ].map((s, i) => (
-                    <div key={i} style={{ display: "flex", alignItems: "center", flex: 1 }}>
-                      <button onClick={() => setDesignStep(i)} style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", padding: "4px 0", fontFamily: "inherit" }}>
+                  ].map((s, i, arr) => (
+                    <React.Fragment key={i}>
+                      <button onClick={() => setDesignStep(i)} style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer", padding: "4px 0", fontFamily: "inherit", flexShrink: 0 }}>
                         <div style={{ width: 32, height: 32, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, background: designStep === i ? "#1A1815" : s.done ? "#5B8B6B" : "#E8E0D8", color: designStep === i || s.done ? "#fff" : "#9B8B7B", transition: "all .3s", boxShadow: designStep === i ? "0 2px 8px rgba(26,24,21,.2)" : "none" }}>
                           {s.done && designStep !== i ? "\u2713" : s.icon}
                         </div>
@@ -3062,8 +3233,8 @@ export default function App() {
                           <div style={{ fontSize: 10, color: designStep === i ? "#9B8B7B" : "#C8BEB4", lineHeight: 1.2, marginTop: 1 }}>{s.sub}</div>
                         </div>
                       </button>
-                      {i < 3 && <div style={{ flex: 1, height: 1, background: s.done ? "linear-gradient(90deg, #5B8B6B60, #5B8B6B20)" : "#E8E0D8", margin: "0 16px", borderRadius: 1 }} />}
-                    </div>
+                      {i < arr.length - 1 && <div style={{ flex: 1, height: 1, background: s.done ? "linear-gradient(90deg, #5B8B6B60, #5B8B6B20)" : "#E8E0D8", margin: "0 16px", minWidth: 24, borderRadius: 1 }} />}
+                    </React.Fragment>
                   ))}
                 </div>
               </div>
@@ -3435,7 +3606,7 @@ export default function App() {
                         </div>
                       </div>
                       {/* Table header */}
-                      <div className="aura-purchase-header" style={{ display: "grid", gridTemplateColumns: "52px 1fr 120px 80px 90px 90px 80px", gap: 0, padding: "10px 20px", borderBottom: "1px solid #F0EBE4", background: "#FAFAF8" }}>
+                      <div className="aura-purchase-header" style={{ display: "grid", gridTemplateColumns: "52px 1fr 110px 90px 80px 80px 72px", gap: 0, padding: "10px 20px", borderBottom: "1px solid #F0EBE4", background: "#FAFAF8" }}>
                         {["", "Product", "Retailer", "Qty", "Price", "Total", ""].map((h, i) => (
                           <span key={i} style={{ fontSize: 10, fontWeight: 600, color: "#9B8B7B", letterSpacing: ".08em", textTransform: "uppercase" }}>{h}</span>
                         ))}
@@ -3445,7 +3616,7 @@ export default function App() {
                         const qty = sel.get(p.id) || 1;
                         const lineTotal = p.p * qty;
                         return (
-                          <div key={p.id} className="aura-purchase-row" style={{ display: "grid", gridTemplateColumns: "52px 1fr 120px 80px 90px 90px 80px", gap: 0, padding: "12px 20px", borderBottom: idx < selItems.length - 1 ? "1px solid #F5F2ED" : "none", alignItems: "center", transition: "background .15s" }}
+                          <div key={p.id} className="aura-purchase-row" style={{ display: "grid", gridTemplateColumns: "52px 1fr 110px 90px 80px 80px 72px", gap: 0, padding: "12px 20px", borderBottom: idx < selItems.length - 1 ? "1px solid #F5F2ED" : "none", alignItems: "center", transition: "background .15s" }}
                             onMouseEnter={e => e.currentTarget.style.background = "#FAFAF8"}
                             onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                             {/* Thumbnail */}
@@ -3460,10 +3631,10 @@ export default function App() {
                             {/* Retailer */}
                             <span className="aura-purchase-retailer" style={{ fontSize: 11, color: "#7A6B5B" }}>{p.r}</span>
                             {/* Quantity — clean inline stepper */}
-                            <div style={{ display: "inline-flex", alignItems: "center", border: "1px solid #E8E0D8", borderRadius: 6, overflow: "hidden", height: 28 }}>
-                              <button onClick={() => setQty(p.id, qty - 1)} style={{ width: 28, height: 28, border: "none", borderRight: "1px solid #E8E0D8", background: "#FAFAF8", fontSize: 14, cursor: "pointer", fontFamily: "inherit", color: "#5A5045", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>−</button>
-                              <span style={{ width: 28, textAlign: "center", fontSize: 12, fontWeight: 600, color: "#1A1815" }}>{qty}</span>
-                              <button onClick={() => setQty(p.id, qty + 1)} style={{ width: 28, height: 28, border: "none", borderLeft: "1px solid #E8E0D8", background: "#FAFAF8", fontSize: 14, cursor: "pointer", fontFamily: "inherit", color: "#5A5045", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>+</button>
+                            <div style={{ display: "inline-flex", alignItems: "center", border: "1px solid #E8E0D8", borderRadius: 6, overflow: "hidden", height: 26 }}>
+                              <button onClick={() => setQty(p.id, qty - 1)} style={{ width: 26, height: 26, border: "none", borderRight: "1px solid #E8E0D8", background: "#FAFAF8", fontSize: 13, cursor: "pointer", fontFamily: "inherit", color: "#5A5045", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>−</button>
+                              <span style={{ width: 24, textAlign: "center", fontSize: 12, fontWeight: 600, color: "#1A1815" }}>{qty}</span>
+                              <button onClick={() => setQty(p.id, qty + 1)} style={{ width: 26, height: 26, border: "none", borderLeft: "1px solid #E8E0D8", background: "#FAFAF8", fontSize: 13, cursor: "pointer", fontFamily: "inherit", color: "#5A5045", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>+</button>
                             </div>
                             {/* Unit price */}
                             <span className="aura-purchase-unit" style={{ fontSize: 12, color: "#7A6B5B" }}>{fmt(p.p)}</span>
@@ -3475,7 +3646,7 @@ export default function App() {
                         );
                       })}
                       {/* Total footer */}
-                      <div className="aura-purchase-footer" style={{ display: "grid", gridTemplateColumns: "52px 1fr 120px 80px 90px 90px 80px", gap: 0, padding: "16px 20px", borderTop: "2px solid #E8E0D8", background: "#FAFAF8" }}>
+                      <div className="aura-purchase-footer" style={{ display: "grid", gridTemplateColumns: "52px 1fr 110px 90px 80px 80px 72px", gap: 0, padding: "16px 20px", borderTop: "2px solid #E8E0D8", background: "#FAFAF8" }}>
                         <span />
                         <span style={{ fontSize: 14, fontWeight: 700, color: "#1A1815", padding: "0 10px" }}>Total ({selCount} items)</span>
                         <span className="aura-purchase-retailer" style={{ fontSize: 11, color: "#9B8B7B" }}>{[...new Set(selItems.map(p => p.r))].length} retailers</span>
