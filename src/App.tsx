@@ -1427,9 +1427,9 @@ export default function App() {
         <div style={{ background: "#fff", borderRadius: 20, padding: "48px 40px", maxWidth: 400, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,.06)" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 4 }}><AuraLogo size={32} /><h1 style={{ fontFamily: "Georgia,serif", fontSize: 28, fontWeight: 400, margin: 0 }}>AURA</h1></div>
           <p style={{ textAlign: "center", fontSize: 14, color: "#9B8B7B", marginBottom: 32 }}>Set your new password</p>
-          <input value={ap} onChange={(e) => setAp(e.target.value)} type="password" placeholder="New password (8+ characters)" onKeyDown={(e) => { if (e.key === "Enter") { if (!ap || ap.length < 8) { setAErr("Password must be at least 8 characters"); return; } setALd(true); setAErr(""); doAuth("reset", null, ap).then(e => { if (e) { setAErr(e); setALd(false); } }); }}} style={{ width: "100%", padding: "14px 16px", border: "1px solid #E8E0D8", borderRadius: 12, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 16 }} />
+          <input value={ap} onChange={(e) => setAp(e.target.value)} type="password" placeholder="New password (8+ characters)" onKeyDown={async (e) => { if (e.key === "Enter") { if (!ap || ap.length < 8) { setAErr("Password must be at least 8 characters"); return; } setALd(true); setAErr(""); try { const err = await doAuth("reset", null, ap); if (err) setAErr(err); } catch (_e) { setAErr("Something went wrong."); } setALd(false); }}} style={{ width: "100%", padding: "14px 16px", border: "1px solid #E8E0D8", borderRadius: 12, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 16 }} />
           {aErr && <p style={{ color: "#C17550", fontSize: 13, textAlign: "center", marginBottom: 12 }}>{aErr}</p>}
-          <button onClick={async () => { if (!ap || ap.length < 8) { setAErr("Password must be at least 8 characters"); return; } setALd(true); setAErr(""); const e = await doAuth("reset", null, ap); if (e) { setAErr(e); setALd(false); } }} disabled={aLd} style={{ width: "100%", padding: "14px", background: "#C17550", color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: aLd ? 0.5 : 1 }}>{aLd ? "..." : "Update Password"}</button>
+          <button onClick={async () => { if (!ap || ap.length < 8) { setAErr("Password must be at least 8 characters"); return; } setALd(true); setAErr(""); try { const err = await doAuth("reset", null, ap); if (err) setAErr(err); } catch (_e) { setAErr("Something went wrong."); } setALd(false); }} disabled={aLd} style={{ width: "100%", padding: "14px", background: "#C17550", color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: aLd ? 0.5 : 1 }}>{aLd ? "..." : "Update Password"}</button>
         </div>
       </div>
     );
@@ -1441,17 +1441,22 @@ export default function App() {
       if (authMode === "forgot") {
         if (!ae) { setAErr("Enter your email"); return; }
         setALd(true); setAErr("");
-        const e = await doAuth("forgot", ae);
-        if (e) { setAErr(e); setALd(false); }
-        else setALd(false);
+        try {
+          const e = await doAuth("forgot", ae);
+          if (e) setAErr(e);
+        } catch (_e) { setAErr("Something went wrong. Please try again."); }
+        setALd(false);
         return;
       }
       if (!ae || !ap) { setAErr("Fill in all fields"); return; }
       if (authMode === "signup" && !an) { setAErr("Name required"); return; }
       if (authMode === "signup" && ap.length < 8) { setAErr("Password must be at least 8 characters"); return; }
       setALd(true); setAErr("");
-      const e = await doAuth(authMode, ae, ap, an);
-      if (e) { setAErr(e); setALd(false); }
+      try {
+        const e = await doAuth(authMode, ae, ap, an);
+        if (e) setAErr(e);
+      } catch (_e) { setAErr("Something went wrong. Please try again."); }
+      setALd(false);
     };
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, background: "linear-gradient(160deg,#FDFCFA,#F0EBE4)" }}>
