@@ -7,7 +7,7 @@ import { compressImage } from "./utils/compress";
 import { sanitizeHtml, formatChatMessage } from "./utils/sanitize";
 import { getAuthToken, authHeaders } from "./utils/auth";
 import { AI_API, aiChat, analyzeImage, generateAIImage, searchFeaturedProducts } from "./api";
-import { ROOMS, VIBES, fmt, budgets, FURN_DIMS, STYLE_PALETTES, ROOM_NEEDS } from "./constants";
+import { ROOMS, VIBES, fmt, budgets, FURN_DIMS, STYLE_PALETTES, ROOM_NEEDS, STYLE_COMPAT } from "./constants";
 import { getProductDims, buildDesignBoard, generateMoodBoards } from "./engine/designEngine";
 import { generateCADLayout } from "./engine/cadLayout";
 import Card, { CAT_COLORS } from "./components/Card";
@@ -743,12 +743,27 @@ export default function App() {
     let aiWorked = false;
     try {
       const m = msg.toLowerCase();
+      const vibeCompat = vibe ? ((STYLE_COMPAT as Record<string, Record<string, number>>)[vibe as string] || {}) : {};
+      const vibePalette = vibe ? ((STYLE_PALETTES as Record<string, StylePalette>)[vibe as string]) : null;
       const scored = uniqueDB.map((x) => {
         let s = 0;
-        if (room && x.rm && x.rm.includes(room)) s += 3;
-        if (vibe && x.v && x.v.includes(vibe)) s += 3;
+        // Room fit
+        if (room && x.rm && x.rm.includes(room)) s += 5;
+        // Style match (primary = strong, compatible = partial, clashing = penalty)
+        if (vibe && x.v && x.v.length > 0) {
+          if (x.v.includes(vibe)) s += 8;
+          else { let best = 0; for (const st of x.v) { best = Math.max(best, vibeCompat[st] || 0); } s += Math.round(best * 5); if (best < 0.4) s -= 3; }
+        }
+        // Color & material harmony with chosen palette
+        if (vibePalette) {
+          const txt = ((x.n || "") + " " + (x.pr || "")).toLowerCase();
+          for (const c of vibePalette.colors) { if (txt.includes(c)) s += 2; }
+          for (const mat of vibePalette.materials) { if (txt.includes(mat)) s += 3; }
+        }
+        // Category keyword match from user message
         const catKws: Record<string, string[]> = { sofa:["sofa","couch","sectional"], table:["table","desk","coffee","console","dining"], chair:["chair","seat","lounge","armchair"], stool:["stool","counter","bar"], light:["light","lamp","chandelier","pendant","sconce"], rug:["rug","carpet"], art:["art","painting","print"], accent:["ottoman","bench","mirror","cabinet","bed","dresser","pillow","vase"] };
-        Object.entries(catKws).forEach(([cat, kws]) => { kws.forEach((w) => { if (m.includes(w) && x.c === cat) s += 5; }); });
+        Object.entries(catKws).forEach(([cat, kws]) => { kws.forEach((w) => { if (m.includes(w) && x.c === cat) s += 6; }); });
+        // Product name word match
         (x.n || "").toLowerCase().split(" ").forEach((w) => { if (w.length > 3 && m.includes(w)) s += 2; });
         return { ...x, _s: s };
       }).sort((a, b) => b._s - a._s).slice(0, 50);
@@ -765,21 +780,22 @@ export default function App() {
         ? "\n\nALREADY SELECTED BY USER (" + selItems.length + " items):\n" + selItems.map(p => "- " + p.n + " (" + p.c + ") by " + p.r + " — $" + p.p).join("\n")
         : "";
 
-      const sysPrompt = "You are AURA, an elite AI interior design consultant with access to over 100,000 products from hundreds of top retailers including Amazon, Wayfair, West Elm, CB2, Target, IKEA, and more. You have a continuous conversation with the user about their space. Remember EVERYTHING discussed — room photos they uploaded, dimensions, style preferences, and products they liked or disliked.\n\nCatalog (showing most relevant from 100k+ products):\n" + catalogStr +
+      const sysPrompt = "You are AURA, an elite AI interior design consultant with access to over 100,000 products from hundreds of top retailers. You curate like a professional designer — every recommendation must feel COHESIVE, like a thoughtfully assembled collection, not random picks.\n\nCatalog (most relevant from 100k+ products):\n" + catalogStr +
         "\n\nContext: Room=" + (room || "any") + ", Style=" + (vibe || "any") +
         ", Budget=" + (bud === "all" ? "any" : bud) + (sqft ? ", ~" + sqft + " sq ft" : "") +
         (roomW && roomL ? ", Dimensions=" + roomW + "ft x " + roomL + "ft" : "") +
         selProductStr +
-        "\n\nFURNITURE DIMENSIONS: " + furnDimStr +
-        "\n\nSPATIAL RULES: BEFORE recommending any furniture, verify it physically fits the room. A " + (sqft || "200") + " sqft room is roughly " + Math.round(Math.sqrt((parseInt(sqft) || 200) * 1.3)) + "ft x " + Math.round((parseInt(sqft) || 200) / Math.sqrt((parseInt(sqft) || 200) * 1.3)) + "ft. " +
-        "A 7.5ft sofa needs 3ft clearance in front + walking space. Do NOT recommend oversized furniture for small rooms. " +
-        "If the user's room is under 150 sqft, prefer compact/small-scale pieces. Mention dimensions when suggesting placement." +
+        "\n\nDESIGN PRINCIPLES (follow these like a professional designer):" +
+        "\n1. COLOR COHESION (60-30-10 rule): 60% dominant neutral/color, 30% secondary, 10% accent. All pieces should share a color temperature (warm OR cool, never random). Palette colors: " + (palette.colors || []).join(", ") +
+        "\n2. MATERIAL HARMONY: Stick to 2-3 material families that complement each other. Mix textures (smooth+rough, matte+shiny) but keep undertones consistent. Palette materials: " + (palette.materials || []).join(", ") +
+        "\n3. STYLE COHERENCE (80/20 rule): 80% of pieces in the primary style, 20% can be a compatible accent style. Never mix clashing styles." +
+        "\n4. PRICE TIER CONSISTENCY: Splurge on anchor pieces (sofa, bed, dining table). Save on accessories (art, throws, candles). Don't pair a $15K sofa with a $20 side table — keep furniture within 3-5x price range of each other." +
+        "\n5. CATEGORY PRIORITY: Recommend Tier 1 essentials first (sofa/bed/table), then Tier 2 (chairs, rugs, lighting), then Tier 3 polish (art, accents, decor). A room without essentials is incomplete." +
+        "\n6. SPATIAL FIT: " + furnDimStr + ". A " + (sqft || "200") + " sqft room is roughly " + Math.round(Math.sqrt((parseInt(sqft) || 200) * 1.3)) + "ft x " + Math.round((parseInt(sqft) || 200) / Math.sqrt((parseInt(sqft) || 200) * 1.3)) + "ft. Verify each piece fits. Fill ~60% of floor space, leave 40% open for walkways." +
         (cadAnalysis ? "\nFloor plan analysis: " + cadAnalysis.slice(0, 500) : "") +
-        (roomPhotoAnalysis ? "\nROOM PHOTO ANALYSIS (user uploaded a photo of their actual room): " + roomPhotoAnalysis : "") +
-        (roomNeeds.layout ? "\nLayout guidelines: " + roomNeeds.layout : "") +
-        "\n\nRULES: Write flowing paragraphs, NOT numbered lists. Bold product names with **name**. Reference as [ID:N]. Recommend up to 12 products. Warm editorial tone. Suggest specific placement with dimensions. Colors: " + (palette.colors || []).slice(0, 4).join(", ") +
-        ". Materials: " + (palette.materials || []).slice(0, 3).join(", ") +
-        ". ALWAYS mention how each large piece fits the room dimensions. If the user uploaded a room photo, reference what you see in their actual room — wall colors, flooring, existing features. Continue the conversation naturally, remembering everything discussed.";
+        (roomPhotoAnalysis ? "\nROOM PHOTO ANALYSIS: " + roomPhotoAnalysis : "") +
+        (roomNeeds.layout ? "\nLayout: " + roomNeeds.layout : "") +
+        "\n\nRULES: Write flowing paragraphs, NOT numbered lists. Bold product names with **name**. Reference as [ID:N]. Recommend up to 12 products. Warm editorial tone. EXPLAIN WHY pieces work together — mention shared colors, materials, or visual weight. Always describe the cohesive story of the room. If the user uploaded a room photo, reference what you see. Continue naturally, remembering everything discussed.";
 
       const chatHistory = [{ role: "system", content: sysPrompt }];
       // Include full conversation history (last 12 messages) so AI remembers the room, preferences, and prior recommendations

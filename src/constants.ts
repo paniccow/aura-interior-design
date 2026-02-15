@@ -40,6 +40,73 @@ export const STYLE_PALETTES: Record<StyleName, StylePalette> = {
 };
 
 
+/* ─── DESIGN INTELLIGENCE: STYLE COMPATIBILITY MATRIX ─── */
+// 0.0 = clash, 0.5 = moderate, 0.8+ = great pair (based on shared silhouettes, materials, era)
+export const STYLE_COMPAT: Record<string, Record<string, number>> = {
+  "Warm Modern":    { "Warm Modern":1,"Minimalist":.7,"Bohemian":.6,"Scandinavian":.85,"Mid-Century":.8,"Luxury":.5,"Coastal":.6,"Japandi":.8,"Industrial":.4,"Art Deco":.3,"Rustic":.5,"Glam":.4,"Transitional":.9,"Organic Modern":.95 },
+  "Minimalist":     { "Warm Modern":.7,"Minimalist":1,"Bohemian":.3,"Scandinavian":.9,"Mid-Century":.75,"Luxury":.5,"Coastal":.5,"Japandi":.95,"Industrial":.7,"Art Deco":.3,"Rustic":.2,"Glam":.3,"Transitional":.7,"Organic Modern":.75 },
+  "Bohemian":       { "Warm Modern":.6,"Minimalist":.3,"Bohemian":1,"Scandinavian":.6,"Mid-Century":.75,"Luxury":.3,"Coastal":.65,"Japandi":.4,"Industrial":.5,"Art Deco":.3,"Rustic":.7,"Glam":.3,"Transitional":.5,"Organic Modern":.7 },
+  "Scandinavian":   { "Warm Modern":.85,"Minimalist":.9,"Bohemian":.6,"Scandinavian":1,"Mid-Century":.85,"Luxury":.4,"Coastal":.65,"Japandi":.95,"Industrial":.5,"Art Deco":.2,"Rustic":.4,"Glam":.3,"Transitional":.75,"Organic Modern":.85 },
+  "Mid-Century":    { "Warm Modern":.8,"Minimalist":.75,"Bohemian":.75,"Scandinavian":.85,"Mid-Century":1,"Luxury":.5,"Coastal":.4,"Japandi":.7,"Industrial":.75,"Art Deco":.55,"Rustic":.4,"Glam":.4,"Transitional":.75,"Organic Modern":.7 },
+  "Luxury":         { "Warm Modern":.5,"Minimalist":.5,"Bohemian":.3,"Scandinavian":.4,"Mid-Century":.5,"Luxury":1,"Coastal":.3,"Japandi":.4,"Industrial":.3,"Art Deco":.85,"Rustic":.2,"Glam":.9,"Transitional":.7,"Organic Modern":.4 },
+  "Coastal":        { "Warm Modern":.6,"Minimalist":.5,"Bohemian":.65,"Scandinavian":.65,"Mid-Century":.4,"Luxury":.3,"Coastal":1,"Japandi":.5,"Industrial":.3,"Art Deco":.2,"Rustic":.7,"Glam":.25,"Transitional":.65,"Organic Modern":.7 },
+  "Japandi":        { "Warm Modern":.8,"Minimalist":.95,"Bohemian":.4,"Scandinavian":.95,"Mid-Century":.7,"Luxury":.4,"Coastal":.5,"Japandi":1,"Industrial":.5,"Art Deco":.2,"Rustic":.4,"Glam":.2,"Transitional":.7,"Organic Modern":.9 },
+  "Industrial":     { "Warm Modern":.4,"Minimalist":.7,"Bohemian":.5,"Scandinavian":.5,"Mid-Century":.75,"Luxury":.3,"Coastal":.3,"Japandi":.5,"Industrial":1,"Art Deco":.4,"Rustic":.65,"Glam":.3,"Transitional":.5,"Organic Modern":.4 },
+  "Art Deco":       { "Warm Modern":.3,"Minimalist":.3,"Bohemian":.3,"Scandinavian":.2,"Mid-Century":.55,"Luxury":.85,"Coastal":.2,"Japandi":.2,"Industrial":.4,"Art Deco":1,"Rustic":.15,"Glam":.85,"Transitional":.5,"Organic Modern":.25 },
+  "Rustic":         { "Warm Modern":.5,"Minimalist":.2,"Bohemian":.7,"Scandinavian":.4,"Mid-Century":.4,"Luxury":.2,"Coastal":.7,"Japandi":.4,"Industrial":.65,"Art Deco":.15,"Rustic":1,"Glam":.15,"Transitional":.5,"Organic Modern":.65 },
+  "Glam":           { "Warm Modern":.4,"Minimalist":.3,"Bohemian":.3,"Scandinavian":.3,"Mid-Century":.4,"Luxury":.9,"Coastal":.25,"Japandi":.2,"Industrial":.3,"Art Deco":.85,"Rustic":.15,"Glam":1,"Transitional":.6,"Organic Modern":.25 },
+  "Transitional":   { "Warm Modern":.9,"Minimalist":.7,"Bohemian":.5,"Scandinavian":.75,"Mid-Century":.75,"Luxury":.7,"Coastal":.65,"Japandi":.7,"Industrial":.5,"Art Deco":.5,"Rustic":.5,"Glam":.6,"Transitional":1,"Organic Modern":.8 },
+  "Organic Modern": { "Warm Modern":.95,"Minimalist":.75,"Bohemian":.7,"Scandinavian":.85,"Mid-Century":.7,"Luxury":.4,"Coastal":.7,"Japandi":.9,"Industrial":.4,"Art Deco":.25,"Rustic":.65,"Glam":.25,"Transitional":.8,"Organic Modern":1 },
+};
+
+/* ─── COLOR TEMPERATURE FAMILIES ─── */
+export const COLOR_TEMPS: Record<string, "warm"|"cool"|"neutral"> = {
+  cream:"warm", taupe:"warm", "warm gray":"warm", oak:"warm", brass:"warm", terracotta:"warm", ivory:"warm", sand:"warm",
+  amber:"warm", rust:"warm", mustard:"warm", ochre:"warm", teak:"warm", "burnt orange":"warm", walnut:"warm", gold:"warm",
+  champagne:"warm", honey:"warm", "warm brown":"warm", copper:"warm", "warm white":"warm", cherry:"warm", ruby:"warm",
+  blush:"warm", coral:"warm", clay:"warm",
+  white:"neutral", "light gray":"neutral", gray:"neutral", black:"neutral", concrete:"neutral", natural:"neutral",
+  "pale oak":"neutral", greige:"neutral", charcoal:"neutral", stone:"neutral", onyx:"neutral", "off-white":"neutral",
+  "exposed brick":"neutral", iron:"neutral", steel:"neutral", "dark wood":"neutral", silver:"neutral", crystal:"neutral",
+  mirrored:"neutral", fur:"neutral", geometric:"neutral",
+  "pale blue":"cool", "soft blue":"cool", navy:"cool", "sea blue":"cool", seafoam:"cool", emerald:"cool",
+  sage:"cool", olive:"cool", indigo:"cool", "forest green":"cool", moss:"cool", ash:"cool", birch:"cool",
+  "light wood":"cool", driftwood:"cool", "natural wood":"cool", "soft gray":"cool",
+};
+
+/* ─── RETAILER TIER & AESTHETIC CLUSTERS ─── */
+export const RETAILER_TIERS: Record<string, number> = {
+  "Restoration Hardware":4, "RH":4, "Arhaus":4, "Roche Bobois":4, "B&B Italia":4, "Holly Hunt":4,
+  "Design Within Reach":4, "Herman Miller":4, "Knoll":4,
+  "Crate & Barrel":3, "Room & Board":3, "Pottery Barn":3, "Serena & Lily":3,
+  "West Elm":2, "CB2":2, "Article":2, "Joybird":2, "Castlery":2,
+  "Lulu & Georgia":3, "McGee & Co":3, "Shoppe Amber":3,
+  "IKEA":1, "Target":1, "Wayfair":1, "Amazon":1, "Online Store":1,
+};
+
+/* ─── SPLURGE vs SAVE CATEGORIES ─── */
+// Investment: anchor pieces where quality matters most (splurge)
+// Flexible: can go either way
+// Save: decorative/replaceable items where budget finds work great
+export const CATEGORY_INVESTMENT: Record<string, "splurge"|"flexible"|"save"> = {
+  sofa:"splurge", bed:"splurge", chair:"flexible", table:"flexible",
+  stool:"flexible", light:"flexible", rug:"flexible",
+  art:"save", accent:"save", decor:"save", storage:"flexible",
+};
+
+/* ─── ROOM CATEGORY TIER PRIORITY ─── */
+// Tier 1: Must-have (incomplete without), Tier 2: Important, Tier 3: Polish
+export const ROOM_CAT_TIERS: Record<string, Record<string, 1|2|3>> = {
+  "Living Room":  { sofa:1, table:1, light:1, chair:2, rug:2, art:3, accent:3 },
+  "Dining Room":  { table:1, chair:1, light:1, rug:2, art:3, accent:3, storage:2 },
+  "Kitchen":      { stool:1, light:1, table:2, accent:3 },
+  "Bedroom":      { bed:1, table:1, light:1, rug:2, chair:2, art:3, accent:3 },
+  "Office":       { table:1, chair:1, light:1, storage:2, rug:2, art:3, accent:3 },
+  "Outdoor":      { chair:1, table:1, sofa:2, light:2, accent:3 },
+  "Bathroom":     { light:1, accent:2, art:3 },
+  "Great Room":   { sofa:1, table:1, light:1, chair:2, rug:2, art:3, accent:3, stool:2 },
+};
+
 /* ─── ROOM TYPE REQUIREMENTS + SPATIAL RULES ─── */
 export const ROOM_NEEDS: Record<RoomType, RoomNeed> = {
   "Living Room":  { essential: ["sofa"], recommended: ["table","chair","rug","light","art","accent"], layout: "Anchor with a sofa facing the focal wall. Coffee table 14-18\" from sofa. Accent chairs flanking at 45°. Rug grounding the conversation zone. Lighting at varying heights.", minSqft: 120, zones: ["conversation","reading nook","entry"] },
