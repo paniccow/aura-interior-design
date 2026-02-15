@@ -710,6 +710,32 @@ export default function App() {
     setBusy(true);
     setMsgs((prev) => [...prev, { role: "user", text: msg, recs: [] }]);
 
+    // Search RapidAPI for products matching user's message (non-blocking, adds variety)
+    let apiProducts: Product[] = [];
+    try {
+      const searchTerms = msg.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 3);
+      const furnitureKws = ["sofa","couch","table","chair","desk","lamp","rug","bed","stool","light","art","shelf","cabinet","mirror","ottoman","bench","dresser","nightstand","chandelier","pendant","sconce","sectional","bookcase","sideboard","credenza","headboard","daybed","armchair","recliner","outdoor","patio"];
+      const matchedKws = searchTerms.filter(w => furnitureKws.some(fk => w.includes(fk) || fk.includes(w)));
+      const searchQuery = matchedKws.length > 0 ? matchedKws.join(" ") : (searchTerms.length > 1 ? searchTerms.slice(0, 3).join(" ") + " furniture" : "");
+      if (searchQuery) {
+        const result = await searchFeaturedProducts(searchQuery, 1);
+        apiProducts = result.products;
+        // Cache these products so they can be selected later
+        if (apiProducts.length > 0) {
+          setFeaturedCache(prev => {
+            const next = new Map(prev);
+            for (const p of apiProducts) next.set(p.id, p);
+            return next;
+          });
+        }
+      }
+    } catch (_e) { /* API search is best-effort */ }
+
+    const combinedDB = [...DB, ...apiProducts, ...Array.from(featuredCache.values())];
+    // Deduplicate by id
+    const seen = new Set<number>();
+    const uniqueDB = combinedDB.filter(p => { if (seen.has(p.id)) return false; seen.add(p.id); return true; });
+
     let recs = [];
     try { recs = localMatch(msg); } catch (_e) { recs = DB.slice(0, 12); }
     const topPicks = recs.slice(0, 12);
@@ -717,7 +743,7 @@ export default function App() {
     let aiWorked = false;
     try {
       const m = msg.toLowerCase();
-      const scored = DB.map((x) => {
+      const scored = uniqueDB.map((x) => {
         let s = 0;
         if (room && x.rm && x.rm.includes(room)) s += 3;
         if (vibe && x.v && x.v.includes(vibe)) s += 3;
@@ -739,7 +765,7 @@ export default function App() {
         ? "\n\nALREADY SELECTED BY USER (" + selItems.length + " items):\n" + selItems.map(p => "- " + p.n + " (" + p.c + ") by " + p.r + " — $" + p.p).join("\n")
         : "";
 
-      const sysPrompt = "You are AURA, an elite AI interior design consultant. You have a continuous conversation with the user about their space. Remember EVERYTHING discussed — room photos they uploaded, dimensions, style preferences, and products they liked or disliked.\n\nCatalog (showing relevant):\n" + catalogStr +
+      const sysPrompt = "You are AURA, an elite AI interior design consultant with access to over 100,000 products from hundreds of top retailers including Amazon, Wayfair, West Elm, CB2, Target, IKEA, and more. You have a continuous conversation with the user about their space. Remember EVERYTHING discussed — room photos they uploaded, dimensions, style preferences, and products they liked or disliked.\n\nCatalog (showing most relevant from 100k+ products):\n" + catalogStr +
         "\n\nContext: Room=" + (room || "any") + ", Style=" + (vibe || "any") +
         ", Budget=" + (bud === "all" ? "any" : bud) + (sqft ? ", ~" + sqft + " sq ft" : "") +
         (roomW && roomL ? ", Dimensions=" + roomW + "ft x " + roomL + "ft" : "") +
@@ -767,21 +793,21 @@ export default function App() {
       const text = await aiChat(chatHistory);
 
       if (text && text.length > 20 && text !== "[object Object]") {
-        const ids = []; const rx = /\[ID:(\d+)\]/g; let mt;
+        const ids: number[] = []; const rx = /\[ID:(-?\d+)\]/g; let mt;
         while ((mt = rx.exec(text)) !== null) ids.push(parseInt(mt[1]));
-        let apiRecs = ids.map((id) => DB.find((p) => p.id === id)).filter((x): x is Product => Boolean(x));
+        let apiRecs = ids.map((id) => uniqueDB.find((p) => p.id === id)).filter((x): x is Product => Boolean(x));
 
         if (apiRecs.length === 0) {
           const boldNames = []; const bx = /\*\*([^*]+)\*\*/g; let bm;
           while ((bm = bx.exec(text)) !== null) boldNames.push(bm[1].toLowerCase().trim());
           const found = new Set();
           for (const bn of boldNames) {
-            let match = DB.find(p => (p.n || "").toLowerCase() === bn);
-            if (!match) match = DB.find(p => (p.n || "").toLowerCase().includes(bn) || bn.includes((p.n || "").toLowerCase()));
+            let match = uniqueDB.find(p => (p.n || "").toLowerCase() === bn);
+            if (!match) match = uniqueDB.find(p => (p.n || "").toLowerCase().includes(bn) || bn.includes((p.n || "").toLowerCase()));
             if (!match) {
               const words = bn.split(/[\s,\-\/]+/).filter(w => w.length > 2);
               if (words.length >= 2) {
-                match = DB.find(p => {
+                match = uniqueDB.find(p => {
                   const pn = (p.n || "").toLowerCase();
                   return words.filter(w => pn.includes(w)).length >= Math.ceil(words.length * 0.6);
                 });
@@ -842,7 +868,10 @@ export default function App() {
 
   const localMatch = (msg: string): Product[] => {
     const m = msg.toLowerCase();
-    return DB.map((x) => {
+    const pool = [...DB, ...Array.from(featuredCache.values())];
+    const seenIds = new Set<number>();
+    const uniquePool = pool.filter(p => { if (seenIds.has(p.id)) return false; seenIds.add(p.id); return true; });
+    return uniquePool.map((x) => {
       let s = Math.random() * 1.5;
       const kws: Record<string, string[]> = { sofa:["sofa","couch","sectional","seating"], table:["table","desk","coffee","console","dining","side"], chair:["chair","seat","lounge","armchair"], stool:["stool","counter","bar"], light:["light","lamp","chandelier","pendant","sconce"], rug:["rug","carpet"], art:["art","painting","print","wall"], accent:["accent","ottoman","tub","bench","headboard","daybed","cabinet","mirror","bed","dresser","nightstand","credenza"] };
       Object.keys(kws).forEach((cat) => { kws[cat].forEach((w: string) => { if (m.includes(w) && x.c === cat) s += 7; }); });
