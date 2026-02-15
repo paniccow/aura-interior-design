@@ -158,6 +158,37 @@ async function generateAIImage(prompt, referenceImage, productImageUrls, cadImag
   return null;
 }
 
+/* ─── HTML SANITIZER ─── */
+/* Strips all HTML tags except a safe whitelist, prevents XSS from AI responses */
+function sanitizeHtml(html) {
+  // First escape everything
+  const escaped = html
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+  return escaped;
+}
+
+/* Convert markdown-like text to safe HTML for chat messages */
+function formatChatMessage(text) {
+  if (!text) return "";
+  // Sanitize first to prevent XSS — escape all HTML
+  let safe = sanitizeHtml(text);
+  // Then apply our own formatting on the escaped text
+  safe = safe
+    .replace(/\*\*(.*?)\*\*/g, '<strong style="color:#8B6040;font-weight:700">$1</strong>')
+    .replace(/_(.*?)_/g, "<em>$1</em>")
+    .replace(/^\d+[\.\)]\s*/gm, "")
+    .replace(/^[-•]\s*/gm, "")
+    .replace(/\n{2,}/g, '</p><p style="margin:10px 0 0">')
+    .replace(/\n/g, "<br/>")
+    .replace(/^/, '<p style="margin:0">')
+    .replace(/$/, "</p>");
+  return safe;
+}
+
 const ROOMS = ["Living Room","Dining Room","Kitchen","Bedroom","Office","Outdoor","Bathroom","Great Room"];
 const VIBES = ["Warm Modern","Minimalist","Bohemian","Scandinavian","Mid-Century","Luxury","Coastal","Japandi","Industrial","Art Deco","Rustic","Glam","Transitional","Organic Modern"];
 const fmt = (n) => "$" + n.toLocaleString();
@@ -2959,16 +2990,7 @@ export default function App() {
                       <div ref={chatBoxRef} style={{ maxHeight: 400, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 10, WebkitOverflowScrolling: "touch" }}>
                         {msgs.map((m, i) => (
                           <div key={i}>
-                            <div style={{ padding: m.role === "user" ? "10px 14px" : "12px 16px", borderRadius: m.role === "user" ? "14px 14px 4px 14px" : "14px 14px 14px 4px", fontSize: 14, lineHeight: 1.65, maxWidth: m.role === "user" ? "80%" : "100%", background: m.role === "user" ? "#1A1815" : "#F8F5F0", color: m.role === "user" ? "#fff" : "#3A3530", marginLeft: m.role === "user" ? "auto" : 0, wordBreak: "break-word" }} dangerouslySetInnerHTML={{ __html: (m.text || "")
-                              .replace(/\*\*(.*?)\*\*/g, '<strong style="color:#8B6040;font-weight:700">$1</strong>')
-                              .replace(/_(.*?)_/g, "<em>$1</em>")
-                              .replace(/^\d+[\.\)]\s*/gm, "")
-                              .replace(/^[-•]\s*/gm, "")
-                              .replace(/\n{2,}/g, '</p><p style="margin:10px 0 0">')
-                              .replace(/\n/g, "<br/>")
-                              .replace(/^/, '<p style="margin:0">')
-                              .replace(/$/, "</p>")
-                            }} />
+                            <div style={{ padding: m.role === "user" ? "10px 14px" : "12px 16px", borderRadius: m.role === "user" ? "14px 14px 4px 14px" : "14px 14px 14px 4px", fontSize: 14, lineHeight: 1.65, maxWidth: m.role === "user" ? "80%" : "100%", background: m.role === "user" ? "#1A1815" : "#F8F5F0", color: m.role === "user" ? "#fff" : "#3A3530", marginLeft: m.role === "user" ? "auto" : 0, wordBreak: "break-word" }} dangerouslySetInnerHTML={{ __html: formatChatMessage(m.text) }} />
                             {m.recs?.length > 0 && (
                               <div style={{ marginTop: 10 }}>
                                 <p style={{ fontSize: 10, color: "#B8A898", marginBottom: 6 }}>Tap + to add to your selection</p>
