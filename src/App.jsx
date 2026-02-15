@@ -2337,7 +2337,6 @@ export default function App() {
           .aura-admin-grid{grid-template-columns:1fr!important}
           .aura-compare-header,.aura-compare-row{grid-template-columns:1fr repeat(3,48px)!important;gap:2px!important;padding:12px 14px!important}
           .aura-compare-header>div:nth-child(n+5),.aura-compare-row>div:nth-child(n+5){display:none!important}
-          .aura-compare-row .aura-feat-icon{display:none!important}
         }
       `}</style>
 
@@ -2698,20 +2697,20 @@ export default function App() {
                 {(() => {
                   const competitors = ["Havenly", "Modsy", "RoomGPT", "Pottery Barn", "Houzz"];
                   const features = [
-                    { icon: "\uD83D\uDDBC\uFE0F", name: "AI room visualization", desc: "Photorealistic renders of your space", aura: true, others: [true, false, true, false, false] },
-                    { icon: "\uD83D\uDED2", name: "Real product links", desc: "Direct purchase from premium brands", aura: true, others: [true, true, false, true, true] },
-                    { icon: "\uD83D\uDCF7", name: "Room photo upload", desc: "Upload your actual room photo", aura: true, others: [false, true, true, false, false] },
-                    { icon: "\uD83D\uDCAC", name: "AI design assistant", desc: "Chat for personalized suggestions", aura: true, others: [false, false, true, false, false] },
-                    { icon: "\uD83D\uDCD0", name: "CAD floor plans", desc: "Professional layouts with dimensions", aura: true, others: [false, false, false, false, false] },
-                    { icon: "\uD83C\uDFA8", name: "Style library", desc: "14+ curated design palettes", aura: true, others: [true, false, false, false, true] },
-                    { icon: "\u2728", name: "Beginner-friendly", desc: "No design skills needed", aura: true, others: [true, true, true, false, false] },
-                    { icon: "\u26A1", name: "Instant results", desc: "Designs generated in seconds", aura: true, others: [false, false, true, false, false] },
-                    { icon: "\uD83D\uDECB\uFE0F", name: DB.length + " curated products", desc: "Hand-picked from top brands", aura: true, others: [false, false, false, false, false] },
-                    { icon: "\uD83D\uDCCA", name: "Smart fit scoring", desc: "AI checks style & room compatibility", aura: true, others: [false, false, false, false, false] },
-                    { icon: "\uD83D\uDCC2", name: "Multi-project support", desc: "Save unlimited design projects", aura: true, others: [true, true, false, false, true] },
-                    { icon: "\uD83C\uDFB2", name: "Mood board generation", desc: "AI-curated product collections", aura: true, others: [true, true, false, false, false] },
-                    { icon: "\uD83C\uDF10", name: "Web-based", desc: "No installation required", aura: true, others: [true, true, true, true, true] },
-                    { icon: "\uD83C\uDD93", name: "Free tier available", desc: "Start designing at no cost", aura: true, others: [false, false, true, false, false] },
+                    { name: "AI room visualization", desc: "Photorealistic renders of your space", aura: true, others: [true, false, true, false, false] },
+                    { name: "Real product links", desc: "Direct purchase from premium brands", aura: true, others: [true, true, false, true, true] },
+                    { name: "Room photo upload", desc: "Upload your actual room photo", aura: true, others: [false, true, true, false, false] },
+                    { name: "AI design assistant", desc: "Chat for personalized suggestions", aura: true, others: [false, false, true, false, false] },
+                    { name: "CAD floor plans", desc: "Professional layouts with dimensions", aura: true, others: [false, false, false, false, false] },
+                    { name: "Style library", desc: "14+ curated design palettes", aura: true, others: [true, false, false, false, true] },
+                    { name: "Beginner-friendly", desc: "No design skills needed", aura: true, others: [true, true, true, false, false] },
+                    { name: "Instant results", desc: "Designs generated in seconds", aura: true, others: [false, false, true, false, false] },
+                    { name: DB.length + " curated products", desc: "Hand-picked from top brands", aura: true, others: [false, false, false, false, false] },
+                    { name: "Smart fit scoring", desc: "AI checks style & room compatibility", aura: true, others: [false, false, false, false, false] },
+                    { name: "Multi-project support", desc: "Save unlimited design projects", aura: true, others: [true, true, false, false, true] },
+                    { name: "Mood board generation", desc: "AI-curated product collections", aura: true, others: [true, true, false, false, false] },
+                    { name: "Web-based", desc: "No installation required", aura: true, others: [true, true, true, true, true] },
+                    { name: "Free tier available", desc: "Start designing at no cost", aura: true, others: [false, false, true, false, false] },
                   ];
                   const Check = () => <div style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg, #E8F5EC, #D4EDDA)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(52,168,83,.15)" }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#34A853" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg></div>;
                   const Cross = () => <div style={{ width: 30, height: 30, borderRadius: "50%", background: "linear-gradient(135deg, #FDE8E8, #FCDADA)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(234,67,53,.1)" }}><svg width="11" height="11" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="#EA4335" strokeWidth="2.5" strokeLinecap="round"/></svg></div>;
@@ -2734,12 +2733,9 @@ export default function App() {
                           onMouseEnter={e => { e.currentTarget.style.background = "#FDFCFA"; }}
                           onMouseLeave={e => { e.currentTarget.style.background = "#fff"; }}
                         >
-                          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                            <div style={{ width: 36, height: 36, borderRadius: 10, background: "#F8F5F0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>{f.icon}</div>
-                            <div>
-                              <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1815", margin: "0 0 1px", lineHeight: 1.3 }}>{f.name}</p>
-                              <p style={{ fontSize: 11.5, color: "#A89B8B", margin: 0, lineHeight: 1.3 }}>{f.desc}</p>
-                            </div>
+                          <div>
+                            <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1815", margin: "0 0 2px", lineHeight: 1.3 }}>{f.name}</p>
+                            <p style={{ fontSize: 12, color: "#A89B8B", margin: 0, lineHeight: 1.3 }}>{f.desc}</p>
                           </div>
                           <div style={{ display: "flex", justifyContent: "center" }}>{f.aura ? <Check /> : <Cross />}</div>
                           {f.others.map((has, ci) => <div key={ci} style={{ display: "flex", justifyContent: "center" }}>{has ? <Check /> : <Cross />}</div>)}
@@ -2747,8 +2743,7 @@ export default function App() {
                       ))}
                       {/* Summary row */}
                       <div className="aura-compare-row" style={{ display: "grid", gridTemplateColumns: "1.4fr repeat(6, 1fr)", alignItems: "center", padding: "22px 32px", background: "linear-gradient(180deg, #F8F5F0, #F0EBE4)", borderTop: "2px solid #EDE8E2" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                          <div style={{ width: 36, height: 36, borderRadius: 10, background: "#C1755015", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>{"\uD83C\uDFC6"}</div>
+                        <div>
                           <span style={{ fontSize: 14, fontWeight: 700, color: "#1A1815" }}>Total features</span>
                         </div>
                         <div style={{ textAlign: "center" }}>
@@ -2781,9 +2776,11 @@ export default function App() {
             <RevealSection style={{ maxWidth: 1100, margin: "0 auto", textAlign: "center" }}>
               <p style={{ fontSize: 12, letterSpacing: ".2em", textTransform: "uppercase", color: "#C17550", fontWeight: 600, marginBottom: 16 }}>Curated From</p>
               <h2 style={{ fontFamily: "Georgia,serif", fontSize: 36, fontWeight: 400, marginBottom: 40 }}>Premium brands, real products</h2>
-              <div style={{ display: "flex", justifyContent: "center", gap: 48, flexWrap: "wrap", marginBottom: 20 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20, maxWidth: 900, margin: "0 auto 24px", alignItems: "center" }}>
                 {["Lulu & Georgia", "McGee & Co", "Shoppe Amber Interiors", "West Elm"].map(b => (
-                  <span key={b} style={{ fontFamily: "Georgia,serif", fontSize: 18, color: "#8B7355", fontWeight: 400 }}>{b}</span>
+                  <div key={b} style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 12px" }}>
+                    <span style={{ fontFamily: "Georgia,serif", fontSize: 17, color: "#8B7355", fontWeight: 400, textAlign: "center", lineHeight: 1.3 }}>{b}</span>
+                  </div>
                 ))}
               </div>
               <p style={{ fontSize: 14, color: "#9B8B7B" }}>{DB.length} products — every item links directly to the exact product page for purchase</p>
