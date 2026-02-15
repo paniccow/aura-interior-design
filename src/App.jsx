@@ -2717,15 +2717,15 @@ export default function App() {
                   return (
                     <div style={{ background: "#fff", borderRadius: 24, border: "1px solid #EDE8E2", overflow: "hidden", boxShadow: "0 8px 40px rgba(0,0,0,.05)" }}>
                       {/* Header row */}
-                      <div className="aura-compare-header" style={{ display: "grid", gridTemplateColumns: "1.4fr repeat(6, 1fr)", alignItems: "end", padding: "28px 32px 18px", borderBottom: "2px solid #F0EBE4", background: "linear-gradient(180deg, #FDFCFA, #F8F5F0)" }}>
+                      <div className="aura-compare-header" style={{ display: "grid", gridTemplateColumns: "1.4fr repeat(6, 1fr)", alignItems: "center", padding: "24px 32px", borderBottom: "2px solid #F0EBE4", background: "linear-gradient(180deg, #FDFCFA, #F8F5F0)" }}>
                         <div style={{ fontSize: 10, letterSpacing: ".15em", textTransform: "uppercase", color: "#B8A898", fontWeight: 700 }}>Feature</div>
-                        <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                        <div style={{ textAlign: "center", display: "flex", justifyContent: "center", alignItems: "center", height: 36 }}>
                           <div style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "linear-gradient(135deg, #C17550, #A85D3A)", padding: "7px 18px", borderRadius: 24, boxShadow: "0 3px 12px rgba(193,117,80,.3)" }}>
                             <AuraLogo size={14} />
                             <span style={{ fontSize: 12, fontWeight: 700, color: "#fff", letterSpacing: ".06em" }}>AURA</span>
                           </div>
                         </div>
-                        {competitors.map(c => <div key={c} style={{ textAlign: "center", fontSize: 11, fontWeight: 600, color: "#A89B8B", letterSpacing: ".02em" }}>{c}</div>)}
+                        {competitors.map(c => <div key={c} style={{ textAlign: "center", fontSize: 12, fontWeight: 600, color: "#7A6B5B", letterSpacing: ".02em", height: 36, display: "flex", alignItems: "center", justifyContent: "center" }}>{c}</div>)}
                       </div>
                       {/* Feature rows */}
                       {features.map((f, i) => (
@@ -2741,23 +2741,6 @@ export default function App() {
                           {f.others.map((has, ci) => <div key={ci} style={{ display: "flex", justifyContent: "center" }}>{has ? <Check /> : <Cross />}</div>)}
                         </div>
                       ))}
-                      {/* Summary row */}
-                      <div className="aura-compare-row" style={{ display: "grid", gridTemplateColumns: "1.4fr repeat(6, 1fr)", alignItems: "center", padding: "22px 32px", background: "linear-gradient(180deg, #F8F5F0, #F0EBE4)", borderTop: "2px solid #EDE8E2" }}>
-                        <div>
-                          <span style={{ fontSize: 14, fontWeight: 700, color: "#1A1815" }}>Total features</span>
-                        </div>
-                        <div style={{ textAlign: "center" }}>
-                          <span style={{ fontSize: 22, fontWeight: 700, color: "#C17550", fontFamily: "Georgia,serif" }}>{features.filter(f => f.aura).length}</span>
-                          <span style={{ fontSize: 13, color: "#B8A898" }}>/{features.length}</span>
-                        </div>
-                        {competitors.map((c, ci) => {
-                          const ct = features.filter(f => f.others[ci]).length;
-                          return <div key={c} style={{ textAlign: "center" }}>
-                            <span style={{ fontSize: 18, fontWeight: 600, color: ct > 5 ? "#5A5045" : "#C8BEB4", fontFamily: "Georgia,serif" }}>{ct}</span>
-                            <span style={{ fontSize: 12, color: "#C8BEB4" }}>/{features.length}</span>
-                          </div>;
-                        })}
-                      </div>
                     </div>
                   );
                 })()}
