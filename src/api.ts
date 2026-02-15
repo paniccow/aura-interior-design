@@ -1,11 +1,16 @@
-import { authHeaders } from "./utils/auth.js";
+import { authHeaders } from "./utils/auth";
 
 const AI_API = "/api/ai";
 
 export { AI_API };
 
+interface AIMessage {
+  role: string;
+  content: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
+}
+
 /* Chat with AI — sends conversation history, returns text */
-export async function aiChat(messages) {
+export async function aiChat(messages: AIMessage[]): Promise<string | null> {
   try {
     const headers = await authHeaders();
     const resp = await Promise.race([
@@ -14,7 +19,7 @@ export async function aiChat(messages) {
         headers,
         body: JSON.stringify({ action: "chat", messages })
       }),
-      new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 30000))
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 30000))
     ]);
     if (resp.ok) {
       const data = await resp.json();
@@ -24,12 +29,12 @@ export async function aiChat(messages) {
       const err = await resp.text();
       console.log("AI chat: OpenRouter " + resp.status, err.slice(0, 200));
     }
-  } catch (err) { console.log("AI chat: OpenRouter error:", err?.message); }
+  } catch (err: unknown) { console.log("AI chat: OpenRouter error:", (err as Error)?.message); }
   return null;
 }
 
 /* Vision analysis — analyzes images with AI */
-export async function analyzeImage(base64Data, mimeType, prompt) {
+export async function analyzeImage(base64Data: string, mimeType: string, prompt: string): Promise<string | null> {
   const dataUrl = "data:" + mimeType + ";base64," + base64Data;
   try {
     const headers = await authHeaders();
@@ -46,19 +51,19 @@ export async function analyzeImage(base64Data, mimeType, prompt) {
           max_tokens: 2000
         })
       }),
-      new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 45000))
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 45000))
     ]);
     if (resp.ok) {
       const data = await resp.json();
       const text = data?.choices?.[0]?.message?.content;
       if (text && text.length > 20) { console.log("Vision: OpenRouter success"); return text; }
     }
-  } catch (err) { console.log("Vision: OpenRouter error:", err?.message); }
+  } catch (err: unknown) { console.log("Vision: OpenRouter error:", (err as Error)?.message); }
   return null;
 }
 
 /* Image generation — generates interior design visualizations */
-export async function generateAIImage(prompt, referenceImage, productImageUrls, cadImage) {
+export async function generateAIImage(prompt: string, referenceImage?: string | null, productImageUrls?: string[], cadImage?: string | null): Promise<string | null> {
   try {
     const headers = await authHeaders();
     const resp = await Promise.race([
@@ -67,7 +72,7 @@ export async function generateAIImage(prompt, referenceImage, productImageUrls, 
         headers,
         body: JSON.stringify({ action: "image", prompt, referenceImage: referenceImage || null, cadImage: cadImage || null, productImageUrls: productImageUrls || [] })
       }),
-      new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 120000))
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 120000))
     ]);
 
     if (resp.ok) {
@@ -107,6 +112,6 @@ export async function generateAIImage(prompt, referenceImage, productImageUrls, 
     } else {
       console.log("Image gen: error " + resp.status);
     }
-  } catch (err) { console.log("Image gen: error:", err?.message); }
+  } catch (err: unknown) { console.log("Image gen: error:", (err as Error)?.message); }
   return null;
 }

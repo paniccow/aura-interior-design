@@ -1,4 +1,6 @@
-export default function AuraLogo({ size = 28 }) {
+interface AuraLogoProps { size?: number; }
+
+export default function AuraLogo({ size = 28 }: AuraLogoProps) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width={size} height={size} style={{ display: "block" }}>
       <g><g transform="translate(.000001 0)"><g transform="translate(.000001 0)">

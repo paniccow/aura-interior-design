@@ -1,5 +1,5 @@
 /* Strips all HTML tags — prevents XSS from AI responses */
-export function sanitizeHtml(html) {
+export function sanitizeHtml(html: string): string {
   const escaped = html
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -10,7 +10,7 @@ export function sanitizeHtml(html) {
 }
 
 /* Convert markdown-like text to safe HTML for chat messages */
-export function formatChatMessage(text) {
+export function formatChatMessage(text: string): string {
   if (!text) return "";
   let safe = sanitizeHtml(text);
   safe = safe

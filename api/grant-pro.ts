@@ -1,33 +1,37 @@
+import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 
-const ADMIN_PASS = process.env.ADMIN_PASSWORD || "aura2025admin";
+const ADMIN_PASS: string = process.env.ADMIN_PASSWORD || "aura2025admin";
 
 const supabaseAdmin =
   process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
     ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
     : null;
 
-export default async function handler(req, res) {
+export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   // CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  if (req.method === "OPTIONS") return res.status(200).end();
-  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  if (req.method === "OPTIONS") { res.status(200).end(); return; }
+  if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
 
-  const { email, adminPass } = req.body || {};
+  const { email, adminPass } = (req.body || {}) as { email?: string; adminPass?: string };
 
   // Verify admin password
   if (adminPass !== ADMIN_PASS) {
-    return res.status(403).json({ error: "Invalid admin password" });
+    res.status(403).json({ error: "Invalid admin password" });
+    return;
   }
 
   if (!email || typeof email !== "string") {
-    return res.status(400).json({ error: "Email is required" });
+    res.status(400).json({ error: "Email is required" });
+    return;
   }
 
   if (!supabaseAdmin) {
-    return res.status(500).json({ error: "Supabase not configured" });
+    res.status(500).json({ error: "Supabase not configured" });
+    return;
   }
 
   try {
@@ -46,13 +50,15 @@ export default async function handler(req, res) {
         .ilike("email", email.trim());
 
       if (searchErr || !profiles || profiles.length === 0) {
-        return res.status(404).json({ error: "No user found with email: " + email });
+        res.status(404).json({ error: "No user found with email: " + email });
+        return;
       }
 
       // Use first match
       const target = profiles[0];
       if (target.plan === "pro") {
-        return res.status(200).json({ message: target.email + " is already on Pro plan" });
+        res.status(200).json({ message: target.email + " is already on Pro plan" });
+        return;
       }
 
       const { error: updateErr } = await supabaseAdmin
@@ -61,14 +67,17 @@ export default async function handler(req, res) {
         .eq("id", target.id);
 
       if (updateErr) {
-        return res.status(500).json({ error: "Failed to update: " + updateErr.message });
+        res.status(500).json({ error: "Failed to update: " + updateErr.message });
+        return;
       }
 
-      return res.status(200).json({ message: target.email + " upgraded to Pro!" });
+      res.status(200).json({ message: target.email + " upgraded to Pro!" });
+      return;
     }
 
     if (profile.plan === "pro") {
-      return res.status(200).json({ message: profile.email + " is already on Pro plan" });
+      res.status(200).json({ message: profile.email + " is already on Pro plan" });
+      return;
     }
 
     const { error: updateErr } = await supabaseAdmin
@@ -77,11 +86,12 @@ export default async function handler(req, res) {
       .eq("id", profile.id);
 
     if (updateErr) {
-      return res.status(500).json({ error: "Failed to update: " + updateErr.message });
+      res.status(500).json({ error: "Failed to update: " + updateErr.message });
+      return;
     }
 
-    return res.status(200).json({ message: profile.email + " upgraded to Pro!" });
-  } catch (err) {
-    return res.status(500).json({ error: "Server error: " + err.message });
+    res.status(200).json({ message: profile.email + " upgraded to Pro!" });
+  } catch (err: unknown) {
+    res.status(500).json({ error: "Server error: " + (err as Error).message });
   }
 }

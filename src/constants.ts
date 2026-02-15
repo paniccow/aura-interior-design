@@ -1,11 +1,13 @@
-export const ROOMS = ["Living Room","Dining Room","Kitchen","Bedroom","Office","Outdoor","Bathroom","Great Room"];
-export const VIBES = ["Warm Modern","Minimalist","Bohemian","Scandinavian","Mid-Century","Luxury","Coastal","Japandi","Industrial","Art Deco","Rustic","Glam","Transitional","Organic Modern"];
-export const fmt = (n) => "$" + n.toLocaleString();
-export const budgets = [["all","All Budgets"],["u500","Under $500"],["u1k","Under $1K"],["1k5k","$1K-$5K"],["5k10k","$5K-$10K"],["10k25k","$10K-$25K"],["25k","$25K+"]];
+import type { RoomType, StyleName, BudgetKey, FurnitureDim, FurnitureCategory, StylePalette, RoomNeed } from "./types";
+
+export const ROOMS: readonly RoomType[] = ["Living Room","Dining Room","Kitchen","Bedroom","Office","Outdoor","Bathroom","Great Room"];
+export const VIBES: readonly StyleName[] = ["Warm Modern","Minimalist","Bohemian","Scandinavian","Mid-Century","Luxury","Coastal","Japandi","Industrial","Art Deco","Rustic","Glam","Transitional","Organic Modern"];
+export const fmt = (n: number): string => "$" + n.toLocaleString();
+export const budgets: readonly [BudgetKey, string][] = [["all","All Budgets"],["u500","Under $500"],["u1k","Under $1K"],["1k5k","$1K-$5K"],["5k10k","$5K-$10K"],["10k25k","$10K-$25K"],["25k","$25K+"]];
 
 
 /* ─── FURNITURE DIMENSIONS (feet) ─── */
-export const FURN_DIMS = {
+export const FURN_DIMS: Record<FurnitureCategory, FurnitureDim> = {
   sofa:   { w: 7, d: 3, clearF: 2.5, clearS: 0.5, label: "Sofa" },
   bed:    { w: 5.5, d: 7, clearF: 3, clearS: 1.5, label: "Bed" },
   table:  { w: 4.5, d: 2.5, clearF: 3, clearS: 2, label: "Table" },
@@ -15,10 +17,12 @@ export const FURN_DIMS = {
   rug:    { w: 8, d: 5, clearF: 0, clearS: 0, label: "Rug" },
   art:    { w: 2.5, d: 0.3, clearF: 0, clearS: 0, label: "Art" },
   accent: { w: 1.8, d: 1.8, clearF: 0.5, clearS: 0.5, label: "Accent" },
+  decor: { w: 1, d: 1, clearF: 0.3, clearS: 0.3, label: "Decor" },
+  storage: { w: 3, d: 1.5, clearF: 1, clearS: 0.5, label: "Storage" },
 };
 
 /* ─── COLOR & MATERIAL PALETTES ─── */
-export const STYLE_PALETTES = {
+export const STYLE_PALETTES: Record<StyleName, StylePalette> = {
   "Warm Modern":    { colors: ["cream","taupe","warm gray","oak","brass","terracotta","ivory","sand"], materials: ["linen","oak","walnut","bouclé","brass","ceramic","wool","cotton"], feel: "Inviting warmth meets clean lines — natural materials, soft textures, and earthy neutrals create spaces that feel both polished and lived-in." },
   "Minimalist":     { colors: ["white","light gray","black","concrete","natural","pale oak"], materials: ["steel","glass","concrete","linen","oak","leather"], feel: "Less is more — every piece is intentional. Clean silhouettes, monochromatic tones, and negative space as a design element." },
   "Bohemian":       { colors: ["amber","rust","sage","terracotta","indigo","mustard","ochre","cream"], materials: ["rattan","jute","woven","macramé","cotton","kilim","wool","leather"], feel: "Collected, layered, and deeply personal — global textiles, handcrafted pieces, and a rich mix of patterns and textures." },
@@ -37,7 +41,7 @@ export const STYLE_PALETTES = {
 
 
 /* ─── ROOM TYPE REQUIREMENTS + SPATIAL RULES ─── */
-export const ROOM_NEEDS = {
+export const ROOM_NEEDS: Record<RoomType, RoomNeed> = {
   "Living Room":  { essential: ["sofa"], recommended: ["table","chair","rug","light","art","accent"], layout: "Anchor with a sofa facing the focal wall. Coffee table 14-18\" from sofa. Accent chairs flanking at 45°. Rug grounding the conversation zone. Lighting at varying heights.", minSqft: 120, zones: ["conversation","reading nook","entry"] },
   "Dining Room":  { essential: ["table"], recommended: ["chair","light","rug","art","accent"], layout: "Table centered with 36\" clearance on all sides for chair pullback. Chandelier 30-34\" above table. Rug extends 24\" beyond chairs. Buffet against longest wall.", minSqft: 100, zones: ["dining","buffet"] },
   "Kitchen":      { essential: ["stool"], recommended: ["light","table","accent"], layout: "Counter stools spaced 26-28\" center-to-center. Pendant lights 30-36\" above island. Open 48\" walkway between island and cabinetry.", minSqft: 80, zones: ["island seating","prep zone"] },

@@ -2,18 +2,27 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 
-class ErrorBoundary extends React.Component {
-  constructor(props) {
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null };
   }
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
   }
-  componentDidCatch(error, info) {
+  componentDidCatch(error: Error, info: React.ErrorInfo): void {
     console.error("AURA Error:", error, info);
   }
-  render() {
+  render(): React.ReactNode {
     if (this.state.hasError) {
       return (
         <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Helvetica Neue',sans-serif", background: "#FDFCFA" }}>
@@ -32,7 +41,7 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(
+ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary>
       <App />

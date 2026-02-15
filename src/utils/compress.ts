@@ -1,9 +1,11 @@
+import type { CompressedImage } from "../types";
+
 /* Compress/resize an image file to stay under Vercel's 4.5MB body limit.
    Returns { dataUrl, base64, mimeType } where base64 is under ~2MB */
-export function compressImage(file, maxDim = 1200, quality = 0.7) {
+export function compressImage(file: File, maxDim = 1200, quality = 0.7): Promise<CompressedImage> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = (ev: ProgressEvent<FileReader>) => {
       const img = new Image();
       img.onload = () => {
         let w = img.width, h = img.height;
@@ -16,7 +18,7 @@ export function compressImage(file, maxDim = 1200, quality = 0.7) {
         canvas.width = w;
         canvas.height = h;
         const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, w, h);
+        ctx!.drawImage(img, 0, 0, w, h);
         const dataUrl = canvas.toDataURL("image/jpeg", quality);
         const base64 = dataUrl.split(",")[1];
         if (base64.length > 2500000) {
@@ -27,7 +29,7 @@ export function compressImage(file, maxDim = 1200, quality = 0.7) {
         }
       };
       img.onerror = () => reject(new Error("Failed to load image"));
-      img.src = ev.target.result;
+      img.src = ev.target!.result as string;
     };
     reader.onerror = () => reject(new Error("Failed to read file"));
     reader.readAsDataURL(file);

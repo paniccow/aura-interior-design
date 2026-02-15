@@ -1,10 +1,13 @@
-import { getProductDims } from "./designEngine.js";
+import { getProductDims } from "./designEngine";
+import type { Product, CADLayout, PlacedItem, WindowDef, DoorDef, RoomType } from "../types";
+
+interface AnchorRect { x: number; y: number; w: number; h: number; cx: number; cy: number; }
 
 /* ─── PRO CAD LAYOUT GENERATOR ─── */
-export function generateCADLayout(items, roomSqft, roomType, cadAnalysis) {
+export function generateCADLayout(items: Product[], roomSqft: number, roomType: string, cadAnalysis?: string | null): CADLayout {
   // Room dimensions — use standard aspect ratios by room type
   const aspectRatios = { "Living Room": 1.4, "Bedroom": 1.25, "Dining Room": 1.3, "Kitchen": 1.1, "Office": 1.2, "Great Room": 1.5 };
-  const aspect = aspectRatios[roomType] || 1.3;
+  const aspect = (aspectRatios as Record<string, number>)[roomType] || 1.3;
   const roomW = Math.sqrt(roomSqft * aspect);
   const roomH = roomSqft / roomW;
   const scale = 60; // px per foot
@@ -14,13 +17,13 @@ export function generateCADLayout(items, roomSqft, roomType, cadAnalysis) {
   const walkway = 2.5 * scale;  // 2.5ft walkway clearance
 
   // Parse CAD analysis for windows/doors
-  let windows = [], doors = [];
+  let windows: WindowDef[] = [], doors: DoorDef[] = [];
   if (cadAnalysis) {
     const wMatch = cadAnalysis.match(/(\d+)\s*window/gi);
     const numWindows = wMatch ? parseInt(wMatch[0]) || 2 : 2;
     for (let i = 0; i < numWindows; i++) {
       const wx = (canvasW / (numWindows + 1)) * (i + 1) - 1.5 * scale;
-      windows.push({ x: wx, y: 0, w: 3 * scale, side: "top" });
+      windows.push({ x: wx, y: 0, w: 3 * scale, side: "top" as const });
     }
     if (/door|entry|entrance/i.test(cadAnalysis)) doors.push({ x: canvasW - 3 * scale, y: canvasH - 3 * scale, w: 3 * scale, side: "right" });
     else doors.push({ x: canvasW * 0.4, y: canvasH, w: 3 * scale, side: "bottom" });
@@ -31,21 +34,21 @@ export function generateCADLayout(items, roomSqft, roomType, cadAnalysis) {
   }
 
   // Placement infrastructure
-  const placed = [];
-  const occupied = []; // solid furniture collision boxes
-  const catColors = { sofa: "#8B6840", bed: "#7B4870", table: "#4B7B50", chair: "#5B4B9B", stool: "#8B6B35", light: "#B8901A", rug: "#3878A0", art: "#985050", accent: "#607060" };
+  const placed: PlacedItem[] = [];
+  const occupied: { x: number; y: number; w: number; h: number }[] = []; // solid furniture collision boxes
+  const catColors: Record<string, string> = { sofa: "#8B6840", bed: "#7B4870", table: "#4B7B50", chair: "#5B4B9B", stool: "#8B6B35", light: "#B8901A", rug: "#3878A0", art: "#985050", accent: "#607060" };
 
-  const collides = (x, y, w, h, padding) => {
+  const collides = (x: number, y: number, w: number, h: number, padding?: number): boolean => {
     const p = padding || 0;
     for (const o of occupied) {
       if (x - p < o.x + o.w && x + w + p > o.x && y - p < o.y + o.h && y + h + p > o.y) return true;
     }
     return false;
   };
-  const inBounds = (x, y, w, h) => x >= wallGap && y >= wallGap && x + w <= canvasW - wallGap && y + h <= canvasH - wallGap;
-  const clamp = (v, lo, hi) => Math.max(lo, Math.min(v, hi));
+  const inBounds = (x: number, y: number, w: number, h: number): boolean => x >= wallGap && y >= wallGap && x + w <= canvasW - wallGap && y + h <= canvasH - wallGap;
+  const clamp = (v: number, lo: number, hi: number): number => Math.max(lo, Math.min(v, hi));
 
-  const placeAt = (item, x, y, w, h, rot) => {
+  const placeAt = (item: Product, x: number, y: number, w: number, h: number, rot?: number): void => {
     x = clamp(x, wallGap, canvasW - w - wallGap);
     y = clamp(y, wallGap, canvasH - h - wallGap);
     const dims = getProductDims(item);
@@ -55,7 +58,7 @@ export function generateCADLayout(items, roomSqft, roomType, cadAnalysis) {
   };
 
   // Fine-grained search: find nearest non-colliding position (1ft grid steps)
-  const findNear = (tx, ty, w, h, radius, pad) => {
+  const findNear = (tx: number, ty: number, w: number, h: number, radius?: number, pad?: number): { x: number; y: number } | null => {
     const step = scale * 0.5; // half-foot precision
     const r = Math.min(radius || scale * 5, scale * 10);
     let best = null, bestD = Infinity;
@@ -73,13 +76,13 @@ export function generateCADLayout(items, roomSqft, roomType, cadAnalysis) {
   };
 
   // Sort: rugs → beds → sofas → tables → chairs → stools → accents → lights → art
-  const sortOrder = { rug: 0, bed: 1, sofa: 2, table: 3, chair: 4, stool: 5, accent: 6, light: 7, art: 8 };
+  const sortOrder: Record<string, number> = { rug: 0, bed: 1, sofa: 2, table: 3, chair: 4, stool: 5, accent: 6, light: 7, art: 8, decor: 9, storage: 5 };
   const sorted = [...items].sort((a, b) => (sortOrder[a.c] ?? 6) - (sortOrder[b.c] ?? 6));
 
   // Anchor tracking — every subsequent piece positions relative to these
-  let sofaRect = null;  // { x, y, w, h, cx, cy }
-  let tableRect = null; // { x, y, w, h, cx, cy }
-  let bedRect = null;
+  let sofaRect: AnchorRect | null = null;  // { x, y, w, h, cx, cy }
+  let tableRect: AnchorRect | null = null; // { x, y, w, h, cx, cy }
+  let bedRect: AnchorRect | null = null;
 
   // ─── ROOM-TYPE SPECIFIC FOCAL POINTS ───
   // "Focal wall" = top wall (where TV/fireplace/headboard would go)

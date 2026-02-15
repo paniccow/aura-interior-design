@@ -1,11 +1,12 @@
-import { DB } from "../data.js";
-import { FURN_DIMS, STYLE_PALETTES, ROOM_NEEDS } from "../constants.js";
+import { DB } from "../data";
+import { FURN_DIMS, STYLE_PALETTES, ROOM_NEEDS } from "../constants";
+import type { Product, ProductDims, FurnitureCategory, RoomType, StyleName, BudgetKey, DesignBoard, MoodBoard, ScoredProduct, Shape, StylePalette, RoomNeed } from "../types";
 
 /* ─── SMART PER-PRODUCT DIMENSION ESTIMATION ─── */
-export function getProductDims(product) {
+export function getProductDims(product: Product): ProductDims {
   const name = (product.n || "").toLowerCase();
   const cat = product.c;
-  const baseDims = FURN_DIMS[cat] || FURN_DIMS.accent;
+  const baseDims = FURN_DIMS[cat as FurnitureCategory] || FURN_DIMS.accent;
   const price = product.p || 0;
 
   // Try to extract explicit dimensions from product name (e.g. "84\"" or "60 x 36")
@@ -21,7 +22,7 @@ export function getProductDims(product) {
 
   // ─── SOFA / SECTIONAL ───
   if (cat === "sofa") {
-    let w = 7, d = 3, label = "Sofa", shape = "rect";
+    let w = 7, d = 3, label = "Sofa", shape: Shape = "rect";
     if (/sectional/i.test(name)) { w = 10; d = 7; label = "Sectional"; shape = "L"; }
     else if (/modular/i.test(name)) { w = 9; d = 3.5; label = "Modular Sofa"; }
     else if (/loveseat|love\s*seat/i.test(name)) { w = 5; d = 2.8; label = "Loveseat"; }
@@ -50,7 +51,7 @@ export function getProductDims(product) {
 
   // ─── TABLE ───
   if (cat === "table") {
-    let w = 4.5, d = 2.5, label = "Table", shape = "rect";
+    let w = 4.5, d = 2.5, label = "Table", shape: Shape = "rect";
     if (/dining/i.test(name)) {
       if (/round/i.test(name)) { w = 4; d = 4; label = "Round Dining"; shape = "round"; }
       else if (/oval/i.test(name)) { w = 6; d = 3.5; label = "Oval Dining"; shape = "oval"; }
@@ -76,7 +77,7 @@ export function getProductDims(product) {
 
   // ─── CHAIR ───
   if (cat === "chair") {
-    let w = 2.2, d = 2.2, label = "Chair", shape = "rect";
+    let w = 2.2, d = 2.2, label = "Chair", shape: Shape = "rect";
     if (/dining/i.test(name)) { w = 1.6; d = 1.8; label = "Dining Chair"; }
     else if (/accent|arm\s*chair|lounge/i.test(name)) { w = 2.5; d = 2.8; label = "Accent Chair"; }
     else if (/recliner/i.test(name)) { w = 3; d = 3; label = "Recliner"; }
@@ -94,7 +95,7 @@ export function getProductDims(product) {
 
   // ─── STOOL ───
   if (cat === "stool") {
-    let w = 1.4, d = 1.4, label = "Stool", shape = "round";
+    let w = 1.4, d = 1.4, label = "Stool", shape: Shape = "round";
     if (/counter/i.test(name)) { label = "Counter Stool"; }
     else if (/bar/i.test(name)) { label = "Bar Stool"; }
     else if (/backless/i.test(name)) { w = 1.2; d = 1.2; label = "Backless Stool"; }
@@ -104,7 +105,7 @@ export function getProductDims(product) {
 
   // ─── LIGHT ───
   if (cat === "light") {
-    let w = 1.2, d = 1.2, label = "Light", shape = "round";
+    let w = 1.2, d = 1.2, label = "Light", shape: Shape = "round";
     if (/chandelier/i.test(name)) { w = 2.5; d = 2.5; label = "Chandelier"; }
     else if (/pendant/i.test(name)) { w = 1.5; d = 1.5; label = "Pendant"; }
     else if (/floor\s*lamp/i.test(name)) { w = 1.2; d = 1.2; label = "Floor Lamp"; }
@@ -116,7 +117,7 @@ export function getProductDims(product) {
 
   // ─── RUG ───
   if (cat === "rug") {
-    let w = 8, d = 5, label = "Rug", shape = "rect";
+    let w = 8, d = 5, label = "Rug", shape: Shape = "rect";
     // Rug sizes from name
     const rugSize = name.match(/(\d+)\s*(?:'|ft|foot)?\s*(?:x|by)\s*(\d+)/);
     if (rugSize) { w = parseInt(rugSize[1]); d = parseInt(rugSize[2]); }
@@ -132,7 +133,7 @@ export function getProductDims(product) {
 
   // ─── ART ───
   if (cat === "art") {
-    let w = 2.5, d = 0.3, label = "Art", shape = "rect";
+    let w = 2.5, d = 0.3, label = "Art", shape: Shape = "rect";
     if (/mirror/i.test(name)) { w = 2.5; d = 0.3; label = "Mirror"; if (/round/i.test(name)) shape = "round"; }
     else if (/large|oversized/i.test(name)) { w = 4; }
     else if (/small|mini/i.test(name)) { w = 1.5; }
@@ -141,7 +142,7 @@ export function getProductDims(product) {
 
   // ─── ACCENT ───
   if (cat === "accent") {
-    let w = 1.8, d = 1.8, label = "Accent", shape = "rect";
+    let w = 1.8, d = 1.8, label = "Accent", shape: Shape = "rect";
     if (/mirror/i.test(name)) { w = 2.5; d = 0.3; label = "Mirror"; if (/round/i.test(name)) shape = "round"; }
     else if (/planter|pot|vase/i.test(name)) { w = 1; d = 1; label = "Decor"; shape = "round"; }
     else if (/basket|hamper/i.test(name)) { w = 1.5; d = 1.5; label = "Basket"; shape = "round"; }
@@ -157,13 +158,13 @@ export function getProductDims(product) {
   }
 
   // Fallback
-  return { ...baseDims, shape: "rect" };
+  return { ...baseDims, shape: "rect" as Shape };
 }
 
 /* ─── SPATIAL DESIGN ENGINE ─── */
-export function buildDesignBoard(roomType, style, budgetKey, sqft, existingIds, cadData) {
-  const palette = STYLE_PALETTES[style] || STYLE_PALETTES["Warm Modern"];
-  const needs = ROOM_NEEDS[roomType] || ROOM_NEEDS["Living Room"];
+export function buildDesignBoard(roomType: string, style: string, budgetKey: string, sqft: number | null, existingIds: number[], cadData?: string | null): DesignBoard {
+  const palette = (STYLE_PALETTES as Record<string, StylePalette>)[style] || STYLE_PALETTES["Warm Modern"];
+  const needs = (ROOM_NEEDS as Record<string, RoomNeed>)[roomType] || ROOM_NEEDS["Living Room"];
   const existing = new Set(existingIds || []);
   const roomSqft = sqft || needs.minSqft || 200;
 
@@ -186,8 +187,8 @@ export function buildDesignBoard(roomType, style, budgetKey, sqft, existingIds, 
     if (p.v && p.v.includes(style)) score += 30;
     const pName = (p.n || "").toLowerCase();
     const pDesc = (p.pr || "").toLowerCase();
-    palette.colors.forEach(c => { if (pName.includes(c) || pDesc.includes(c)) score += 6; });
-    palette.materials.forEach(m => { if (pName.includes(m) || pDesc.includes(m)) score += 8; });
+    palette.colors.forEach((c: string) => { if (pName.includes(c) || pDesc.includes(c)) score += 6; });
+    palette.materials.forEach((m: string) => { if (pName.includes(m) || pDesc.includes(m)) score += 8; });
     if (p.rm && p.rm.includes(roomType)) score += 20;
     if (p.p >= minP && p.p <= maxP) score += 15;
     else if (p.p < minP * 0.5 || p.p > maxP * 2) score -= 20;
@@ -197,23 +198,23 @@ export function buildDesignBoard(roomType, style, budgetKey, sqft, existingIds, 
     if (p.kaa) score += 5;
     score += Math.random() * 4;
     return { ...p, _score: score };
-  }).filter(Boolean).sort((a, b) => b._score - a._score);
+  }).filter((p): p is ScoredProduct => p !== null).sort((a, b) => b._score - a._score);
 
   // Build spatially-aware board
-  const board = [];
-  const usedIds = new Set();
-  const catCounts = {};
+  const board: ScoredProduct[] = [];
+  const usedIds = new Set<number>();
+  const catCounts: Record<string, number> = {};
   let totalFootprint = 0;
 
-  const catTargets = {};
+  const catTargets: Record<string, number> = {};
   for (const cat of needs.essential) catTargets[cat] = Math.max(1, Math.round(2 * sizeMult));
   for (const cat of needs.recommended) {
     if (!catTargets[cat]) catTargets[cat] = Math.max(1, Math.round(1.5 * sizeMult));
   }
   // Dining chairs scale with table
-  if (roomType === "Dining Room") catTargets.chair = Math.max(4, Math.round(3 * sizeMult));
+  if (roomType === "Dining Room") catTargets["chair"] = Math.max(4, Math.round(3 * sizeMult));
 
-  const addItem = (p) => {
+  const addItem = (p: ScoredProduct) => {
     const dims = getProductDims(p);
     const footprint = dims.w * dims.d + (dims.clearF * dims.w) + (dims.clearS * dims.d);
     // Skip rugs/art/light from footprint calc (they overlap or are wall/ceiling mounted)
@@ -256,7 +257,7 @@ export function buildDesignBoard(roomType, style, budgetKey, sqft, existingIds, 
   };
 }
 
-export function generateMoodBoards(roomType, style, budgetKey, sqft, cadData) {
+export function generateMoodBoards(roomType: string, style: string, budgetKey: string, sqft: number | null, cadData?: string | null): MoodBoard[] {
   const board1 = buildDesignBoard(roomType, style, budgetKey, sqft, [], cadData);
   const board2 = buildDesignBoard(roomType, style, budgetKey, sqft, board1.items.map(p => p.id), cadData);
   const board3 = buildDesignBoard(roomType, style, budgetKey, sqft, [...board1.items, ...board2.items].map(p => p.id), cadData);

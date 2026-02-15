@@ -1,99 +1,122 @@
 import React, { useState, useRef, useEffect, useCallback, Fragment } from "react";
-import { DB } from "./data.js";
-import { supabase } from "./supabaseClient.js";
+import { DB } from "./data";
+import { supabase } from "./supabaseClient";
 
 /* ─── Extracted modules ─── */
-import { compressImage } from "./utils/compress.js";
-import { sanitizeHtml, formatChatMessage } from "./utils/sanitize.js";
-import { getAuthToken, authHeaders } from "./utils/auth.js";
-import { AI_API, aiChat, analyzeImage, generateAIImage } from "./api.js";
-import { ROOMS, VIBES, fmt, budgets, FURN_DIMS, STYLE_PALETTES, ROOM_NEEDS } from "./constants.js";
-import { getProductDims, buildDesignBoard, generateMoodBoards } from "./engine/designEngine.js";
-import { generateCADLayout } from "./engine/cadLayout.js";
-import Card, { CAT_COLORS } from "./components/Card.jsx";
-import AuraLogo from "./components/AuraLogo.jsx";
-import Pill from "./components/Pill.jsx";
-import RevealSection, { useScrollReveal } from "./components/RevealSection.jsx";
-import CADFloorPlan from "./components/CADFloorPlan.jsx";
+import { compressImage } from "./utils/compress";
+import { sanitizeHtml, formatChatMessage } from "./utils/sanitize";
+import { getAuthToken, authHeaders } from "./utils/auth";
+import { AI_API, aiChat, analyzeImage, generateAIImage } from "./api";
+import { ROOMS, VIBES, fmt, budgets, FURN_DIMS, STYLE_PALETTES, ROOM_NEEDS } from "./constants";
+import { getProductDims, buildDesignBoard, generateMoodBoards } from "./engine/designEngine";
+import { generateCADLayout } from "./engine/cadLayout";
+import Card, { CAT_COLORS } from "./components/Card";
+import AuraLogo from "./components/AuraLogo";
+import Pill from "./components/Pill";
+import RevealSection, { useScrollReveal } from "./components/RevealSection";
+import CADFloorPlan from "./components/CADFloorPlan";
+import type { Product, ChatMessage, MoodBoard, CADLayout as CADLayoutType, Project, AppUser, UserProfile, AdminStats, StylePalette, RoomNeed, BudgetKey, FurnitureCategory } from "./types";
+
+/* ─── Local Types ─── */
+interface CadFileState {
+  name: string;
+  data: string;
+  type: string;
+}
+
+interface RoomPhotoState {
+  name: string;
+  data: string;
+  type: string;
+}
+
+interface VizUrl {
+  url: string | null;
+  label: string;
+  concept?: boolean;
+  mood?: string;
+  colors?: string[];
+  products?: string[];
+}
 
 /* ─── MAIN APP ─── */
 export default function App() {
-  const [pg, setPg] = useState("home");
-  const [user, setUser] = useState(null);
-  const [profile, setProfile] = useState(null); // Supabase profile: { plan, stripe_customer_id, viz_count, viz_month, ... }
-  const [authLoading, setAuthLoading] = useState(true); // true until Supabase session check completes
-  const [confirmationPending, setConfirmationPending] = useState(false);
-  const [resetEmailSent, setResetEmailSent] = useState(false);
-  const [adminAuthed, setAdminAuthed] = useState(false);
-  const [adminPassInput, setAdminPassInput] = useState("");
-  const [adminPassErr, setAdminPassErr] = useState("");
-  const [grantEmail, setGrantEmail] = useState("");
-  const [grantStatus, setGrantStatus] = useState(""); // "success", "error", or ""
-  const [grantMsg, setGrantMsg] = useState("");
+  const [pg, setPg] = useState<string>("home");
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null); // Supabase profile: { plan, stripe_customer_id, viz_count, viz_month, ... }
+  const [authLoading, setAuthLoading] = useState<boolean>(true); // true until Supabase session check completes
+  const [confirmationPending, setConfirmationPending] = useState<boolean>(false);
+  const [resetEmailSent, setResetEmailSent] = useState<boolean>(false);
+  const [adminAuthed, setAdminAuthed] = useState<boolean>(false);
+  const [adminPassInput, setAdminPassInput] = useState<string>("");
+  const [adminPassErr, setAdminPassErr] = useState<string>("");
+  const [grantEmail, setGrantEmail] = useState<string>("");
+  const [grantStatus, setGrantStatus] = useState<string>(""); // "success", "error", or ""
+  const [grantMsg, setGrantMsg] = useState<string>("");
   const ADMIN_PASS = "aura2025admin";
-  const [adminStats, setAdminStats] = useState(null); // { totalUsers, proUsers, totalViz, recentUsers }
-  const [projects, setProjects] = useState(() => {
-    try { const p = localStorage.getItem("aura_projects"); return p ? JSON.parse(p) : []; } catch { return []; }
+  const [adminStats, setAdminStats] = useState<AdminStats | null>(null); // { totalUsers, proUsers, totalViz, recentUsers }
+  const [projects, setProjects] = useState<Project[]>(() => {
+    try { const p = localStorage.getItem("aura_projects"); return p ? JSON.parse(p) : []; } catch (_e) { return []; }
   });
-  const [msgs, setMsgs] = useState([{ role: "bot", text: "Welcome to AURA! I have **" + DB.length + " products** from premium brands including Restoration Hardware, West Elm, Article, Crate & Barrel, AllModern, Serena & Lily, Rejuvenation, McGee & Co, Shoppe Amber, and more.\n\n**Tell me about your space** — your room type, style preferences, and what you're looking for. I'll generate personalized mood boards based on our conversation.\n\n**Upload a room photo** above and I'll analyze your existing space to create layouts that actually work.\n\nOr ask me anything about design — I'll explain exactly why each piece works for your space!", recs: [] }]);
-  const [inp, setInp] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [room, setRoom] = useState(() => {
-    try { return localStorage.getItem("aura_room") || null; } catch { return null; }
+  const [msgs, setMsgs] = useState<ChatMessage[]>([{ role: "bot", text: "Welcome to AURA! I have **" + DB.length + " products** from premium brands including Restoration Hardware, West Elm, Article, Crate & Barrel, AllModern, Serena & Lily, Rejuvenation, McGee & Co, Shoppe Amber, and more.\n\n**Tell me about your space** — your room type, style preferences, and what you're looking for. I'll generate personalized mood boards based on our conversation.\n\n**Upload a room photo** above and I'll analyze your existing space to create layouts that actually work.\n\nOr ask me anything about design — I'll explain exactly why each piece works for your space!", recs: [] }]);
+  const [inp, setInp] = useState<string>("");
+  const [busy, setBusy] = useState<boolean>(false);
+  const [room, setRoom] = useState<string | null>(() => {
+    try { return localStorage.getItem("aura_room") || null; } catch (_e) { return null; }
   });
-  const [vibe, setVibe] = useState(() => {
-    try { return localStorage.getItem("aura_vibe") || null; } catch { return null; }
+  const [vibe, setVibe] = useState<string | null>(() => {
+    try { return localStorage.getItem("aura_vibe") || null; } catch (_e) { return null; }
   });
-  const [bud, setBud] = useState("all");
-  const [sel, setSel] = useState(() => {
+  const [bud, setBud] = useState<string>("all");
+  const [sel, setSel] = useState<Map<number, number>>(() => {
     try {
       const s = localStorage.getItem("aura_sel");
       if (!s) return new Map();
       const parsed = JSON.parse(s);
       if (Array.isArray(parsed) && parsed.length > 0 && !Array.isArray(parsed[0])) {
-        return new Map(parsed.map(id => [id, 1]));
+        return new Map(parsed.map((id: number) => [id, 1] as [number, number]));
       }
       return new Map(parsed);
-    } catch { return new Map(); }
+    } catch (_e) { return new Map(); }
   });
-  const [sc, setSc] = useState(false);
-  const [tab, setTab] = useState("studio");
-  const [catFilter, setCatFilter] = useState("all");
-  const [searchQ, setSearchQ] = useState("");
-  const [authMode, setAuthMode] = useState("signin");
-  const [ae, setAe] = useState("");
-  const [ap, setAp] = useState("");
-  const [an, setAn] = useState("");
-  const [aErr, setAErr] = useState("");
-  const [aLd, setALd] = useState(false);
-  const [vizUrls, setVizUrls] = useState([]);
-  const [vizSt, setVizSt] = useState("idle");
-  const [vizErr, setVizErr] = useState("");
+  const [sc, setSc] = useState<boolean>(false);
+  const [tab, setTab] = useState<string>("studio");
+  const [catFilter, setCatFilter] = useState<string>("all");
+  const [searchQ, setSearchQ] = useState<string>("");
+  const [authMode, setAuthMode] = useState<string>("signin");
+  const [ae, setAe] = useState<string>("");
+  const [ap, setAp] = useState<string>("");
+  const [an, setAn] = useState<string>("");
+  const [aErr, setAErr] = useState<string>("");
+  const [aLd, setALd] = useState<boolean>(false);
+  const [vizUrls, setVizUrls] = useState<VizUrl[]>([]);
+  const [vizSt, setVizSt] = useState<string>("idle");
+  const [vizErr, setVizErr] = useState<string>("");
   // Viz tracking now comes from Supabase profile (server-side truth)
-  const [cadFile, setCadFile] = useState(null);
-  const [cadAnalysis, setCadAnalysis] = useState(null);
-  const [cadLoading, setCadLoading] = useState(false);
-  const [page, setPage] = useState(0);
-  const [boards, setBoards] = useState(null);
-  const [activeBoard, setActiveBoard] = useState(0);
-  const [sqft, setSqft] = useState("");
-  const [roomW, setRoomW] = useState(""); // room width in feet
-  const [roomL, setRoomL] = useState(""); // room length in feet
-  const [cadLayout, setCadLayout] = useState(null);
-  const [roomPhoto, setRoomPhoto] = useState(null);
-  const [roomPhotoAnalysis, setRoomPhotoAnalysis] = useState(null);
-  const [roomPhotoLoading, setRoomPhotoLoading] = useState(false);
-  const [boardsGenHint, setBoardsGenHint] = useState(null);
+  const [cadFile, setCadFile] = useState<CadFileState | null>(null);
+  const [cadAnalysis, setCadAnalysis] = useState<string | null>(null);
+  const [cadLoading, setCadLoading] = useState<boolean>(false);
+  const [page, setPage] = useState<number>(0);
+  const [boards, setBoards] = useState<MoodBoard[] | null>(null);
+  const [activeBoard, setActiveBoard] = useState<number>(0);
+  const [sqft, setSqft] = useState<string>("");
+  const [roomW, setRoomW] = useState<string>(""); // room width in feet
+  const [roomL, setRoomL] = useState<string>(""); // room length in feet
+  const [cadLayout, setCadLayout] = useState<CADLayoutType | null>(null);
+  const [roomPhoto, setRoomPhoto] = useState<RoomPhotoState | null>(null);
+  const [roomPhotoAnalysis, setRoomPhotoAnalysis] = useState<string | null>(null);
+  const [roomPhotoLoading, setRoomPhotoLoading] = useState<boolean>(false);
+  const [boardsGenHint, setBoardsGenHint] = useState<string | null>(null);
   // Multi-project
-  const [activeProjectId, setActiveProjectId] = useState(() => {
-    try { const a = localStorage.getItem("aura_activeProject"); return a ? JSON.parse(a) : null; } catch { return null; }
+  const [activeProjectId, setActiveProjectId] = useState<number | null>(() => {
+    try { const a = localStorage.getItem("aura_activeProject"); return a ? JSON.parse(a) : null; } catch (_e) { return null; }
   });
-  const [editingProjectName, setEditingProjectName] = useState(null);
-  const [designStep, _setDesignStep] = useState(0); // 0=setup, 1=chat, 2=review
-  const setDesignStep = (step) => { _setDesignStep(step); window.scrollTo({ top: 0, behavior: "smooth" }); };
-  const chatEnd = useRef(null);
-  const chatBoxRef = useRef(null);
-  const vizAreaRef = useRef(null);
+  const [editingProjectName, setEditingProjectName] = useState<number | null>(null);
+  const [designStep, _setDesignStep] = useState<number>(0); // 0=setup, 1=chat, 2=review
+  const setDesignStep = (step: number) => { _setDesignStep(step); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const chatEnd = useRef<HTMLDivElement>(null);
+  const chatBoxRef = useRef<HTMLDivElement>(null);
+  const vizAreaRef = useRef<HTMLDivElement>(null);
   // Homepage static images
   const homeHeroImg = "/hero-room.jpg";
   const homeVizImg = "/viz-room.jpg";
@@ -101,23 +124,23 @@ export default function App() {
 
   // Persist projects, selection, and preferences to localStorage
   useEffect(() => {
-    try { localStorage.setItem("aura_projects", JSON.stringify(projects)); } catch {}
+    try { localStorage.setItem("aura_projects", JSON.stringify(projects)); } catch (_e) {}
   }, [projects]);
   useEffect(() => {
-    try { localStorage.setItem("aura_sel", JSON.stringify(Array.from(sel.entries()))); } catch {}
+    try { localStorage.setItem("aura_sel", JSON.stringify(Array.from(sel.entries()))); } catch (_e) {}
   }, [sel]);
   useEffect(() => {
-    try { if (room) localStorage.setItem("aura_room", room); else localStorage.removeItem("aura_room"); } catch {}
+    try { if (room) localStorage.setItem("aura_room", room); else localStorage.removeItem("aura_room"); } catch (_e) {}
   }, [room]);
   useEffect(() => {
-    try { if (vibe) localStorage.setItem("aura_vibe", vibe); else localStorage.removeItem("aura_vibe"); } catch {}
+    try { if (vibe) localStorage.setItem("aura_vibe", vibe); else localStorage.removeItem("aura_vibe"); } catch (_e) {}
   }, [vibe]);
   useEffect(() => {
-    try { localStorage.setItem("aura_activeProject", JSON.stringify(activeProjectId)); } catch {}
+    try { localStorage.setItem("aura_activeProject", JSON.stringify(activeProjectId)); } catch (_e) {}
   }, [activeProjectId]);
 
   // ─── SUPABASE AUTH ───
-  const fetchProfile = async (userId) => {
+  const fetchProfile = async (userId: string) => {
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
@@ -132,8 +155,8 @@ export default function App() {
       if (session?.user) {
         setUser({
           id: session.user.id,
-          email: session.user.email,
-          name: session.user.user_metadata?.name || session.user.email.split("@")[0]
+          email: session.user.email || "",
+          name: session.user.user_metadata?.name || (session.user.email || "").split("@")[0]
         });
         fetchProfile(session.user.id);
       }
@@ -145,8 +168,8 @@ export default function App() {
         if (event === "SIGNED_IN" && session?.user) {
           setUser({
             id: session.user.id,
-            email: session.user.email,
-            name: session.user.user_metadata?.name || session.user.email.split("@")[0]
+            email: session.user.email || "",
+            name: session.user.user_metadata?.name || (session.user.email || "").split("@")[0]
           });
           fetchProfile(session.user.id);
           setConfirmationPending(false);
@@ -215,7 +238,7 @@ export default function App() {
 
   // Mood boards are now generated after AI chat prompt — not auto-generated
   // This function is called from the send() function after AI responds
-  const triggerMoodBoards = useCallback((promptRoom, promptStyle, promptBudget, promptSqft) => {
+  const triggerMoodBoards = useCallback((promptRoom?: string | null, promptStyle?: string | null, promptBudget?: string | null, promptSqft?: string | null) => {
     const r = promptRoom || room;
     const s = promptStyle || vibe;
     const b = promptBudget || bud;
@@ -233,7 +256,7 @@ export default function App() {
       try {
         const items = DB.filter(p => sel.has(p.id));
         const expandedItems = items.flatMap(p => Array.from({ length: sel.get(p.id) || 1 }, (_, i) => ({ ...p, _qtyIdx: i })));
-        const sq = parseInt(sqft) || (ROOM_NEEDS[room]?.minSqft || 200);
+        const sq = parseInt(sqft) || ((ROOM_NEEDS as Record<string, RoomNeed>)[room]?.minSqft || 200);
         const layout = generateCADLayout(expandedItems, sq, room, cadAnalysis);
         setCadLayout(layout);
       } catch (err) {
@@ -245,14 +268,14 @@ export default function App() {
     }
   }, [sel, room, sqft, cadAnalysis, user]);
 
-  const go = (p) => { setPg(p); window.scrollTo(0, 0); };
-  const toggle = (id) => setSel((prev) => { const n = new Map(prev); n.has(id) ? n.delete(id) : n.set(id, 1); return n; });
-  const setQty = (id, qty) => setSel((prev) => { const n = new Map(prev); if (qty <= 0) n.delete(id); else n.set(id, qty); return n; });
+  const go = (p: string) => { setPg(p); window.scrollTo(0, 0); };
+  const toggle = (id: number) => setSel((prev) => { const n = new Map(prev); n.has(id) ? n.delete(id) : n.set(id, 1); return n; });
+  const setQty = (id: number, qty: number) => setSel((prev) => { const n = new Map(prev); if (qty <= 0) n.delete(id); else n.set(id, qty); return n; });
   const selItems = DB.filter((p) => sel.has(p.id));
   const selTotal = selItems.reduce((s, p) => s + p.p * (sel.get(p.id) || 1), 0);
   const selCount = Array.from(sel.values()).reduce((s, q) => s + q, 0);
 
-  const addBoard = (boardIdx) => {
+  const addBoard = (boardIdx: number) => {
     if (!boards || !boards[boardIdx]) return;
     const newSel = new Map(sel);
     boards[boardIdx].items.forEach(p => { if (!newSel.has(p.id)) newSel.set(p.id, 1); });
@@ -260,8 +283,8 @@ export default function App() {
   };
 
   // Analyze uploaded CAD/PDF for room dimensions — compress then send to AI
-  const handleCad = async (e) => {
-    const file = e.target.files[0];
+  const handleCad = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
     setCadLoading(true);
     try {
@@ -295,8 +318,8 @@ export default function App() {
       console.log("CAD compression error:", err);
       // Fallback: read without compression
       const reader = new FileReader();
-      reader.onload = (ev) => {
-        setCadFile({ name: file.name, data: ev.target.result, type: file.type });
+      reader.onload = (ev: ProgressEvent<FileReader>) => {
+        setCadFile({ name: file.name, data: ev.target!.result as string, type: file.type });
       };
       reader.readAsDataURL(file);
     }
@@ -304,8 +327,8 @@ export default function App() {
   };
 
   // Handle room photo upload — compress then AI analyzes the actual room
-  const handleRoomPhoto = async (e) => {
-    const file = e.target.files[0];
+  const handleRoomPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
     setRoomPhotoLoading(true);
     try {
@@ -349,8 +372,8 @@ export default function App() {
       console.log("Room photo compression error:", err);
       // Fallback: try reading the file without compression
       const reader = new FileReader();
-      reader.onload = (ev) => {
-        setRoomPhoto({ name: file.name, data: ev.target.result, type: file.type });
+      reader.onload = (ev: ProgressEvent<FileReader>) => {
+        setRoomPhoto({ name: file.name, data: ev.target!.result as string, type: file.type });
         setMsgs((prev) => [...prev, { role: "bot", text: "**Room photo saved!** The image is large so analysis may be limited. Describe your room and I'll use the photo for visualization.", recs: [] }]);
       };
       reader.readAsDataURL(file);
@@ -381,10 +404,10 @@ export default function App() {
       const items = selItems;
       const roomName = room || "living room";
       const styleName = vibe || "modern luxury";
-      const palette = STYLE_PALETTES[styleName] || STYLE_PALETTES["Warm Modern"];
-      const roomSqft = sqft || (ROOM_NEEDS[room] || ROOM_NEEDS["Living Room"]).minSqft || 200;
-      const roomWidth = roomW || (roomSqft ? String(Math.round(Math.sqrt(parseFloat(roomSqft) * 1.3))) : "");
-      const roomLength = roomL || (roomSqft ? String(Math.round(parseFloat(roomSqft) / Math.sqrt(parseFloat(roomSqft) * 1.3))) : "");
+      const palette = (STYLE_PALETTES as Record<string, StylePalette>)[styleName] || STYLE_PALETTES["Warm Modern"];
+      const roomSqft: string | number = sqft || ((ROOM_NEEDS as Record<string, RoomNeed>)[room as string] || ROOM_NEEDS["Living Room"]).minSqft || 200;
+      const roomWidth = roomW || (roomSqft ? String(Math.round(Math.sqrt(parseFloat(String(roomSqft)) * 1.3))) : "");
+      const roomLength = roomL || (roomSqft ? String(Math.round(parseFloat(String(roomSqft)) / Math.sqrt(parseFloat(String(roomSqft)) * 1.3))) : "");
 
       // ─── STEP 1: AI VISION ANALYSIS OF PRODUCT IMAGES ───
       // GPT-4o-mini looks at each product photo and writes a detailed visual description
@@ -414,7 +437,7 @@ export default function App() {
               max_tokens: 3000
             })
           }),
-          new Promise((_, rej) => setTimeout(() => rej(new Error("vision timeout")), 35000))
+          new Promise<never>((_, rej) => setTimeout(() => rej(new Error("vision timeout")), 35000))
         ]);
         if (visionResp.ok) {
           const visionData = await visionResp.json();
@@ -424,7 +447,7 @@ export default function App() {
             console.log("Viz Step 1: AI vision analysis complete:\n" + visionText.slice(0, 800));
           }
         }
-      } catch (err) { console.log("Viz Step 1: AI vision failed (using fallback):", err?.message); }
+      } catch (err) { console.log("Viz Step 1: AI vision failed (using fallback):", (err as Error)?.message); }
 
       // ─── STEP 2: BUILD PRODUCT SPECIFICATIONS ───
       // If AI vision worked, use its descriptions; otherwise fall back to keyword extraction
@@ -433,7 +456,7 @@ export default function App() {
       // Build product list — name, shape, size, color, material from AI vision + name keywords
       const COLOR_WORDS = ["white","cream","ivory","beige","tan","sand","camel","cognac","brown","walnut","oak","teak","mahogany","espresso","charcoal","gray","grey","slate","black","navy","blue","green","sage","olive","emerald","teal","blush","pink","coral","rust","terracotta","gold","brass","bronze","silver","chrome","copper","natural","amber","honey","wheat","linen","oatmeal","mushroom","taupe","dune","alabaster","stone","cement","marble","onyx","haze","driftwood"];
       const MAT_WORDS = ["leather","velvet","boucle","bouclé","linen","cotton","wool","silk","jute","rattan","wicker","cane","marble","travertine","granite","concrete","wood","oak","walnut","teak","metal","iron","steel","brass","bronze","glass","ceramic","fabric","upholstered","performance","slipcovered","woven"];
-      const extractKw = (text, words) => words.filter(w => (text || "").toLowerCase().includes(w.toLowerCase()));
+      const extractKw = (text: string, words: string[]) => words.filter((w: string) => (text || "").toLowerCase().includes(w.toLowerCase()));
 
       const productSpecs = items.slice(0, 17).map((item, idx) => {
         const dims = dims_cache[idx];
@@ -469,7 +492,7 @@ export default function App() {
 
       const colorStr = palette.colors.slice(0, 5).join(", ");
       const matStr = palette.materials.slice(0, 4).join(", ");
-      const roomNeeds = ROOM_NEEDS[room] || ROOM_NEEDS["Living Room"];
+      const roomNeeds = (ROOM_NEEDS as Record<string, RoomNeed>)[room as string] || ROOM_NEEDS["Living Room"];
 
       // ─── STEP 4: BUILD IMAGE GENERATION PROMPT ───
       const numItems = items.slice(0, 17).length;
@@ -541,10 +564,10 @@ export default function App() {
     }
   };
 
-  const welcomeMsg = { role: "bot", text: "Welcome to AURA! I have **" + DB.length + " products** from premium brands including Restoration Hardware, West Elm, Article, Crate & Barrel, AllModern, Serena & Lily, Rejuvenation, McGee & Co, Shoppe Amber, and more.\n\n**Tell me about your space** — what room, your style, what you need, where the doors and windows are, any existing furniture to work around. **The more detail you give, the better your visualizations will be!**\n\n**Upload a room photo** above and I'll analyze your space to create layouts that work with your actual walls, windows, and flooring.\n\nI'll use everything you tell me when generating your room visualization — so be specific about colors, materials, and the vibe you want!", recs: [] };
+  const welcomeMsg: ChatMessage = { role: "bot", text: "Welcome to AURA! I have **" + DB.length + " products** from premium brands including Restoration Hardware, West Elm, Article, Crate & Barrel, AllModern, Serena & Lily, Rejuvenation, McGee & Co, Shoppe Amber, and more.\n\n**Tell me about your space** — what room, your style, what you need, where the doors and windows are, any existing furniture to work around. **The more detail you give, the better your visualizations will be!**\n\n**Upload a room photo** above and I'll analyze your space to create layouts that work with your actual walls, windows, and flooring.\n\nI'll use everything you tell me when generating your room visualization — so be specific about colors, materials, and the vibe you want!", recs: [] };
 
   // Snapshot current design state into a project object
-  const snapshotProject = (existingId) => ({
+  const snapshotProject = (existingId?: number | null): Project => ({
     id: existingId || Date.now(),
     name: (room || "My") + " " + (vibe || "Design"),
     room, vibe,
@@ -574,12 +597,12 @@ export default function App() {
     }
   };
 
-  const delPr = (id) => {
+  const delPr = (id: number) => {
     setProjects(prev => prev.filter(p => p.id !== id));
     if (activeProjectId === id) setActiveProjectId(null);
   };
 
-  const loadPr = (pr) => {
+  const loadPr = (pr: Project) => {
     // Auto-save current project before switching
     if (activeProjectId && sel.size > 0) {
       setProjects(prev => prev.map(p => p.id === activeProjectId ? { ...snapshotProject(activeProjectId), name: p.name } : p));
@@ -614,16 +637,16 @@ export default function App() {
     go("design"); setTab("studio");
   };
 
-  const renameProject = (id, newName) => {
+  const renameProject = (id: number, newName: string) => {
     setProjects(prev => prev.map(p => p.id === id ? { ...p, name: newName } : p));
     setEditingProjectName(null);
   };
 
-  const doAuth = async (mode, email, pass, name) => {
+  const doAuth = async (mode: string, email?: string | null, pass?: string | null, name?: string | null): Promise<string | null> => {
     if (mode === "signup") {
       const { data, error } = await supabase.auth.signUp({
-        email,
-        password: pass,
+        email: email!,
+        password: pass!,
         options: {
           data: { name },
           emailRedirectTo: window.location.origin
@@ -641,7 +664,7 @@ export default function App() {
     }
 
     if (mode === "signin") {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
+      const { data, error } = await supabase.auth.signInWithPassword({ email: email!, password: pass! });
       if (error) {
         if (error.message.includes("Email not confirmed")) {
           return "Please confirm your email before signing in. Check your inbox.";
@@ -653,7 +676,7 @@ export default function App() {
     }
 
     if (mode === "forgot") {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      const { error } = await supabase.auth.resetPasswordForEmail(email!, {
         redirectTo: window.location.origin
       });
       if (error) return error.message;
@@ -662,7 +685,7 @@ export default function App() {
     }
 
     if (mode === "reset") {
-      const { error } = await supabase.auth.updateUser({ password: pass });
+      const { error } = await supabase.auth.updateUser({ password: pass! });
       if (error) return error.message;
       go("home");
       return null;
@@ -680,7 +703,7 @@ export default function App() {
     setMsgs((prev) => [...prev, { role: "user", text: msg, recs: [] }]);
 
     let recs = [];
-    try { recs = localMatch(msg); } catch { recs = DB.slice(0, 12); }
+    try { recs = localMatch(msg); } catch (_e) { recs = DB.slice(0, 12); }
     const topPicks = recs.slice(0, 12);
 
     let aiWorked = false;
@@ -690,15 +713,15 @@ export default function App() {
         let s = 0;
         if (room && x.rm && x.rm.includes(room)) s += 3;
         if (vibe && x.v && x.v.includes(vibe)) s += 3;
-        const catKws = { sofa:["sofa","couch","sectional"], table:["table","desk","coffee","console","dining"], chair:["chair","seat","lounge","armchair"], stool:["stool","counter","bar"], light:["light","lamp","chandelier","pendant","sconce"], rug:["rug","carpet"], art:["art","painting","print"], accent:["ottoman","bench","mirror","cabinet","bed","dresser","pillow","vase"] };
+        const catKws: Record<string, string[]> = { sofa:["sofa","couch","sectional"], table:["table","desk","coffee","console","dining"], chair:["chair","seat","lounge","armchair"], stool:["stool","counter","bar"], light:["light","lamp","chandelier","pendant","sconce"], rug:["rug","carpet"], art:["art","painting","print"], accent:["ottoman","bench","mirror","cabinet","bed","dresser","pillow","vase"] };
         Object.entries(catKws).forEach(([cat, kws]) => { kws.forEach((w) => { if (m.includes(w) && x.c === cat) s += 5; }); });
         (x.n || "").toLowerCase().split(" ").forEach((w) => { if (w.length > 3 && m.includes(w)) s += 2; });
         return { ...x, _s: s };
       }).sort((a, b) => b._s - a._s).slice(0, 50);
 
       const catalogStr = scored.slice(0, 25).map((x) => "[ID:" + x.id + "] " + x.n + " by " + x.r + " $" + x.p + " (" + x.c + ")").join("\n");
-      const palette = STYLE_PALETTES[vibe] || {};
-      const roomNeeds = ROOM_NEEDS[room] || {};
+      const palette = (STYLE_PALETTES as Record<string, StylePalette>)[vibe as string] || {};
+      const roomNeeds = (ROOM_NEEDS as Record<string, RoomNeed>)[room as string] || {};
 
       // Build furniture dimension reference for AI
       const furnDimStr = Object.entries(FURN_DIMS).map(([k, v]) => k + ": " + v.w + "ft W x " + v.d + "ft D").join(", ");
@@ -738,7 +761,7 @@ export default function App() {
       if (text && text.length > 20 && text !== "[object Object]") {
         const ids = []; const rx = /\[ID:(\d+)\]/g; let mt;
         while ((mt = rx.exec(text)) !== null) ids.push(parseInt(mt[1]));
-        let apiRecs = ids.map((id) => DB.find((p) => p.id === id)).filter(Boolean);
+        let apiRecs = ids.map((id) => DB.find((p) => p.id === id)).filter((x): x is Product => Boolean(x));
 
         if (apiRecs.length === 0) {
           const boldNames = []; const bx = /\*\*([^*]+)\*\*/g; let bm;
@@ -786,13 +809,13 @@ export default function App() {
     } catch (e) { console.log("AI chat error:", e); }
 
     if (!aiWorked) {
-      const palette = STYLE_PALETTES[vibe] || {};
+      const palette = (STYLE_PALETTES as Record<string, StylePalette>)[vibe as string] || {};
       const reasons = topPicks.slice(0, 8).map((p) => {
         const dims = getProductDims(p);
         const styleMatch = vibe && p.v && p.v.includes(vibe) ? ", perfectly suited to the **" + vibe + "** aesthetic" : "";
         const roomMatch = room && p.rm && p.rm.some(r => r === room) ? " and ideal for your **" + room + "**" : "";
         const spatial = sqft ? " At " + dims.w + "'x" + dims.d + "', it's well-proportioned for your " + sqft + " sqft space." : "";
-        const catLabel = { sofa:"luxurious seating piece", chair:"stunning chair", table:"beautiful table", light:"striking light fixture", rug:"gorgeous rug", art:"captivating art piece", stool:"elegant stool", accent:"refined accent piece" }[p.c] || "refined piece";
+        const catLabel = ({ sofa:"luxurious seating piece", chair:"stunning chair", table:"beautiful table", light:"striking light fixture", rug:"gorgeous rug", art:"captivating art piece", stool:"elegant stool", accent:"refined accent piece", bed:"luxurious bed" } as Record<string, string>)[p.c] || "refined piece";
         return "**" + p.n + "** by " + p.r + " (" + fmt(p.p) + ") — a " + catLabel + styleMatch + roomMatch + "." + spatial;
       }).join("\n\n");
       setMsgs((prev) => [...prev, {
@@ -809,15 +832,15 @@ export default function App() {
     setBusy(false);
   };
 
-  const localMatch = (msg) => {
+  const localMatch = (msg: string): Product[] => {
     const m = msg.toLowerCase();
     return DB.map((x) => {
       let s = Math.random() * 1.5;
-      const kws = { sofa:["sofa","couch","sectional","seating"], table:["table","desk","coffee","console","dining","side"], chair:["chair","seat","lounge","armchair"], stool:["stool","counter","bar"], light:["light","lamp","chandelier","pendant","sconce"], rug:["rug","carpet"], art:["art","painting","print","wall"], accent:["accent","ottoman","tub","bench","headboard","daybed","cabinet","mirror","bed","dresser","nightstand","credenza"] };
-      Object.keys(kws).forEach((cat) => { kws[cat].forEach((w) => { if (m.includes(w) && x.c === cat) s += 7; }); });
+      const kws: Record<string, string[]> = { sofa:["sofa","couch","sectional","seating"], table:["table","desk","coffee","console","dining","side"], chair:["chair","seat","lounge","armchair"], stool:["stool","counter","bar"], light:["light","lamp","chandelier","pendant","sconce"], rug:["rug","carpet"], art:["art","painting","print","wall"], accent:["accent","ottoman","tub","bench","headboard","daybed","cabinet","mirror","bed","dresser","nightstand","credenza"] };
+      Object.keys(kws).forEach((cat) => { kws[cat].forEach((w: string) => { if (m.includes(w) && x.c === cat) s += 7; }); });
       if (room && x.rm && x.rm.some((r) => r === room)) s += 4;
       if (vibe && x.v && x.v.includes(vibe)) s += 5;
-      const palette = STYLE_PALETTES[vibe];
+      const palette = (STYLE_PALETTES as Record<string, StylePalette>)[vibe as string];
       if (palette) {
         const pn = (x.n || "").toLowerCase();
         palette.colors.forEach(c => { if (pn.includes(c)) s += 3; });
@@ -860,7 +883,7 @@ export default function App() {
             <div style={{ marginBottom: 24 }}><AuraLogo size={36} /></div>
             <h2 style={{ fontFamily: "Georgia,serif", fontSize: 24, fontWeight: 400, margin: "0 0 6px" }}>Admin Access</h2>
             <p style={{ fontSize: 13, color: "#9B8B7B", margin: "0 0 28px" }}>Enter the admin password to continue</p>
-            <form onSubmit={e => { e.preventDefault(); if (adminPassInput === ADMIN_PASS) { setAdminAuthed(true); setAdminPassErr(""); } else { setAdminPassErr("Incorrect password"); } }}>
+            <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); if (adminPassInput === ADMIN_PASS) { setAdminAuthed(true); setAdminPassErr(""); } else { setAdminPassErr("Incorrect password"); } }}>
               <input type="password" placeholder="Admin password" value={adminPassInput} onChange={e => { setAdminPassInput(e.target.value); setAdminPassErr(""); }}
                 style={{ width: "100%", padding: "14px 16px", border: "1px solid " + (adminPassErr ? "#D45B5B" : "#E8E0D8"), borderRadius: 10, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 12 }} />
               {adminPassErr && <p style={{ fontSize: 12, color: "#D45B5B", margin: "0 0 12px" }}>{adminPassErr}</p>}
@@ -882,13 +905,13 @@ export default function App() {
     }
 
     // Compute all analytics from DB and localStorage
-    const catCounts = {};
-    const retailerCounts = {};
-    const retailerRevenue = {};
-    const styleCounts = {};
-    const roomCounts = {};
-    const priceRanges = { "Under $100": 0, "$100-$500": 0, "$500-$1K": 0, "$1K-$5K": 0, "$5K-$10K": 0, "$10K-$25K": 0, "$25K+": 0 };
-    const leadTimes = {};
+    const catCounts: Record<string, number> = {};
+    const retailerCounts: Record<string, number> = {};
+    const retailerRevenue: Record<string, number> = {};
+    const styleCounts: Record<string, number> = {};
+    const roomCounts: Record<string, number> = {};
+    const priceRanges: Record<string, number> = { "Under $100": 0, "$100-$500": 0, "$500-$1K": 0, "$1K-$5K": 0, "$5K-$10K": 0, "$10K-$25K": 0, "$25K+": 0 };
+    const leadTimes: Record<string, number> = {};
     let totalValue = 0;
     let minPrice = Infinity;
     let maxPrice = 0;
@@ -942,7 +965,7 @@ export default function App() {
     const sessionVibes = vibe || "None selected";
     const sessionRoom = room || "None selected";
 
-    const statCard = (label, value, sub, color) => (
+    const statCard = (label: string, value: string | number, sub?: string, color?: string) => (
       <div style={{ background: "#fff", borderRadius: 14, padding: "22px 24px", border: "1px solid #EDE8E2", flex: "1 1 200px", minWidth: 180 }}>
         <p style={{ fontSize: 11, letterSpacing: ".1em", textTransform: "uppercase", color: "#9B8B7B", margin: "0 0 8px", fontWeight: 600 }}>{label}</p>
         <p style={{ fontSize: 28, fontWeight: 700, color: color || "#1A1815", margin: "0 0 4px", fontFamily: "Georgia,serif" }}>{value}</p>
@@ -950,7 +973,7 @@ export default function App() {
       </div>
     );
 
-    const barChart = (data, maxVal, color) => (
+    const barChart = (data: [string, number][], maxVal: number, color?: string) => (
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {data.map(([label, count]) => (
           <div key={label} style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -983,7 +1006,7 @@ export default function App() {
           <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #EDE8E2", padding: "24px 28px", marginBottom: 32 }}>
             <h3 style={{ fontFamily: "Georgia,serif", fontSize: 18, fontWeight: 400, margin: "0 0 4px" }}>Grant Pro Access</h3>
             <p style={{ fontSize: 12, color: "#9B8B7B", margin: "0 0 16px" }}>Enter a user's email to upgrade them to Pro</p>
-            <form onSubmit={async e => {
+            <form onSubmit={async (e: React.FormEvent<HTMLFormElement>) => {
               e.preventDefault();
               if (!grantEmail.trim()) return;
               setGrantStatus(""); setGrantMsg("");
@@ -997,7 +1020,7 @@ export default function App() {
                 const data = await resp.json();
                 if (resp.ok) { setGrantStatus("success"); setGrantMsg(data.message || "User upgraded to Pro!"); setGrantEmail(""); }
                 else { setGrantStatus("error"); setGrantMsg(data.error || "Failed to grant Pro"); }
-              } catch (err) { setGrantStatus("error"); setGrantMsg("Network error: " + err.message); }
+              } catch (err) { setGrantStatus("error"); setGrantMsg("Network error: " + (err as Error).message); }
             }} style={{ display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
               <div style={{ flex: 1, minWidth: 220 }}>
                 <input type="email" placeholder="user@example.com" value={grantEmail} onChange={e => { setGrantEmail(e.target.value); setGrantStatus(""); }}
@@ -1505,7 +1528,7 @@ export default function App() {
     );
   }
 
-  const currentPalette = STYLE_PALETTES[vibe];
+  const currentPalette = (STYLE_PALETTES as Record<string, StylePalette>)[vibe as string];
 
   /* ─── MAIN LAYOUT ─── */
   return (
@@ -2176,11 +2199,11 @@ export default function App() {
                         {msgs.map((m, i) => (
                           <div key={i}>
                             <div style={{ padding: m.role === "user" ? "10px 14px" : "12px 16px", borderRadius: m.role === "user" ? "14px 14px 4px 14px" : "14px 14px 14px 4px", fontSize: 14, lineHeight: 1.65, maxWidth: m.role === "user" ? "80%" : "100%", background: m.role === "user" ? "#1A1815" : "#F8F5F0", color: m.role === "user" ? "#fff" : "#3A3530", marginLeft: m.role === "user" ? "auto" : 0, wordBreak: "break-word" }} dangerouslySetInnerHTML={{ __html: formatChatMessage(m.text) }} />
-                            {m.recs?.length > 0 && (
+                            {(m.recs?.length ?? 0) > 0 && (
                               <div style={{ marginTop: 10 }}>
                                 <p style={{ fontSize: 10, color: "#B8A898", marginBottom: 6 }}>Tap + to add to your selection</p>
                                 <div className="aura-card-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))", gap: 8 }}>
-                                  {m.recs.map((p) => <Card key={p.id} p={p} small sel={sel.has(p.id)} toggle={toggle} />)}
+                                  {m.recs!.map((p) => <Card key={p.id} p={p} small sel={sel.has(p.id)} toggle={toggle} />)}
                                 </div>
                               </div>
                             )}
@@ -2320,7 +2343,7 @@ export default function App() {
                               <div style={{ marginTop: 16, fontSize: 10, color: "#A09080", letterSpacing: ".1em", textTransform: "uppercase" }}>Design Concept</div>
                             </div>
                           ) : (
-                            <img src={v.url || v} alt={"Room visualization " + (i + 1)} loading="lazy" style={{ width: "100%", height: "auto", minHeight: 200, objectFit: "cover", display: "block", background: "#F0EBE4" }} />
+                            <img src={v.url || ""} alt={"Room visualization " + (i + 1)} loading="lazy" style={{ width: "100%", height: "auto", minHeight: 200, objectFit: "cover", display: "block", background: "#F0EBE4" }} />
                           )}
                           <div style={{ padding: "10px 16px", background: "#fff" }}>
                             <p style={{ fontSize: 12, fontWeight: 600, color: "#C17550", margin: 0 }}>{v.label || ["Morning Light", "Golden Hour", "Evening Ambiance"][i] || "Variation " + (i + 1)}</p>
@@ -2337,7 +2360,7 @@ export default function App() {
                       <CADFloorPlan layout={cadLayout} roomType={room || "Living Room"} style={vibe || "Modern"} />
                       <div style={{ marginTop: 12, padding: "14px 18px", background: "#F8F5F0", borderRadius: 12, border: "1px solid #E8E0D8" }}>
                         <p style={{ fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", color: "#C17550", fontWeight: 700, marginBottom: 8 }}>Placement Notes</p>
-                        <p style={{ fontSize: 12, color: "#5A5045", lineHeight: 1.7, margin: 0 }}>{(ROOM_NEEDS[room] || ROOM_NEEDS["Living Room"]).layout}</p>
+                        <p style={{ fontSize: 12, color: "#5A5045", lineHeight: 1.7, margin: 0 }}>{((ROOM_NEEDS as Record<string, RoomNeed>)[room as string] || ROOM_NEEDS["Living Room"]).layout}</p>
                         <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 10 }}>
                           <span style={{ fontSize: 11, color: "#7A6B5B" }}>Floor area: {cadLayout.roomW}' x {cadLayout.roomH}'</span>
                           <span style={{ fontSize: 11, color: "#7A6B5B" }}>Furniture footprint: {cadLayout.placed.filter(p => !["rug","art","light"].includes(p.item.c)).length} floor items</span>
@@ -2522,7 +2545,7 @@ export default function App() {
                     <div key={pr.id} style={{ background: "#fff", borderRadius: 16, border: activeProjectId === pr.id ? "2px solid #C17550" : "1px solid #F0EBE4", overflow: "hidden", transition: "border .2s, box-shadow .2s", boxShadow: activeProjectId === pr.id ? "0 4px 20px rgba(193,117,80,.12)" : "none" }}>
                       <div style={{ padding: "20px 22px 16px" }}>
                         {editingProjectName === pr.id ? (
-                          <input autoFocus defaultValue={pr.name} onBlur={(e) => renameProject(pr.id, e.target.value || pr.name)} onKeyDown={(e) => { if (e.key === "Enter") renameProject(pr.id, e.target.value || pr.name); if (e.key === "Escape") setEditingProjectName(null); }} style={{ fontFamily: "Georgia,serif", fontSize: 17, border: "1px solid #C17550", borderRadius: 8, padding: "4px 10px", width: "100%", outline: "none", boxSizing: "border-box" }} />
+                          <input autoFocus defaultValue={pr.name} onBlur={(e) => renameProject(pr.id, e.target.value || pr.name)} onKeyDown={(e) => { if (e.key === "Enter") renameProject(pr.id, (e.target as HTMLInputElement).value || pr.name); if (e.key === "Escape") setEditingProjectName(null); }} style={{ fontFamily: "Georgia,serif", fontSize: 17, border: "1px solid #C17550", borderRadius: 8, padding: "4px 10px", width: "100%", outline: "none", boxSizing: "border-box" }} />
                         ) : (
                           <div onClick={() => setEditingProjectName(pr.id)} style={{ fontFamily: "Georgia,serif", fontSize: 17, cursor: "text" }} title="Click to rename">{pr.name}</div>
                         )}
@@ -2551,7 +2574,7 @@ export default function App() {
       <footer style={{ background: "#fff", borderTop: "1px solid #F0EBE4", padding: "28px 5%", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}><AuraLogo size={22} /><span style={{ fontFamily: "Georgia,serif", fontSize: 18 }}>AURA</span></div>
         <div style={{ display: "flex", gap: 24 }}>
-          {[["Design", () => { go("design"); setTab("studio"); }], ["Catalog", () => { go("design"); setTab("catalog"); }], ["Pricing", () => go("pricing")], ["Admin", () => go("admin")]].map(([l, fn]) => (
+          {([["Design", () => { go("design"); setTab("studio"); }], ["Catalog", () => { go("design"); setTab("catalog"); }], ["Pricing", () => go("pricing")], ["Admin", () => go("admin")]] as [string, () => void][]).map(([l, fn]) => (
             <span key={l} onClick={fn} style={{ fontSize: 12, cursor: "pointer", color: "#B8A898" }}>{l}</span>
           ))}
         </div>

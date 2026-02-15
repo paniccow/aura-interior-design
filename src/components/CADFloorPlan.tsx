@@ -1,9 +1,12 @@
 import React from "react";
-import { FURN_DIMS } from "../constants.js";
-import { getProductDims } from "../engine/designEngine.js";
-import { CAT_COLORS } from "./Card.jsx";
+import { FURN_DIMS } from "../constants";
+import { getProductDims } from "../engine/designEngine";
+import { CAT_COLORS } from "./Card";
+import type { CADLayout, FurnitureCategory } from "../types";
 
-export default function CADFloorPlan({ layout, roomType, style }) {
+interface CADFloorPlanProps { layout: CADLayout | null; roomType: string; style: string; }
+
+export default function CADFloorPlan({ layout, roomType, style }: CADFloorPlanProps) {
   if (!layout) return null;
   const { placed, canvasW, canvasH, roomW, roomH, windows, doors, scale } = layout;
   return (
@@ -196,7 +199,7 @@ export default function CADFloorPlan({ layout, roomType, style }) {
           const count = placed.filter(p => p.item.c === cat).length;
           if (!count) return null;
           return <span key={cat} style={{ fontSize: 10, display: "flex", alignItems: "center", gap: 4 }}>
-            <span style={{ width: 10, height: 10, borderRadius: 2, background: (CAT_COLORS[cat] || CAT_COLORS.accent).accent + "30", border: "1px solid " + (CAT_COLORS[cat] || CAT_COLORS.accent).accent, display: "inline-block" }} />
+            <span style={{ width: 10, height: 10, borderRadius: 2, background: ((CAT_COLORS as Record<string, { bg: string; accent: string }>)[cat] || CAT_COLORS.accent).accent + "30", border: "1px solid " + ((CAT_COLORS as Record<string, { bg: string; accent: string }>)[cat] || CAT_COLORS.accent).accent, display: "inline-block" }} />
             {d.label} ({count})
           </span>;
         })}
