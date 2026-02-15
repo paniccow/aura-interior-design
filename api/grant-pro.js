@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 
-const ADMIN_PASS = "aura2025admin";
+const ADMIN_PASS = process.env.ADMIN_PASSWORD || "aura2025admin";
 
 const supabaseAdmin =
   process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
