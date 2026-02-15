@@ -2686,7 +2686,7 @@ export default function App() {
           </section>
 
           {/* Feature Comparison Table */}
-          <section style={{ padding: "100px 6%", background: "#FDFCFA" }}>
+          <section style={{ padding: "100px 6%", background: "#F8F5F0" }}>
             <RevealSection>
               <div style={{ maxWidth: 1100, margin: "0 auto" }}>
                 <div style={{ textAlign: "center", marginBottom: 56 }}>
