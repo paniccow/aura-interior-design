@@ -199,6 +199,15 @@ export interface AdminStats {
   }>;
 }
 
+// ─── Featured Product Search ───
+export interface FeaturedSearchResult {
+  products: Product[];
+  total: number;
+  retailers: string[];
+  query: string;
+  page: number;
+}
+
 // ─── Category Colors ───
 export interface CatColorDef {
   bg: string;

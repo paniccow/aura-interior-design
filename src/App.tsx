@@ -6,7 +6,7 @@ import { supabase } from "./supabaseClient";
 import { compressImage } from "./utils/compress";
 import { sanitizeHtml, formatChatMessage } from "./utils/sanitize";
 import { getAuthToken, authHeaders } from "./utils/auth";
-import { AI_API, aiChat, analyzeImage, generateAIImage } from "./api";
+import { AI_API, aiChat, analyzeImage, generateAIImage, searchFeaturedProducts } from "./api";
 import { ROOMS, VIBES, fmt, budgets, FURN_DIMS, STYLE_PALETTES, ROOM_NEEDS } from "./constants";
 import { getProductDims, buildDesignBoard, generateMoodBoards } from "./engine/designEngine";
 import { generateCADLayout } from "./engine/cadLayout";
@@ -112,6 +112,16 @@ export default function App() {
     try { const a = localStorage.getItem("aura_activeProject"); return a ? JSON.parse(a) : null; } catch (_e) { return null; }
   });
   const [editingProjectName, setEditingProjectName] = useState<number | null>(null);
+  // Featured catalog (external products from RapidAPI)
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const [featuredQuery, setFeaturedQuery] = useState<string>("");
+  const [featuredCat, setFeaturedCat] = useState<string>("all");
+  const [featuredLoading, setFeaturedLoading] = useState<boolean>(false);
+  const [featuredTotal, setFeaturedTotal] = useState<number>(0);
+  const [featuredPage, setFeaturedPage] = useState<number>(1);
+  const [featuredRetailers, setFeaturedRetailers] = useState<string[]>([]);
+  const [featuredCache, setFeaturedCache] = useState<Map<number, Product>>(new Map());
+
   const [designStep, _setDesignStep] = useState<number>(0); // 0=setup, 1=chat, 2=review
   const setDesignStep = (step: number) => { _setDesignStep(step); window.scrollTo({ top: 0, behavior: "smooth" }); };
   const chatEnd = useRef<HTMLDivElement>(null);
@@ -271,9 +281,7 @@ export default function App() {
   const go = (p: string) => { setPg(p); window.scrollTo(0, 0); };
   const toggle = (id: number) => setSel((prev) => { const n = new Map(prev); n.has(id) ? n.delete(id) : n.set(id, 1); return n; });
   const setQty = (id: number, qty: number) => setSel((prev) => { const n = new Map(prev); if (qty <= 0) n.delete(id); else n.set(id, qty); return n; });
-  const selItems = DB.filter((p) => sel.has(p.id));
-  const selTotal = selItems.reduce((s, p) => s + p.p * (sel.get(p.id) || 1), 0);
-  const selCount = Array.from(sel.values()).reduce((s, q) => s + q, 0);
+  // selItems/selTotal/selCount are computed below (after featuredCache), combining DB + featured products
 
   const addBoard = (boardIdx: number) => {
     if (!boards || !boards[boardIdx]) return;
@@ -872,6 +880,57 @@ export default function App() {
     { id: "stool", n: "Stools" }, { id: "light", n: "Lighting" }, { id: "rug", n: "Rugs" },
     { id: "art", n: "Art" }, { id: "accent", n: "Accents" }
   ];
+
+  // ─── Featured catalog search ───
+  const featuredCats = [
+    { id: "all", n: "All Furniture" }, { id: "sofa", n: "Sofas" }, { id: "table", n: "Tables" },
+    { id: "chair", n: "Chairs" }, { id: "bed", n: "Beds" }, { id: "light", n: "Lighting" },
+    { id: "rug", n: "Rugs" }, { id: "storage", n: "Storage" }, { id: "outdoor", n: "Outdoor" },
+    { id: "stool", n: "Stools" }, { id: "art", n: "Art" }, { id: "accent", n: "Decor" }
+  ];
+
+  const doFeaturedSearch = useCallback(async (query?: string, cat?: string, pg?: number) => {
+    const q = query ?? featuredQuery;
+    const c = cat ?? featuredCat;
+    const p = pg ?? 1;
+    setFeaturedLoading(true);
+    try {
+      const result = await searchFeaturedProducts(q || "", p, c !== "all" ? c : undefined);
+      if (p === 1) {
+        setFeaturedProducts(result.products);
+      } else {
+        setFeaturedProducts(prev => [...prev, ...result.products]);
+      }
+      setFeaturedTotal(result.total);
+      setFeaturedRetailers(prev => {
+        const combined = new Set([...prev, ...result.retailers]);
+        return Array.from(combined);
+      });
+      setFeaturedPage(p);
+      // Cache featured products for selection persistence
+      setFeaturedCache(prev => {
+        const next = new Map(prev);
+        for (const prod of result.products) next.set(prod.id, prod);
+        return next;
+      });
+    } catch (_e) {
+      console.log("Featured search failed");
+    }
+    setFeaturedLoading(false);
+  }, [featuredQuery, featuredCat]);
+
+  // Auto-search when Featured tab opens (initial load)
+  useEffect(() => {
+    if (tab === "featured" && featuredProducts.length === 0 && !featuredLoading) {
+      doFeaturedSearch("", "all", 1);
+    }
+  }, [tab]);
+
+  // Combined selected items: DB products + featured products
+  const allProducts = [...DB, ...Array.from(featuredCache.values())];
+  const selItems = allProducts.filter((p) => sel.has(p.id));
+  const selTotal = selItems.reduce((s, p) => s + p.p * (sel.get(p.id) || 1), 0);
+  const selCount = Array.from(sel.values()).reduce((s, q) => s + q, 0);
 
   /* ─── ADMIN ANALYTICS PAGE ─── */
   if (pg === "admin") {
@@ -2026,7 +2085,7 @@ export default function App() {
         <div style={{ paddingTop: 60 }}>
           <div style={{ borderBottom: "1px solid #F0EBE4", background: "#fff" }}>
             <div style={{ display: "flex", padding: "0 5%", overflowX: "auto" }}>
-              {[["studio", "Studio"], ["catalog", "Catalog (" + DB.length + ")"], ["projects", "Projects" + (projects.length ? " (" + projects.length + ")" : "")]].map(([id, lb]) => (
+              {[["studio", "Studio"], ["catalog", "Catalog (" + DB.length + ")"], ["featured", "Featured"], ["projects", "Projects" + (projects.length ? " (" + projects.length + ")" : "")]].map(([id, lb]) => (
                 <button key={id} onClick={() => { setTab(id); setPage(0); }} style={{ padding: "16px 22px", fontSize: 12, fontWeight: tab === id ? 700 : 500, background: "none", border: "none", borderBottom: tab === id ? "2px solid #1A1815" : "2px solid transparent", color: tab === id ? "#1A1815" : "#B8A898", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", letterSpacing: ".02em", transition: "all .15s" }}>{lb}</button>
               ))}
               <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8, padding: "10px 0" }}>
@@ -2500,7 +2559,7 @@ export default function App() {
             <div style={{ padding: "28px 5%" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 20, flexWrap: "wrap", gap: 14 }}>
                 <div>
-                  <p style={{ fontSize: 12, letterSpacing: ".15em", textTransform: "uppercase", color: "#C17550", fontWeight: 600, marginBottom: 6 }}>Full Catalog</p>
+                  <p style={{ fontSize: 12, letterSpacing: ".15em", textTransform: "uppercase", color: "#C17550", fontWeight: 600, marginBottom: 6 }}>Curated Catalog</p>
                   <h2 style={{ fontFamily: "Georgia,serif", fontSize: 26, fontWeight: 400 }}>{filteredDB.length} products</h2>
                 </div>
                 <input value={searchQ} onChange={(e) => { setSearchQ(e.target.value); setPage(0); }} placeholder="Search products or brands..." style={{ background: "#fff", border: "1px solid #E8E0D8", borderRadius: 12, padding: "12px 18px", fontFamily: "inherit", fontSize: 13, outline: "none", width: 280 }} />
@@ -2514,6 +2573,69 @@ export default function App() {
               {hasMore && (
                 <div style={{ textAlign: "center", padding: "32px 0" }}>
                   <button onClick={() => setPage((p) => p + 1)} style={{ background: "#1A1815", color: "#fff", border: "none", borderRadius: 12, padding: "14px 32px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Load more ({filteredDB.length - pagedDB.length} remaining)</button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* FEATURED CATALOG TAB */}
+          {tab === "featured" && (
+            <div style={{ padding: "28px 5%" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 20, flexWrap: "wrap", gap: 14 }}>
+                <div>
+                  <p style={{ fontSize: 12, letterSpacing: ".15em", textTransform: "uppercase", color: "#C17550", fontWeight: 600, marginBottom: 6 }}>Featured Catalog</p>
+                  <h2 style={{ fontFamily: "Georgia,serif", fontSize: 26, fontWeight: 400 }}>
+                    {featuredLoading && featuredProducts.length === 0 ? "Searching..." : featuredProducts.length + " products from top brands"}
+                  </h2>
+                </div>
+                <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); doFeaturedSearch(featuredQuery, featuredCat, 1); }} style={{ display: "flex", gap: 8 }}>
+                  <input value={featuredQuery} onChange={(e) => setFeaturedQuery(e.target.value)} placeholder="Search furniture from all retailers..." style={{ background: "#fff", border: "1px solid #E8E0D8", borderRadius: 12, padding: "12px 18px", fontFamily: "inherit", fontSize: 13, outline: "none", width: 260 }} />
+                  <button type="submit" style={{ background: "#C17550", color: "#fff", border: "none", borderRadius: 12, padding: "12px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>Search</button>
+                </form>
+              </div>
+              {/* Category pills */}
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16 }}>
+                {featuredCats.map((ct) => <Pill key={ct.id} active={featuredCat === ct.id} onClick={() => { setFeaturedCat(ct.id); doFeaturedSearch(featuredQuery, ct.id, 1); }}>{ct.n}</Pill>)}
+              </div>
+              {/* Retailer badges */}
+              {featuredRetailers.length > 0 && (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 24, alignItems: "center" }}>
+                  <span style={{ fontSize: 11, color: "#B8A898", fontWeight: 500 }}>From:</span>
+                  {featuredRetailers.slice(0, 12).map((r) => (
+                    <span key={r} style={{ fontSize: 10, background: "#F8F5F0", color: "#7A6B5B", padding: "4px 10px", borderRadius: 20, fontWeight: 500, border: "1px solid #EDE8E2" }}>{r}</span>
+                  ))}
+                  {featuredRetailers.length > 12 && <span style={{ fontSize: 10, color: "#B8A898" }}>+{featuredRetailers.length - 12} more</span>}
+                </div>
+              )}
+              {/* Loading state */}
+              {featuredLoading && featuredProducts.length === 0 && (
+                <div style={{ textAlign: "center", padding: "80px 0" }}>
+                  <div style={{ width: 32, height: 32, border: "3px solid #E8E0D8", borderTopColor: "#C17550", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 16px" }} />
+                  <p style={{ color: "#9B8B7B", fontSize: 14 }}>Searching thousands of products across hundreds of brands...</p>
+                </div>
+              )}
+              {/* Product grid */}
+              {featuredProducts.length > 0 && (
+                <div className="aura-card-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: 14 }}>
+                  {featuredProducts.map((p) => <Card key={p.id} p={p} sel={sel.has(p.id)} toggle={toggle} />)}
+                </div>
+              )}
+              {/* No results */}
+              {!featuredLoading && featuredProducts.length === 0 && featuredQuery && (
+                <div style={{ textAlign: "center", padding: "60px 0" }}>
+                  <p style={{ fontSize: 14, color: "#9B8B7B" }}>No products found for "{featuredQuery}". Try a different search.</p>
+                </div>
+              )}
+              {/* Load more */}
+              {featuredProducts.length > 0 && featuredProducts.length < featuredTotal && (
+                <div style={{ textAlign: "center", padding: "32px 0" }}>
+                  <button
+                    onClick={() => doFeaturedSearch(featuredQuery, featuredCat, featuredPage + 1)}
+                    disabled={featuredLoading}
+                    style={{ background: "#1A1815", color: "#fff", border: "none", borderRadius: 12, padding: "14px 32px", fontSize: 13, fontWeight: 600, cursor: featuredLoading ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: featuredLoading ? 0.6 : 1 }}
+                  >
+                    {featuredLoading ? "Loading..." : "Load more products"}
+                  </button>
                 </div>
               )}
             </div>
@@ -2574,7 +2696,7 @@ export default function App() {
       <footer style={{ background: "#fff", borderTop: "1px solid #F0EBE4", padding: "28px 5%", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}><AuraLogo size={22} /><span style={{ fontFamily: "Georgia,serif", fontSize: 18 }}>AURA</span></div>
         <div style={{ display: "flex", gap: 24 }}>
-          {([["Design", () => { go("design"); setTab("studio"); }], ["Catalog", () => { go("design"); setTab("catalog"); }], ["Pricing", () => go("pricing")], ["Admin", () => go("admin")]] as [string, () => void][]).map(([l, fn]) => (
+          {([["Design", () => { go("design"); setTab("studio"); }], ["Catalog", () => { go("design"); setTab("catalog"); }], ["Featured", () => { go("design"); setTab("featured"); }], ["Pricing", () => go("pricing")], ["Admin", () => go("admin")]] as [string, () => void][]).map(([l, fn]) => (
             <span key={l} onClick={fn} style={{ fontSize: 12, cursor: "pointer", color: "#B8A898" }}>{l}</span>
           ))}
         </div>

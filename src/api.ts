@@ -1,6 +1,8 @@
 import { authHeaders } from "./utils/auth";
+import type { Product, FeaturedSearchResult } from "./types";
 
 const AI_API = "/api/ai";
+const PRODUCTS_API = "/api/products";
 
 export { AI_API };
 
@@ -114,4 +116,41 @@ export async function generateAIImage(prompt: string, referenceImage?: string | 
     }
   } catch (err: unknown) { console.log("Image gen: error:", (err as Error)?.message); }
   return null;
+}
+
+/* Search featured products — searches Google Shopping via RapidAPI proxy */
+export async function searchFeaturedProducts(
+  query: string,
+  page: number = 1,
+  category?: string
+): Promise<FeaturedSearchResult> {
+  const empty: FeaturedSearchResult = { products: [], total: 0, retailers: [], query, page };
+  try {
+    const resp = await Promise.race([
+      fetch(PRODUCTS_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, page, category })
+      }),
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 15000))
+    ]);
+    if (resp.ok) {
+      const data = await resp.json();
+      const products: Product[] = (data.products || []).map((p: Product) => ({
+        ...p,
+        c: p.c || "accent",
+      }));
+      console.log(`Featured search: ${products.length} products from "${query}" (page ${page})`);
+      return {
+        products,
+        total: data.total || 0,
+        retailers: data.retailers || [],
+        query: data.query || query,
+        page: data.page || page,
+      };
+    } else {
+      console.log("Featured search: error", resp.status);
+    }
+  } catch (err: unknown) { console.log("Featured search: error:", (err as Error)?.message); }
+  return empty;
 }
