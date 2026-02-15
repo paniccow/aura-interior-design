@@ -1835,7 +1835,7 @@ export default function App() {
           <section style={{ padding: "100px 6%", background: "#F8F5F0" }}>
             <RevealSection>
               <div style={{ maxWidth: 1200, margin: "0 auto", textAlign: "center", marginBottom: 48 }}>
-                <span style={{ display: "inline-block", background: "#8B735515", color: "#8B7355", padding: "6px 16px", borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 20 }}>Curated Catalog</span>
+                <span style={{ display: "inline-block", background: "#8B735515", color: "#8B7355", padding: "6px 16px", borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 20 }}>Featured Catalog</span>
                 <h2 style={{ fontFamily: "Georgia,serif", fontSize: "clamp(28px,3.5vw,42px)", fontWeight: 400, marginBottom: 14, lineHeight: 1.15 }}>{DB.length} products, hand-picked by designers</h2>
                 <p style={{ fontSize: 16, color: "#7A6B5B", lineHeight: 1.7, maxWidth: 600, margin: "0 auto" }}>Every item links directly to the product page for purchase. From sofas to sconces, each piece is sourced from premium brands for quality and lasting style.</p>
               </div>
@@ -2090,7 +2090,7 @@ export default function App() {
         <div style={{ paddingTop: 60 }}>
           <div style={{ borderBottom: "1px solid #F0EBE4", background: "#fff" }}>
             <div style={{ display: "flex", padding: "0 5%", overflowX: "auto" }}>
-              {[["studio", "Studio"], ["catalog", "Catalog (" + DB.length + ")"], ["featured", "Featured"], ["projects", "Projects" + (projects.length ? " (" + projects.length + ")" : "")]].map(([id, lb]) => (
+              {[["studio", "Studio"], ["catalog", "Featured Catalog"], ["featured", "Catalog"], ["projects", "Projects" + (projects.length ? " (" + projects.length + ")" : "")]].map(([id, lb]) => (
                 <button key={id} onClick={() => { setTab(id); setPage(0); }} style={{ padding: "16px 22px", fontSize: 12, fontWeight: tab === id ? 700 : 500, background: "none", border: "none", borderBottom: tab === id ? "2px solid #1A1815" : "2px solid transparent", color: tab === id ? "#1A1815" : "#B8A898", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", letterSpacing: ".02em", transition: "all .15s" }}>{lb}</button>
               ))}
               <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8, padding: "10px 0" }}>
@@ -2564,7 +2564,7 @@ export default function App() {
             <div style={{ padding: "28px 5%" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 20, flexWrap: "wrap", gap: 14 }}>
                 <div>
-                  <p style={{ fontSize: 12, letterSpacing: ".15em", textTransform: "uppercase", color: "#C17550", fontWeight: 600, marginBottom: 6 }}>Curated Catalog</p>
+                  <p style={{ fontSize: 12, letterSpacing: ".15em", textTransform: "uppercase", color: "#C17550", fontWeight: 600, marginBottom: 6 }}>Featured Catalog</p>
                   <h2 style={{ fontFamily: "Georgia,serif", fontSize: 26, fontWeight: 400 }}>{filteredDB.length} products</h2>
                 </div>
                 <input value={searchQ} onChange={(e) => { setSearchQ(e.target.value); setPage(0); }} placeholder="Search products or brands..." style={{ background: "#fff", border: "1px solid #E8E0D8", borderRadius: 12, padding: "12px 18px", fontFamily: "inherit", fontSize: 13, outline: "none", width: 280 }} />
@@ -2583,14 +2583,14 @@ export default function App() {
             </div>
           )}
 
-          {/* FEATURED CATALOG TAB */}
+          {/* CATALOG TAB (External Products) */}
           {tab === "featured" && (
             <div style={{ padding: "28px 5%" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 20, flexWrap: "wrap", gap: 14 }}>
                 <div>
-                  <p style={{ fontSize: 12, letterSpacing: ".15em", textTransform: "uppercase", color: "#C17550", fontWeight: 600, marginBottom: 6 }}>Featured Catalog</p>
+                  <p style={{ fontSize: 12, letterSpacing: ".15em", textTransform: "uppercase", color: "#C17550", fontWeight: 600, marginBottom: 6 }}>Catalog</p>
                   <h2 style={{ fontFamily: "Georgia,serif", fontSize: 26, fontWeight: 400 }}>
-                    {featuredLoading && featuredProducts.length === 0 ? "Searching..." : featuredProducts.length + " products from top brands"}
+                    {featuredLoading && featuredProducts.length === 0 ? "Searching..." : "100,000+ products from top brands"}
                   </h2>
                 </div>
                 <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); doFeaturedSearch(featuredQuery, featuredCat, 1); }} style={{ display: "flex", gap: 8 }}>
@@ -2701,7 +2701,7 @@ export default function App() {
       <footer style={{ background: "#fff", borderTop: "1px solid #F0EBE4", padding: "28px 5%", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}><AuraLogo size={22} /><span style={{ fontFamily: "Georgia,serif", fontSize: 18 }}>AURA</span></div>
         <div style={{ display: "flex", gap: 24 }}>
-          {([["Design", () => { go("design"); setTab("studio"); }], ["Catalog", () => { go("design"); setTab("catalog"); }], ["Featured", () => { go("design"); setTab("featured"); }], ["Pricing", () => go("pricing")], ["Admin", () => go("admin")]] as [string, () => void][]).map(([l, fn]) => (
+          {([["Design", () => { go("design"); setTab("studio"); }], ["Featured Catalog", () => { go("design"); setTab("catalog"); }], ["Catalog", () => { go("design"); setTab("featured"); }], ["Pricing", () => go("pricing")], ["Admin", () => go("admin")]] as [string, () => void][]).map(([l, fn]) => (
             <span key={l} onClick={fn} style={{ fontSize: 12, cursor: "pointer", color: "#B8A898" }}>{l}</span>
           ))}
         </div>

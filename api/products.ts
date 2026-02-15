@@ -187,7 +187,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   try {
-    const apiUrl = `https://${RAPIDAPI_HOST}/search?q=${encodeURIComponent(searchQuery)}&country=us&language=en&page=${page}&limit=40&sort_by=BEST_MATCH&product_condition=ANY&min_rating=ANY`;
+    const apiUrl = `https://${RAPIDAPI_HOST}/search-v2?q=${encodeURIComponent(searchQuery)}&country=us&language=en&page=${page}&limit=40&sort_by=BEST_MATCH`;
 
     const response = await fetch(apiUrl, {
       method: "GET",
@@ -205,7 +205,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
     const data = await response.json();
-    const rawProducts: RapidAPIProduct[] = data?.data || data?.products || [];
+    const rawProducts: RapidAPIProduct[] = data?.data?.products || data?.data || [];
 
     // Reset ID counter for each fresh search to keep IDs predictable
     // (page 1 = -1 to -40, page 2 = -41 to -80, etc.)
@@ -222,7 +222,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     const result = {
       products,
-      total: data?.total_count || data?.total || products.length * 5,
+      total: products.length >= 30 ? page * 40 + 100 : products.length + ((page - 1) * 40),
       retailers,
       query: searchQuery,
       page,
