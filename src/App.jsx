@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { DB } from "./data.js";
+import { supabase } from "./supabaseClient.js";
 
 /* AURA v27 — Interactive room editor, multi-project, enhanced viz prompts, 1000 products */
 /* API key is stored as Vercel env var — NEVER exposed to client */
@@ -48,13 +49,30 @@ function compressImage(file, maxDim = 1200, quality = 0.7) {
   });
 }
 
+// Get Supabase auth token for API calls
+async function getAuthToken() {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token || null;
+  } catch { return null; }
+}
+
+// Build headers with optional auth token
+async function authHeaders() {
+  const token = await getAuthToken();
+  const h = { "Content-Type": "application/json" };
+  if (token) h["Authorization"] = "Bearer " + token;
+  return h;
+}
+
 async function aiChat(messages) {
   // Strategy 1: OpenRouter via our secure proxy (GPT-4o-mini — fast, reliable, cheap)
   try {
+    const headers = await authHeaders();
     const resp = await Promise.race([
       fetch(AI_API, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ action: "chat", messages })
       }),
       new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 30000))
@@ -78,10 +96,11 @@ async function analyzeImage(base64Data, mimeType, prompt) {
 
   // Strategy 1: OpenRouter GPT-4o-mini vision
   try {
+    const headers = await authHeaders();
     const resp = await Promise.race([
       fetch(AI_API, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           action: "chat",
           messages: [{ role: "user", content: [
@@ -106,10 +125,11 @@ async function analyzeImage(base64Data, mimeType, prompt) {
 /* Image generation — OpenRouter via secure proxy. referenceImage = room photo data URL, cadImage = floor plan data URL, productImageUrls = array of product photo URLs. */
 async function generateAIImage(prompt, referenceImage, productImageUrls, cadImage) {
   try {
+    const headers = await authHeaders();
     const resp = await Promise.race([
       fetch(AI_API, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ action: "image", prompt, referenceImage: referenceImage || null, cadImage: cadImage || null, productImageUrls: productImageUrls || [] })
       }),
       new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 120000))
@@ -1143,9 +1163,11 @@ function CADFloorPlan({ layout, roomType, style }) {
 /* ─── MAIN APP ─── */
 export default function App() {
   const [pg, setPg] = useState("home");
-  const [user, setUser] = useState(() => {
-    try { const u = localStorage.getItem("aura_user"); return u ? JSON.parse(u) : null; } catch { return null; }
-  });
+  const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null); // Supabase profile: { plan, stripe_customer_id, viz_count, viz_month, ... }
+  const [authLoading, setAuthLoading] = useState(true); // true until Supabase session check completes
+  const [confirmationPending, setConfirmationPending] = useState(false);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
   const [projects, setProjects] = useState(() => {
     try { const p = localStorage.getItem("aura_projects"); return p ? JSON.parse(p) : []; } catch { return []; }
   });
@@ -1183,19 +1205,7 @@ export default function App() {
   const [vizUrls, setVizUrls] = useState([]);
   const [vizSt, setVizSt] = useState("idle");
   const [vizErr, setVizErr] = useState("");
-  // Visualization usage tracking — { month: "2025-01", count: 3 }
-  const [vizUsage, setVizUsage] = useState(() => {
-    try {
-      const stored = localStorage.getItem("aura_viz_usage");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        const now = new Date();
-        const currentMonth = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
-        if (parsed.month === currentMonth) return parsed;
-      }
-      return { month: new Date().getFullYear() + "-" + String(new Date().getMonth() + 1).padStart(2, "0"), count: 0 };
-    } catch { return { month: new Date().getFullYear() + "-" + String(new Date().getMonth() + 1).padStart(2, "0"), count: 0 }; }
-  });
+  // Viz tracking now comes from Supabase profile (server-side truth)
   const [cadFile, setCadFile] = useState(null);
   const [cadAnalysis, setCadAnalysis] = useState(null);
   const [cadLoading, setCadLoading] = useState(false);
@@ -1225,10 +1235,7 @@ export default function App() {
   const homeVizImg = "/viz-room.jpg";
   const PAGE_SIZE = 40;
 
-  // Persist user, projects, and selection to localStorage
-  useEffect(() => {
-    try { if (user) localStorage.setItem("aura_user", JSON.stringify(user)); else localStorage.removeItem("aura_user"); } catch {}
-  }, [user]);
+  // Persist projects, selection, and preferences to localStorage
   useEffect(() => {
     try { localStorage.setItem("aura_projects", JSON.stringify(projects)); } catch {}
   }, [projects]);
@@ -1244,13 +1251,77 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem("aura_activeProject", JSON.stringify(activeProjectId)); } catch {}
   }, [activeProjectId]);
-  useEffect(() => {
-    try { localStorage.setItem("aura_viz_usage", JSON.stringify(vizUsage)); } catch {}
-  }, [vizUsage]);
 
-  // Viz limits: free = 1/month, pro = 100/month
-  const vizLimit = user?.plan === "pro" ? 100 : 1;
-  const vizRemaining = Math.max(0, vizLimit - vizUsage.count);
+  // ─── SUPABASE AUTH ───
+  const fetchProfile = async (userId) => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
+    if (data && !error) setProfile(data);
+  };
+
+  // Supabase auth state listener — handles session restore, login, logout, email confirm, password reset
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setUser({
+          id: session.user.id,
+          email: session.user.email,
+          name: session.user.user_metadata?.name || session.user.email.split("@")[0]
+        });
+        fetchProfile(session.user.id);
+      }
+      setAuthLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === "SIGNED_IN" && session?.user) {
+          setUser({
+            id: session.user.id,
+            email: session.user.email,
+            name: session.user.user_metadata?.name || session.user.email.split("@")[0]
+          });
+          fetchProfile(session.user.id);
+          setConfirmationPending(false);
+        } else if (event === "SIGNED_OUT") {
+          setUser(null);
+          setProfile(null);
+        } else if (event === "PASSWORD_RECOVERY") {
+          setPg("reset-password");
+        }
+        setAuthLoading(false);
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Handle Stripe checkout redirect (?checkout=success or ?checkout=cancel)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const checkoutResult = params.get("checkout");
+    if (checkoutResult === "success") {
+      setPg("success");
+      if (user?.id) {
+        setTimeout(() => fetchProfile(user.id), 2000);
+        setTimeout(() => fetchProfile(user.id), 5000);
+      }
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (checkoutResult === "cancel") {
+      setPg("pricing");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [user]);
+
+  // Plan and viz limits from Supabase profile (server-side source of truth)
+  const userPlan = profile?.plan || "free";
+  const currentMonth = new Date().getFullYear() + "-" + String(new Date().getMonth() + 1).padStart(2, "0");
+  const vizCount = (profile?.viz_month === currentMonth) ? (profile?.viz_count || 0) : 0;
+  const vizLimit = userPlan === "pro" ? 100 : 1;
+  const vizRemaining = Math.max(0, vizLimit - vizCount);
 
   // Auto-save active project every 8 seconds when state changes
   useEffect(() => {
@@ -1294,7 +1365,7 @@ export default function App() {
 
   // Auto-generate CAD layout for Pro users when selection changes
   useEffect(() => {
-    if (user?.plan === "pro" && sel.size > 0 && room) {
+    if (userPlan === "pro" && sel.size > 0 && room) {
       try {
         const items = DB.filter(p => sel.has(p.id));
         const expandedItems = items.flatMap(p => Array.from({ length: sel.get(p.id) || 1 }, (_, i) => ({ ...p, _qtyIdx: i })));
@@ -1426,13 +1497,13 @@ export default function App() {
   // Generate single room visualization — OpenRouter, concept card fallback
   const generateViz = async () => {
     if (selItems.length === 0) return;
-    // Check monthly viz limit
-    const now = new Date();
-    const currentMonth = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
-    const usage = vizUsage.month === currentMonth ? vizUsage : { month: currentMonth, count: 0 };
-    const limit = user?.plan === "pro" ? 100 : 1;
-    if (usage.count >= limit) {
-      setVizErr(user?.plan === "pro"
+    // Check viz limit (client-side pre-check — server enforces too)
+    if (!user) {
+      setVizErr("Please sign in to generate visualizations.");
+      return;
+    }
+    if (vizRemaining <= 0) {
+      setVizErr(userPlan === "pro"
         ? "You've used all 100 visualizations this month. Your limit resets next month."
         : "You've used your free visualization for this month. Upgrade to Pro for 100 visualizations per month!");
       return;
@@ -1468,10 +1539,11 @@ export default function App() {
         });
         visionContent.push({ type: "text", text: "An AI image generator CANNOT see these photos. Your text is its ONLY reference for what each product looks like. COLOR ACCURACY IS CRITICAL — look closely at each image.\n\nFor EACH product write this format on ONE line:\nPRODUCT [number]: shape=[rectangular/round/oval/L-shaped/curved/square], color=[EXACT hex-level color description — e.g. 'light warm sand beige' or 'deep charcoal grey' or 'rich cognac brown' — be very specific about the shade and tone], material=[material+texture e.g. 'nubby cream boucle' or 'smooth black metal'], legs=[style+color e.g. 'tapered walnut legs' or 'none/platform'], arms=[if sofa/chair: 'wide track arms' or 'rolled arms' or 'no arms'], details=[key distinguishing feature in <10 words]" });
 
+        const vizHeaders = await authHeaders();
         const visionResp = await Promise.race([
           fetch(AI_API, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: vizHeaders,
             body: JSON.stringify({
               action: "chat",
               messages: [{ role: "user", content: visionContent }],
@@ -1584,11 +1656,8 @@ export default function App() {
       } else if (imgUrl) {
         setVizUrls([{ url: imgUrl, label: "AI Visualization" }]);
         setVizSt("ok");
-        // Increment monthly usage counter
-        setVizUsage(prev => {
-          const cm = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
-          return prev.month === cm ? { month: cm, count: prev.count + 1 } : { month: cm, count: 1 };
-        });
+        // Refresh profile to get updated viz count from server
+        if (user?.id) fetchProfile(user.id);
         console.log("Viz: SUCCESS");
       } else {
         // Fallback concept card
@@ -1600,11 +1669,6 @@ export default function App() {
           products: items.slice(0, 4).map(p => p.n)
         }]);
         setVizSt("ok");
-        // Still counts as a use
-        setVizUsage(prev => {
-          const cm = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
-          return prev.month === cm ? { month: cm, count: prev.count + 1 } : { month: cm, count: 1 };
-        });
       }
     } catch (err) {
       console.error("Visualization error:", err);
@@ -1691,9 +1755,56 @@ export default function App() {
     setEditingProjectName(null);
   };
 
-  const doAuth = (mode, email, pass, name) => {
-    if (mode === "signup") { setUser({ email, name, plan: "free" }); go("home"); return null; }
-    setUser({ email, name: email.split("@")[0], plan: "free" }); go("home"); return null;
+  const doAuth = async (mode, email, pass, name) => {
+    if (mode === "signup") {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password: pass,
+        options: {
+          data: { name },
+          emailRedirectTo: window.location.origin
+        }
+      });
+      if (error) return error.message;
+      // If email confirmation is required, session is null until confirmed
+      if (data.user && !data.session) {
+        setConfirmationPending(true);
+        go("confirm");
+        return null;
+      }
+      // If email confirmation is disabled (dev), user is signed in immediately
+      return null;
+    }
+
+    if (mode === "signin") {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
+      if (error) {
+        if (error.message.includes("Email not confirmed")) {
+          return "Please confirm your email before signing in. Check your inbox.";
+        }
+        return error.message;
+      }
+      go("home");
+      return null;
+    }
+
+    if (mode === "forgot") {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin
+      });
+      if (error) return error.message;
+      setResetEmailSent(true);
+      return null;
+    }
+
+    if (mode === "reset") {
+      const { error } = await supabase.auth.updateUser({ password: pass });
+      if (error) return error.message;
+      go("home");
+      return null;
+    }
+
+    return "Unknown mode";
   };
 
   /* ─── AI CHAT ─── */
@@ -2070,7 +2181,7 @@ export default function App() {
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {[
                   ["Current User", user ? (user.name + " (" + user.email + ")") : "Not signed in"],
-                  ["Plan", user?.plan === "pro" ? "Pro" : "Free"],
+                  ["Plan", userPlan === "pro" ? "Pro" : "Free"],
                   ["Selected Room", sessionRoom],
                   ["Selected Style", sessionVibes],
                   ["Budget Filter", budgets.find(b => b[0] === bud)?.[1] || bud],
@@ -2082,7 +2193,7 @@ export default function App() {
                   ["Room Photo", roomPhoto ? "Uploaded" : "None"],
                   ["CAD File", cadFile ? cadFile.name : "None"],
                   ["Visualizations", vizUrls.length + " generated"],
-                  ["Viz Usage (month)", vizUsage.count + "/" + vizLimit + " (" + vizRemaining + " remaining)"],
+                  ["Viz Usage (month)", vizCount + "/" + vizLimit + " (" + vizRemaining + " remaining)"],
                   ["Chat Messages", msgs.length],
                   ["Mood Boards", boards ? boards.length + " generated" : "None"],
                 ].map(([k, v]) => (
@@ -2229,20 +2340,76 @@ export default function App() {
     );
   }
 
-  /* ─── AUTH PAGE ─── */
-  if (pg === "auth") {
-    const submit = async () => { if (!ae || !ap) { setAErr("Fill in all fields"); return; } if (authMode === "signup" && !an) { setAErr("Name required"); return; } setALd(true); setAErr(""); const e = doAuth(authMode, ae, ap, an); if (e) { setAErr(e); setALd(false); } };
+  /* ─── AUTH LOADING ─── */
+  if (authLoading) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ width: 32, height: 32, border: "2.5px solid #E8E0D8", borderTopColor: "#C17550", borderRadius: "50%", animation: "spin .8s linear infinite" }} />
+      </div>
+    );
+  }
+
+  /* ─── EMAIL CONFIRMATION PAGE ─── */
+  if (pg === "confirm") {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, background: "linear-gradient(160deg,#FDFCFA,#F0EBE4)" }}>
+        <div style={{ background: "#fff", borderRadius: 20, padding: "48px 40px", maxWidth: 400, width: "100%", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,.06)" }}>
+          <div style={{ width: 64, height: 64, borderRadius: "50%", background: "#C1755015", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px", fontSize: 28 }}>&#9993;</div>
+          <h2 style={{ fontFamily: "Georgia,serif", fontSize: 24, fontWeight: 400, marginBottom: 12 }}>Check your email</h2>
+          <p style={{ fontSize: 14, color: "#9B8B7B", lineHeight: 1.6, marginBottom: 24 }}>We sent a confirmation link to your email address. Click the link to activate your AURA account.</p>
+          <p style={{ fontSize: 12, color: "#B8A898" }}>Didn't receive it? Check your spam folder or <span onClick={() => { go("auth"); setAuthMode("signup"); }} style={{ color: "#C17550", cursor: "pointer" }}>try again</span>.</p>
+          <p style={{ textAlign: "center", marginTop: 20 }}><span onClick={() => { go("auth"); setAuthMode("signin"); }} style={{ fontSize: 13, color: "#C17550", cursor: "pointer", fontWeight: 600 }}>Already confirmed? Sign In</span></p>
+        </div>
+      </div>
+    );
+  }
+
+  /* ─── PASSWORD RESET PAGE ─── */
+  if (pg === "reset-password") {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, background: "linear-gradient(160deg,#FDFCFA,#F0EBE4)" }}>
         <div style={{ background: "#fff", borderRadius: 20, padding: "48px 40px", maxWidth: 400, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,.06)" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 4 }}><AuraLogo size={32} /><h1 style={{ fontFamily: "Georgia,serif", fontSize: 28, fontWeight: 400, margin: 0 }}>AURA</h1></div>
-          <p style={{ textAlign: "center", fontSize: 14, color: "#9B8B7B", marginBottom: 32 }}>{authMode === "signup" ? "Create account" : "Welcome back"}</p>
+          <p style={{ textAlign: "center", fontSize: 14, color: "#9B8B7B", marginBottom: 32 }}>Set your new password</p>
+          <input value={ap} onChange={(e) => setAp(e.target.value)} type="password" placeholder="New password (8+ characters)" onKeyDown={(e) => { if (e.key === "Enter") { if (!ap || ap.length < 8) { setAErr("Password must be at least 8 characters"); return; } setALd(true); setAErr(""); doAuth("reset", null, ap).then(e => { if (e) { setAErr(e); setALd(false); } }); }}} style={{ width: "100%", padding: "14px 16px", border: "1px solid #E8E0D8", borderRadius: 12, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 16 }} />
+          {aErr && <p style={{ color: "#C17550", fontSize: 13, textAlign: "center", marginBottom: 12 }}>{aErr}</p>}
+          <button onClick={async () => { if (!ap || ap.length < 8) { setAErr("Password must be at least 8 characters"); return; } setALd(true); setAErr(""); const e = await doAuth("reset", null, ap); if (e) { setAErr(e); setALd(false); } }} disabled={aLd} style={{ width: "100%", padding: "14px", background: "#C17550", color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: aLd ? 0.5 : 1 }}>{aLd ? "..." : "Update Password"}</button>
+        </div>
+      </div>
+    );
+  }
+
+  /* ─── AUTH PAGE ─── */
+  if (pg === "auth") {
+    const submit = async () => {
+      if (authMode === "forgot") {
+        if (!ae) { setAErr("Enter your email"); return; }
+        setALd(true); setAErr("");
+        const e = await doAuth("forgot", ae);
+        if (e) { setAErr(e); setALd(false); }
+        else setALd(false);
+        return;
+      }
+      if (!ae || !ap) { setAErr("Fill in all fields"); return; }
+      if (authMode === "signup" && !an) { setAErr("Name required"); return; }
+      if (authMode === "signup" && ap.length < 8) { setAErr("Password must be at least 8 characters"); return; }
+      setALd(true); setAErr("");
+      const e = await doAuth(authMode, ae, ap, an);
+      if (e) { setAErr(e); setALd(false); }
+    };
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, background: "linear-gradient(160deg,#FDFCFA,#F0EBE4)" }}>
+        <div style={{ background: "#fff", borderRadius: 20, padding: "48px 40px", maxWidth: 400, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,.06)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 4 }}><AuraLogo size={32} /><h1 style={{ fontFamily: "Georgia,serif", fontSize: 28, fontWeight: 400, margin: 0 }}>AURA</h1></div>
+          <p style={{ textAlign: "center", fontSize: 14, color: "#9B8B7B", marginBottom: 32 }}>{authMode === "signup" ? "Create account" : authMode === "forgot" ? "Reset password" : "Welcome back"}</p>
           {authMode === "signup" && <input value={an} onChange={(e) => setAn(e.target.value)} placeholder="Your name" style={{ width: "100%", padding: "14px 16px", border: "1px solid #E8E0D8", borderRadius: 12, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 12 }} />}
           <input value={ae} onChange={(e) => setAe(e.target.value)} type="email" placeholder="Email" style={{ width: "100%", padding: "14px 16px", border: "1px solid #E8E0D8", borderRadius: 12, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 12 }} />
-          <input value={ap} onChange={(e) => setAp(e.target.value)} type="password" placeholder="Password" onKeyDown={(e) => { if (e.key === "Enter") submit(); }} style={{ width: "100%", padding: "14px 16px", border: "1px solid #E8E0D8", borderRadius: 12, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 16 }} />
+          {authMode !== "forgot" && <input value={ap} onChange={(e) => setAp(e.target.value)} type="password" placeholder="Password" onKeyDown={(e) => { if (e.key === "Enter") submit(); }} style={{ width: "100%", padding: "14px 16px", border: "1px solid #E8E0D8", borderRadius: 12, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 16 }} />}
           {aErr && <p style={{ color: "#C17550", fontSize: 13, textAlign: "center", marginBottom: 12 }}>{aErr}</p>}
-          <button onClick={submit} disabled={aLd} style={{ width: "100%", padding: "14px", background: "#C17550", color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: aLd ? 0.5 : 1 }}>{aLd ? "..." : authMode === "signup" ? "Create Account" : "Sign In"}</button>
-          <p style={{ textAlign: "center", fontSize: 13, color: "#9B8B7B", marginTop: 20 }}>{authMode === "signup" ? "Have an account? " : "Need one? "}<span onClick={() => { setAuthMode(authMode === "signup" ? "signin" : "signup"); setAErr(""); }} style={{ color: "#C17550", cursor: "pointer", fontWeight: 600 }}>{authMode === "signup" ? "Sign In" : "Sign Up"}</span></p>
+          {resetEmailSent && authMode === "forgot" && <p style={{ color: "#5A8C5A", fontSize: 13, textAlign: "center", marginBottom: 12 }}>Reset link sent! Check your email.</p>}
+          <button onClick={submit} disabled={aLd} style={{ width: "100%", padding: "14px", background: "#C17550", color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: aLd ? 0.5 : 1 }}>{aLd ? "..." : authMode === "signup" ? "Create Account" : authMode === "forgot" ? "Send Reset Link" : "Sign In"}</button>
+          {authMode === "signin" && <p style={{ textAlign: "center", fontSize: 12, color: "#B8A898", marginTop: 12 }}><span onClick={() => { setAuthMode("forgot"); setAErr(""); setResetEmailSent(false); }} style={{ cursor: "pointer", textDecoration: "underline" }}>Forgot password?</span></p>}
+          <p style={{ textAlign: "center", fontSize: 13, color: "#9B8B7B", marginTop: 20 }}>{authMode === "signup" ? "Have an account? " : authMode === "forgot" ? "Remember it? " : "Need one? "}<span onClick={() => { setAuthMode(authMode === "signup" ? "signin" : authMode === "forgot" ? "signin" : "signup"); setAErr(""); setResetEmailSent(false); }} style={{ color: "#C17550", cursor: "pointer", fontWeight: 600 }}>{authMode === "signup" ? "Sign In" : authMode === "forgot" ? "Sign In" : "Sign Up"}</span></p>
           <p style={{ textAlign: "center", marginTop: 16 }}><span onClick={() => go("home")} style={{ fontSize: 12, color: "#B8A898", cursor: "pointer" }}>Back</span></p>
         </div>
       </div>
@@ -2267,7 +2434,21 @@ export default function App() {
               <p style={{ fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", color: "#C17550", marginBottom: 8 }}>Pro</p>
               <div style={{ fontFamily: "Georgia,serif", fontSize: 48, fontWeight: 400, marginBottom: 24 }}>$20<span style={{ fontSize: 16, color: "#B8A898" }}>/mo</span></div>
               {["Unlimited mood boards", "Full " + DB.length + " product catalog", "100 AI room visualizations/month", "CAD/PDF floor plan analysis", "AI-powered furniture layout plans", "Exact placement with dimensions", "Spatial fit verification", "Unlimited projects", "All 14 design styles"].map((f) => <p key={f} style={{ fontSize: 14, color: "#7A6B5B", padding: "10px 0", borderBottom: "1px solid #F5F0EB", margin: 0 }}>&#10003; {f}</p>)}
-              <button onClick={() => { setUser({ ...(user || { email: "demo", name: "Demo" }), plan: "pro" }); go("success"); }} style={{ width: "100%", marginTop: 24, padding: "14px", background: "#C17550", color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Subscribe - $20/mo</button>
+              <button onClick={async () => {
+                if (!user) { go("auth"); return; }
+                if (userPlan === "pro") return;
+                try {
+                  const { data: { session } } = await supabase.auth.getSession();
+                  if (!session) { go("auth"); return; }
+                  const resp = await fetch("/api/create-checkout", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token }
+                  });
+                  const result = await resp.json();
+                  if (result.url) window.location.href = result.url;
+                  else setAErr(result.error || "Failed to start checkout");
+                } catch (err) { console.error("Checkout error:", err); }
+              }} style={{ width: "100%", marginTop: 24, padding: "14px", background: userPlan === "pro" ? "#A89B8B" : "#C17550", color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: userPlan === "pro" ? "default" : "pointer", fontFamily: "inherit" }}>{userPlan === "pro" ? "Current Plan" : user ? "Subscribe - $20/mo" : "Sign In to Subscribe"}</button>
             </div>
           </div>
           <button onClick={() => go("home")} style={{ marginTop: 36, background: "none", border: "1px solid #E8E0D8", borderRadius: 12, padding: "12px 28px", fontSize: 13, color: "#9B8B7B", cursor: "pointer", fontFamily: "inherit" }}>Back</button>
@@ -2297,7 +2478,7 @@ export default function App() {
           <button onClick={() => go("home")} style={{ background: "none", border: "none", fontSize: 12, color: "#B8A898", cursor: "pointer", marginBottom: 24, fontFamily: "inherit" }}>Back</button>
           <h1 style={{ fontFamily: "Georgia,serif", fontSize: 32, fontWeight: 400, marginBottom: 4 }}>Hello, {user?.name || "Designer"}</h1>
           <p style={{ fontSize: 14, color: "#9B8B7B", marginBottom: 8 }}>{user?.email}</p>
-          <span style={{ display: "inline-block", background: user?.plan === "pro" ? "#C17550" : "#F0EBE4", color: user?.plan === "pro" ? "#fff" : "#9B8B7B", padding: "5px 14px", borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase" }}>{user?.plan === "pro" ? "Pro" : "Free"}</span>
+          <span style={{ display: "inline-block", background: userPlan === "pro" ? "#C17550" : "#F0EBE4", color: userPlan === "pro" ? "#fff" : "#9B8B7B", padding: "5px 14px", borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase" }}>{userPlan === "pro" ? "Pro" : "Free"}</span>
           <h2 style={{ fontFamily: "Georgia,serif", fontSize: 24, fontWeight: 400, marginTop: 40, marginBottom: 20, paddingTop: 20, borderTop: "1px solid #F0EBE4" }}>Projects ({projects.length})</h2>
           {projects.length === 0 ? <div style={{ background: "#fff", borderRadius: 16, padding: 48, textAlign: "center", color: "#B8A898" }}>No projects yet. Start designing!</div> : projects.map((pr) => (
             <div key={pr.id} style={{ background: "#fff", borderRadius: 14, border: activeProjectId === pr.id ? "2px solid #C17550" : "1px solid #F0EBE4", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", padding: "18px 22px" }}>
@@ -2311,9 +2492,39 @@ export default function App() {
               </div>
             </div>
           ))}
+          {/* Subscription Section */}
+          <h2 style={{ fontFamily: "Georgia,serif", fontSize: 24, fontWeight: 400, marginTop: 40, marginBottom: 20, paddingTop: 20, borderTop: "1px solid #F0EBE4" }}>Subscription</h2>
+          <div style={{ background: "#fff", borderRadius: 16, padding: "24px 28px", border: "1px solid #F0EBE4", marginBottom: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div>
+                <p style={{ fontSize: 16, fontWeight: 600, color: "#1A1815" }}>{userPlan === "pro" ? "Pro Plan" : "Free Plan"}</p>
+                <p style={{ fontSize: 13, color: "#9B8B7B", marginTop: 4 }}>{userPlan === "pro" ? "$20/month" : "$0/month"}</p>
+              </div>
+              <span style={{ background: userPlan === "pro" ? "#C17550" : "#F0EBE4", color: userPlan === "pro" ? "#fff" : "#9B8B7B", padding: "5px 14px", borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase" }}>{userPlan === "pro" ? "Active" : "Free"}</span>
+            </div>
+            <p style={{ fontSize: 13, color: "#7A6B5B" }}>Visualizations: {vizCount}/{vizLimit} used this month · {vizRemaining} remaining</p>
+            <div style={{ marginTop: 16 }}>
+              {userPlan === "pro" ? (
+                <button onClick={async () => {
+                  try {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    if (!session) return;
+                    const resp = await fetch("/api/create-portal", {
+                      method: "POST",
+                      headers: { "Authorization": "Bearer " + session.access_token }
+                    });
+                    const result = await resp.json();
+                    if (result.url) window.location.href = result.url;
+                  } catch (err) { console.error("Portal error:", err); }
+                }} style={{ background: "none", border: "1px solid #C17550", color: "#C17550", borderRadius: 12, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Manage Subscription</button>
+              ) : (
+                <button onClick={() => go("pricing")} style={{ background: "#C17550", color: "#fff", border: "none", borderRadius: 12, padding: "10px 24px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Upgrade to Pro</button>
+              )}
+            </div>
+          </div>
           <div style={{ display: "flex", gap: 10, marginTop: 32 }}>
             <button onClick={newProject} style={{ background: "#C17550", color: "#fff", border: "none", borderRadius: 12, padding: "14px 28px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>New Project</button>
-            <button onClick={() => { setUser(null); setProjects([]); go("home"); }} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 12, padding: "14px 28px", fontSize: 13, color: "#9B8B7B", cursor: "pointer", fontFamily: "inherit" }}>Sign Out</button>
+            <button onClick={async () => { await supabase.auth.signOut(); setUser(null); setProfile(null); setProjects([]); go("home"); }} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 12, padding: "14px 28px", fontSize: 13, color: "#9B8B7B", cursor: "pointer", fontFamily: "inherit" }}>Sign Out</button>
           </div>
         </div>
       </div>
@@ -3097,11 +3308,11 @@ export default function App() {
                           {vizRemaining > 0 ? (
                             <button onClick={generateViz} disabled={vizSt === "loading"} style={{ background: "#C17550", color: "#fff", border: "none", borderRadius: 10, padding: "14px 32px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: vizSt === "loading" ? 0.6 : 1, transition: "all .2s", boxShadow: "0 4px 16px rgba(193,117,80,.35)", letterSpacing: ".02em" }}>{vizSt === "loading" ? "Generating..." : "✦ Visualize Room"}</button>
                           ) : (
-                            <button onClick={() => go("pricing")} style={{ background: "#C17550", color: "#fff", border: "none", borderRadius: 10, padding: "14px 32px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 16px rgba(193,117,80,.35)", letterSpacing: ".02em" }}>{user?.plan === "pro" ? "Limit Reached" : "Upgrade to Pro"}</button>
+                            <button onClick={() => go("pricing")} style={{ background: "#C17550", color: "#fff", border: "none", borderRadius: 10, padding: "14px 32px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 16px rgba(193,117,80,.35)", letterSpacing: ".02em" }}>{userPlan === "pro" ? "Limit Reached" : "Upgrade to Pro"}</button>
                           )}
                           <button onClick={() => { setSel(new Map()); setVizUrls([]); setVizSt("idle"); setVizErr(""); setCadLayout(null); setDesignStep(1); }} style={{ background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.2)", borderRadius: 10, padding: "10px 18px", fontSize: 12, color: "rgba(255,255,255,.7)", cursor: "pointer", fontFamily: "inherit" }}>Clear all</button>
                         </div>
-                        <span style={{ fontSize: 11, color: vizRemaining <= 3 ? "#F0A080" : "rgba(255,255,255,.4)" }}>{vizUsage.count}/{vizLimit} used this month · {vizRemaining} remaining</span>
+                        <span style={{ fontSize: 11, color: vizRemaining <= 3 ? "#F0A080" : "rgba(255,255,255,.4)" }}>{vizCount}/{vizLimit} used this month · {vizRemaining} remaining</span>
                       </div>
                     </div>
                   </div>
@@ -3109,7 +3320,7 @@ export default function App() {
                   {/* Viz images — ABOVE floor plan */}
                   {vizErr && <div style={{ fontSize: 12, color: "#C17550", marginBottom: 16, background: "#FFF8F0", padding: "14px 18px", borderRadius: 10, border: "1px solid #F0D8C0", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
                     <span>{vizErr}</span>
-                    {vizRemaining <= 0 && user?.plan !== "pro" && <button onClick={() => go("pricing")} style={{ background: "#C17550", color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>Upgrade to Pro</button>}
+                    {vizRemaining <= 0 && userPlan !== "pro" && <button onClick={() => go("pricing")} style={{ background: "#C17550", color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>Upgrade to Pro</button>}
                   </div>}
                   <div ref={vizAreaRef}>
                   {vizSt === "loading" && (
@@ -3147,7 +3358,7 @@ export default function App() {
                   )}
 
                   {/* Pro CAD Layout — below viz */}
-                  {cadLayout && user?.plan === "pro" && (
+                  {cadLayout && userPlan === "pro" && (
                     <div style={{ marginBottom: 24 }}>
                       <CADFloorPlan layout={cadLayout} roomType={room || "Living Room"} style={vibe || "Modern"} />
                       <div style={{ marginTop: 12, padding: "14px 18px", background: "#F8F5F0", borderRadius: 12, border: "1px solid #E8E0D8" }}>

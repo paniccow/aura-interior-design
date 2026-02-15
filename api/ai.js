@@ -1,8 +1,34 @@
 // Vercel Serverless Function — proxies AI requests to OpenRouter
 // API key is stored as a Vercel environment variable (never exposed to client)
 
+import { createClient } from "@supabase/supabase-js";
+
 const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+
+// Supabase admin client for server-side auth verification
+const supabaseAdmin = (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)
+  ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY)
+  : null;
+
+// Verify user JWT and fetch profile (plan, viz usage)
+async function verifyUserAndPlan(req) {
+  if (!supabaseAdmin) return { user: null, profile: null, error: "Auth not configured" };
+  const token = req.headers.authorization?.replace("Bearer ", "");
+  if (!token) return { user: null, profile: null, error: "No auth token" };
+
+  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+  if (authError || !user) return { user: null, profile: null, error: "Invalid token" };
+
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError || !profile) return { user, profile: null, error: "Profile not found" };
+  return { user, profile, error: null };
+}
 
 // Allowed origins — only your domain and localhost for dev
 const ALLOWED_ORIGINS = [
@@ -67,7 +93,7 @@ export default async function handler(req, res) {
     res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGINS[0]);
   }
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.setHeader("Access-Control-Max-Age", "86400");
   // Security headers on API responses
   res.setHeader("X-Content-Type-Options", "nosniff");
@@ -108,6 +134,28 @@ export default async function handler(req, res) {
 
     // Action: "image" — image generation (with optional reference room photo + CAD + product images)
     if (action === "image") {
+      // ─── SERVER-SIDE VIZ LIMIT ENFORCEMENT ───
+      const { user: authUser, profile, error: authError } = await verifyUserAndPlan(req);
+      if (supabaseAdmin && (authError || !profile)) {
+        return res.status(401).json({ error: "Authentication required for image generation" });
+      }
+
+      if (profile) {
+        const now = new Date();
+        const currentMonth = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+        const vizLimit = profile.plan === "pro" ? 100 : 1;
+        const vizCount = (profile.viz_month === currentMonth) ? profile.viz_count : 0;
+
+        if (vizCount >= vizLimit) {
+          return res.status(403).json({
+            error: "viz_limit_reached",
+            message: profile.plan === "pro"
+              ? "You have used all 100 visualizations this month."
+              : "Free plan allows 1 visualization per month. Upgrade to Pro for 100/month."
+          });
+        }
+      }
+
       // Validate prompt length
       if (prompt && prompt.length > 10000) {
         return res.status(400).json({ error: "Prompt too long" });
@@ -213,18 +261,23 @@ export default async function handler(req, res) {
           const msg = data?.choices?.[0]?.message;
 
           // Check for images in multiple possible formats
-          if (msg?.images?.length > 0) {
-            return res.status(200).json(data);
-          }
+          const hasGeneratedImage = (
+            msg?.images?.length > 0 ||
+            (Array.isArray(msg?.content) && msg.content.some(b => b.type === "image_url" || b.type === "image")) ||
+            (typeof msg?.content === "string" && msg.content.startsWith("data:image"))
+          );
 
-          if (Array.isArray(msg?.content)) {
-            const hasImage = msg.content.some(b => b.type === "image_url" || b.type === "image");
-            if (hasImage) {
-              return res.status(200).json(data);
+          if (hasGeneratedImage) {
+            // Increment viz count in Supabase (server-side tracking)
+            if (supabaseAdmin && authUser && profile) {
+              const now = new Date();
+              const currentMonth = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+              const vizCount = (profile.viz_month === currentMonth) ? profile.viz_count : 0;
+              await supabaseAdmin.from("profiles").update({
+                viz_count: vizCount + 1,
+                viz_month: currentMonth
+              }).eq("id", authUser.id);
             }
-          }
-
-          if (typeof msg?.content === "string" && msg.content.startsWith("data:image")) {
             return res.status(200).json(data);
           }
         } catch (err) {
