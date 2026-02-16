@@ -778,6 +778,7 @@ export default function App() {
 
       const scored = uniqueDB.map((x) => {
         let s = 0;
+        const isApiProduct = x.id < 0; // API products have negative IDs
         // Room fit
         if (room && x.rm && x.rm.includes(room)) s += 5;
         // Style match (primary = strong, compatible = partial, clashing = penalty)
@@ -798,19 +799,32 @@ export default function App() {
           for (const rc of roomColors) {
             if (txt.includes(rc)) roomColorHits++;
           }
-          // Products matching room colors get a significant boost (they'll coordinate with existing room)
           s += roomColorHits * 3;
-          if (roomColorHits >= 2) s += 4; // Extra bonus for multiple room color matches
+          if (roomColorHits >= 2) s += 4;
         }
         // Category keyword match from user message
         const catKws: Record<string, string[]> = { sofa:["sofa","couch","sectional"], table:["table","desk","coffee","console","dining"], chair:["chair","seat","lounge","armchair"], stool:["stool","counter","bar"], light:["light","lamp","chandelier","pendant","sconce"], rug:["rug","carpet"], art:["art","painting","print"], accent:["ottoman","bench","mirror","cabinet","bed","dresser","pillow","vase"] };
         Object.entries(catKws).forEach(([cat, kws]) => { kws.forEach((w) => { if (m.includes(w) && x.c === cat) s += 6; }); });
         // Product name word match
         (x.n || "").toLowerCase().split(" ").forEach((w) => { if (w.length > 3 && m.includes(w)) s += 2; });
+        // API products are freshly searched and highly relevant to the query — give baseline boost
+        // (they lack v/rm tags but were found via contextual search, so they deserve a fair shot)
+        if (isApiProduct) s += 6;
         return { ...x, _s: s };
-      }).sort((a, b) => b._s - a._s).slice(0, 50);
+      }).sort((a, b) => b._s - a._s);
 
-      const catalogStr = scored.slice(0, 25).map((x) => "[ID:" + x.id + "] " + x.n + " by " + x.r + " $" + x.p + " (" + x.c + ")").join("\n");
+      // Build catalog for AI: mix of top DB products AND top API products (guaranteed representation)
+      const topDB = scored.filter(x => x.id >= 0).slice(0, 15);
+      const topAPI = scored.filter(x => x.id < 0).slice(0, 15);
+      // Interleave: ensures AI sees both curated + real-time products
+      const mixedCatalog: typeof scored = [];
+      const maxLen = Math.max(topDB.length, topAPI.length);
+      for (let i = 0; i < maxLen && mixedCatalog.length < 30; i++) {
+        if (i < topDB.length) mixedCatalog.push(topDB[i]);
+        if (i < topAPI.length) mixedCatalog.push(topAPI[i]);
+      }
+
+      const catalogStr = mixedCatalog.slice(0, 30).map((x) => "[ID:" + x.id + "] " + x.n + " by " + x.r + " $" + x.p + " (" + x.c + ")" + (x.id < 0 ? " [LIVE]" : "")).join("\n");
       const palette = (STYLE_PALETTES as Record<string, StylePalette>)[vibe as string] || {};
       const roomNeeds = (ROOM_NEEDS as Record<string, RoomNeed>)[room as string] || {};
 
@@ -822,7 +836,9 @@ export default function App() {
         ? "\n\nALREADY SELECTED BY USER (" + selItems.length + " items):\n" + selItems.map(p => "- " + p.n + " (" + p.c + ") by " + p.r + " — $" + p.p).join("\n")
         : "";
 
-      const sysPrompt = "You are AURA, an elite AI interior design consultant with access to over 100,000 products from hundreds of top retailers. You curate like a professional designer — every recommendation must feel COHESIVE, like a thoughtfully assembled collection, not random picks.\n\nCatalog (most relevant from 100k+ products):\n" + catalogStr +
+      const apiCount = mixedCatalog.filter(x => x.id < 0).length;
+      const sysPrompt = "You are AURA, an elite AI interior design consultant with access to over 100,000 products from hundreds of top retailers. You curate like a professional designer — every recommendation must feel COHESIVE, like a thoughtfully assembled collection, not random picks.\n\nCatalog (most relevant from 100k+ products — items marked [LIVE] are real-time results from retailers like Wayfair, West Elm, Target, Amazon, etc.):\n" + catalogStr +
+        (apiCount > 0 ? "\n\nIMPORTANT: Include a MIX of both curated and [LIVE] products in your recommendations. [LIVE] products are real, purchasable items found right now from major retailers. Use their [ID:N] references just like curated products." : "") +
         "\n\nContext: Room=" + (room || "any") + ", Style=" + (vibe || "any") +
         ", Budget=" + (bud === "all" ? "any" : bud) + (sqft ? ", ~" + sqft + " sq ft" : "") +
         (roomW && roomL ? ", Dimensions=" + roomW + "ft x " + roomL + "ft" : "") +
