@@ -776,57 +776,75 @@ export default function App() {
         }
       }
 
+      // Score all products with relevance + randomization for variety
       const scored = uniqueDB.map((x) => {
         let s = 0;
-        const isApiProduct = x.id < 0; // API products have negative IDs
+        const isApiProduct = x.id < 0;
         // Room fit
         if (room && x.rm && x.rm.includes(room)) s += 5;
-        // Style match (primary = strong, compatible = partial, clashing = penalty)
+        // Style match
         if (vibe && x.v && x.v.length > 0) {
           if (x.v.includes(vibe)) s += 8;
           else { let best = 0; for (const st of x.v) { best = Math.max(best, vibeCompat[st] || 0); } s += Math.round(best * 5); if (best < 0.4) s -= 3; }
         }
-        // Color & material harmony with chosen palette
+        // Color & material harmony
         if (vibePalette) {
           const txt = ((x.n || "") + " " + (x.pr || "")).toLowerCase();
           for (const c of vibePalette.colors) { if (txt.includes(c)) s += 2; }
           for (const mat of vibePalette.materials) { if (txt.includes(mat)) s += 3; }
         }
-        // Room color harmony — boost products that match the actual room's colors
+        // Room color harmony
         if (roomColors.length > 0) {
           const txt = ((x.n || "") + " " + (x.pr || "")).toLowerCase();
-          let roomColorHits = 0;
-          for (const rc of roomColors) {
-            if (txt.includes(rc)) roomColorHits++;
-          }
-          s += roomColorHits * 3;
-          if (roomColorHits >= 2) s += 4;
+          let hits = 0;
+          for (const rc of roomColors) { if (txt.includes(rc)) hits++; }
+          s += hits * 3;
+          if (hits >= 2) s += 4;
         }
         // Category keyword match from user message
-        const catKws: Record<string, string[]> = { sofa:["sofa","couch","sectional"], table:["table","desk","coffee","console","dining"], chair:["chair","seat","lounge","armchair"], stool:["stool","counter","bar"], light:["light","lamp","chandelier","pendant","sconce"], rug:["rug","carpet"], art:["art","painting","print"], accent:["ottoman","bench","mirror","cabinet","bed","dresser","pillow","vase"] };
+        const catKws: Record<string, string[]> = { sofa:["sofa","couch","sectional"], table:["table","desk","coffee","console","dining"], chair:["chair","seat","lounge","armchair"], bed:["bed","headboard","mattress"], stool:["stool","counter","bar"], light:["light","lamp","chandelier","pendant","sconce"], rug:["rug","carpet","runner"], art:["art","painting","print","canvas"], accent:["ottoman","bench","mirror","cabinet","dresser","pillow","vase","throw"], storage:["shelf","bookcase","cabinet","sideboard","credenza","dresser"] };
         Object.entries(catKws).forEach(([cat, kws]) => { kws.forEach((w) => { if (m.includes(w) && x.c === cat) s += 6; }); });
         // Product name word match
         (x.n || "").toLowerCase().split(" ").forEach((w) => { if (w.length > 3 && m.includes(w)) s += 2; });
-        // API products are freshly searched and highly relevant to the query — give baseline boost
-        // (they lack v/rm tags but were found via contextual search, so they deserve a fair shot)
+        // API products baseline boost
         if (isApiProduct) s += 6;
+        // SIGNIFICANT random noise so results VARY each time (not the same products every query)
+        s += Math.random() * 8;
         return { ...x, _s: s };
       }).sort((a, b) => b._s - a._s);
 
-      // Build catalog for AI: mix of top DB products AND top API products (guaranteed representation)
-      const topDB = scored.filter(x => x.id >= 0).slice(0, 15);
-      const topAPI = scored.filter(x => x.id < 0).slice(0, 15);
-      // Interleave: ensures AI sees both curated + real-time products
-      const mixedCatalog: typeof scored = [];
-      const maxLen = Math.max(topDB.length, topAPI.length);
-      for (let i = 0; i < maxLen && mixedCatalog.length < 30; i++) {
-        if (i < topDB.length) mixedCatalog.push(topDB[i]);
-        if (i < topAPI.length) mixedCatalog.push(topAPI[i]);
+      // ── BUILD CATALOG WITH GUARANTEED CATEGORY COVERAGE ──
+      // A living room MUST have sofas, tables, chairs, rugs, lighting, art in the catalog
+      // so the AI can recommend a complete room, not just 15 of one category.
+      const roomType = room || "Living Room";
+      const roomNeeds = (ROOM_NEEDS as Record<string, RoomNeed>)[roomType] || {};
+      const essentialCats = (roomNeeds as RoomNeed).essential || ["sofa"];
+      const recommendedCats = (roomNeeds as RoomNeed).recommended || ["table","chair","rug","light","art","accent"];
+      const allNeededCats = [...new Set([...essentialCats, ...recommendedCats])];
+
+      // Step 1: Pick best 2-3 products per needed category (from both DB and API)
+      const catalogPicks: (typeof scored[0])[] = [];
+      const pickedIds = new Set<number>();
+      for (const cat of allNeededCats) {
+        const catItems = scored.filter(x => x.c === cat && !pickedIds.has(x.id));
+        // Take top 2 from DB + top 2 from API for each category
+        const dbPicks = catItems.filter(x => x.id >= 0).slice(0, 2);
+        const apiPicks = catItems.filter(x => x.id < 0).slice(0, 2);
+        for (const p of [...dbPicks, ...apiPicks]) {
+          catalogPicks.push(p);
+          pickedIds.add(p.id);
+        }
+      }
+      // Step 2: Fill remaining slots with highest-scored products not yet picked
+      const remaining = scored.filter(x => !pickedIds.has(x.id));
+      for (const p of remaining) {
+        if (catalogPicks.length >= 35) break;
+        catalogPicks.push(p);
+        pickedIds.add(p.id);
       }
 
-      const catalogStr = mixedCatalog.slice(0, 30).map((x) => "[ID:" + x.id + "] " + x.n + " by " + x.r + " $" + x.p + " (" + x.c + ")" + (x.id < 0 ? " [LIVE]" : "")).join("\n");
+      const catalogStr = catalogPicks.slice(0, 35).map((x) => "[ID:" + x.id + "] " + x.n + " by " + x.r + " $" + x.p + " (" + x.c + ")" + (x.id < 0 ? " [LIVE]" : "")).join("\n");
       const palette = (STYLE_PALETTES as Record<string, StylePalette>)[vibe as string] || {};
-      const roomNeeds = (ROOM_NEEDS as Record<string, RoomNeed>)[room as string] || {};
 
       // Build furniture dimension reference for AI
       const furnDimStr = Object.entries(FURN_DIMS).map(([k, v]) => k + ": " + v.w + "ft W x " + v.d + "ft D").join(", ");
@@ -836,25 +854,36 @@ export default function App() {
         ? "\n\nALREADY SELECTED BY USER (" + selItems.length + " items):\n" + selItems.map(p => "- " + p.n + " (" + p.c + ") by " + p.r + " — $" + p.p).join("\n")
         : "";
 
-      const apiCount = mixedCatalog.filter(x => x.id < 0).length;
-      const sysPrompt = "You are AURA, an elite AI interior design consultant with access to over 100,000 products from hundreds of top retailers. You curate like a professional designer — every recommendation must feel COHESIVE, like a thoughtfully assembled collection, not random picks.\n\nCatalog (most relevant from 100k+ products — items marked [LIVE] are real-time results from retailers like Wayfair, West Elm, Target, Amazon, etc.):\n" + catalogStr +
-        (apiCount > 0 ? "\n\nIMPORTANT: Include a MIX of both curated and [LIVE] products in your recommendations. [LIVE] products are real, purchasable items found right now from major retailers. Use their [ID:N] references just like curated products." : "") +
+      // Build room essentials checklist for AI
+      const essentialStr = essentialCats.join(", ");
+      const recommendedStr = recommendedCats.join(", ");
+      const apiCount = catalogPicks.filter(x => x.id < 0).length;
+
+      const sysPrompt = "You are AURA, an elite AI interior design consultant with access to over 100,000 products from hundreds of top retailers. You curate like a professional designer — every recommendation must feel COHESIVE, like a thoughtfully assembled collection, not random picks.\n\nCatalog (most relevant from 100k+ products — items marked [LIVE] are real-time results from top retailers):\n" + catalogStr +
+        (apiCount > 0 ? "\n\nINCLUDE [LIVE] PRODUCTS: You MUST include at least 3-4 [LIVE] products in your recommendations. These are real, purchasable items found right now from major retailers. Reference them with [ID:N] just like curated products." : "") +
         "\n\nContext: Room=" + (room || "any") + ", Style=" + (vibe || "any") +
         ", Budget=" + (bud === "all" ? "any" : bud) + (sqft ? ", ~" + sqft + " sq ft" : "") +
         (roomW && roomL ? ", Dimensions=" + roomW + "ft x " + roomL + "ft" : "") +
         selProductStr +
-        "\n\nDESIGN PRINCIPLES (follow these like a professional designer):" +
-        "\n1. COLOR COHESION (60-30-10 rule): 60% dominant neutral/color, 30% secondary, 10% accent. All pieces should share a color temperature (warm OR cool, never random). Palette colors: " + (palette.colors || []).join(", ") +
-        (roomColors.length > 0 ? ". ROOM'S EXISTING COLORS (from photo): " + roomColors.join(", ") + " — products MUST complement these existing colors, not clash with them" : "") +
-        "\n2. MATERIAL HARMONY: Stick to 2-3 material families that complement each other. Mix textures (smooth+rough, matte+shiny) but keep undertones consistent. Palette materials: " + (palette.materials || []).join(", ") +
-        "\n3. STYLE COHERENCE (80/20 rule): 80% of pieces in the primary style, 20% can be a compatible accent style. Never mix clashing styles." +
-        "\n4. PRICE TIER CONSISTENCY: Splurge on anchor pieces (sofa, bed, dining table). Save on accessories (art, throws, candles). Don't pair a $15K sofa with a $20 side table — keep furniture within 3-5x price range of each other." +
-        "\n5. CATEGORY PRIORITY: Recommend Tier 1 essentials first (sofa/bed/table), then Tier 2 (chairs, rugs, lighting), then Tier 3 polish (art, accents, decor). A room without essentials is incomplete." +
-        "\n6. SPATIAL FIT: " + furnDimStr + ". A " + (sqft || "200") + " sqft room is roughly " + Math.round(Math.sqrt((parseInt(sqft) || 200) * 1.3)) + "ft x " + Math.round((parseInt(sqft) || 200) / Math.sqrt((parseInt(sqft) || 200) * 1.3)) + "ft. Verify each piece fits. Fill ~60% of floor space, leave 40% open for walkways." +
-        (cadAnalysis ? "\nFloor plan analysis: " + cadAnalysis.slice(0, 500) : "") +
-        (roomPhotoAnalysis ? "\nROOM PHOTO ANALYSIS: " + roomPhotoAnalysis : "") +
-        (roomNeeds.layout ? "\nLayout: " + roomNeeds.layout : "") +
-        "\n\nRULES: Write flowing paragraphs, NOT numbered lists. Bold product names with **name**. Reference as [ID:N]. Recommend up to 12 products. Warm editorial tone. EXPLAIN WHY pieces work together — mention shared colors, materials, or visual weight. Always describe the cohesive story of the room. If the user uploaded a room photo, reference what you see. Continue naturally, remembering everything discussed.";
+        "\n\nROOM COMPLETENESS (CRITICAL — follow this checklist):" +
+        "\nA " + (room || "living room") + " MUST include these essential categories: " + essentialStr + "." +
+        "\nIt SHOULD also include: " + recommendedStr + "." +
+        "\nYou MUST recommend at least ONE product from EACH essential category. Do NOT skip essentials." +
+        "\nFor a living room: sofa + coffee table + rug + lighting + accent chair + art/decor minimum." +
+        "\nFor a bedroom: bed + nightstands + lighting + rug + chair or bench minimum." +
+        "\nFor a dining room: dining table + chairs (4-6) + chandelier/pendant + rug minimum." +
+        "\nNEVER recommend 3+ items from the same category unless the user specifically asked for that." +
+        "\n\nDESIGN PRINCIPLES:" +
+        "\n1. COLOR COHESION (60-30-10): 60% dominant, 30% secondary, 10% accent. Palette colors: " + (palette.colors || []).join(", ") +
+        (roomColors.length > 0 ? ". ROOM'S EXISTING COLORS: " + roomColors.join(", ") + " — complement these" : "") +
+        "\n2. MATERIAL HARMONY: 2-3 material families. Palette materials: " + (palette.materials || []).join(", ") +
+        "\n3. STYLE COHERENCE: 80% primary style, 20% compatible accent." +
+        "\n4. PRICE TIERS: Splurge on anchor pieces (sofa, bed, dining table). Save on accessories." +
+        "\n5. SPATIAL FIT: " + furnDimStr + ". Room ~" + (sqft || "200") + " sqft. Fill ~60%, leave 40% for walkways." +
+        (cadAnalysis ? "\nFloor plan: " + cadAnalysis.slice(0, 500) : "") +
+        (roomPhotoAnalysis ? "\nROOM PHOTO: " + roomPhotoAnalysis : "") +
+        ((roomNeeds as RoomNeed).layout ? "\nLayout: " + (roomNeeds as RoomNeed).layout : "") +
+        "\n\nRULES: Write flowing paragraphs, NOT numbered lists. Bold product names with **name**. Reference as [ID:N]. Recommend 8-12 products covering ALL essential categories. Warm editorial tone. EXPLAIN WHY pieces work together. VARY your recommendations — don't repeat the same products every time.";
 
       const chatHistory = [{ role: "system", content: sysPrompt }];
       // Include full conversation history (last 12 messages) so AI remembers the room, preferences, and prior recommendations
@@ -892,7 +921,7 @@ export default function App() {
           }
         }
 
-        const cleanText = text.replace(/\[ID:\d+\]/g, "").trim();
+        const cleanText = text.replace(/\[ID:-?\d+\]/g, "").trim();
         setMsgs((prev) => [...prev, { role: "bot", text: cleanText, recs: apiRecs.length > 0 ? apiRecs : topPicks }]);
         aiWorked = true;
 
