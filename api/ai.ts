@@ -84,7 +84,8 @@ const ALLOWED_MODELS: string[] = [
 ];
 
 // Increase max duration for image generation (Pro plan: up to 300s, Hobby: 60s)
-export const maxDuration = 60;
+// Image generation with reference images can take 90-120s on Gemini
+export const maxDuration = 300;
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   // --- ORIGIN VALIDATION ---
@@ -237,7 +238,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         textInstruction += (hasRoomPhoto ? "Next" : "First") + " image: floor plan/CAD — use for furniture placement.\n";
       }
       if (imgUrls.length > 0) {
-        textInstruction += "Product photos follow (one per item, in order) — match each product's look.\n\n";
+        textInstruction += "The next " + imgUrls.length + " images are product reference photos (one per item, in order matching the numbered list below). You MUST replicate each product's EXACT appearance — same color, shape, material, proportions, and style. These are the specific products the user purchased.\n\n";
       }
       textInstruction += (prompt || "Generate a photorealistic interior design photograph of a modern room.");
 

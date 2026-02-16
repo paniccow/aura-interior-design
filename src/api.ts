@@ -74,7 +74,7 @@ export async function generateAIImage(prompt: string, referenceImage?: string | 
         headers,
         body: JSON.stringify({ action: "image", prompt, referenceImage: referenceImage || null, cadImage: cadImage || null, productImageUrls: productImageUrls || [] })
       }),
-      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 120000))
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 180000))
     ]);
 
     if (resp.ok) {

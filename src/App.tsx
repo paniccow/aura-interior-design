@@ -447,7 +447,7 @@ export default function App() {
               max_tokens: 3000
             })
           }),
-          new Promise<never>((_, rej) => setTimeout(() => rej(new Error("vision timeout")), 35000))
+          new Promise<never>((_, rej) => setTimeout(() => rej(new Error("vision timeout")), 60000))
         ]);
         if (visionResp.ok) {
           const visionData = await visionResp.json();
@@ -541,7 +541,7 @@ export default function App() {
       prompt += "\n\nCRITICAL RULES:";
       prompt += "\n- Render EXACTLY " + numItems + " furniture item" + (numItems > 1 ? "s" : "") + " — no more, no less. Each item appears exactly once unless a quantity is noted.";
       prompt += "\n- DO NOT add ANY furniture, decor, plants, vases, pillows, books, candles, or accessories that are not in the list above. The room should contain ONLY the listed items plus architectural elements (walls, floor, windows, ceiling).";
-      prompt += "\n- Match each item's EXACT color shade, shape, material, arm/leg style as described above. The product references show what each item looks like — replicate them faithfully.";
+      prompt += "\n- Match each item's EXACT color shade, shape, material, arm/leg style as described above. The product reference photos (provided as images) show EXACTLY what each item looks like — replicate their appearance as faithfully as possible. These are real products the user is purchasing.";
       prompt += "\n- " + roomNeeds.layout;
       prompt += "\nHigh resolution, eye-level, natural daylight, wide-angle, sharp detail, 4K quality, Architectural Digest editorial photography. No text or labels.";
 
