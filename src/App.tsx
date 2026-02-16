@@ -254,11 +254,11 @@ export default function App() {
     const b = promptBudget || bud;
     const sq = parseInt(promptSqft || sqft) || null;
     if (r && s) {
-      const newBoards = generateMoodBoards(r, s, b, sq, cadAnalysis);
+      const newBoards = generateMoodBoards(r, s, b, sq, cadAnalysis, roomPhotoAnalysis);
       setBoards(newBoards);
       setActiveBoard(0);
     }
-  }, [room, vibe, bud, sqft, cadAnalysis]);
+  }, [room, vibe, bud, sqft, cadAnalysis, roomPhotoAnalysis]);
 
   // Auto-generate CAD layout for Pro users when selection changes
   useEffect(() => {
@@ -710,17 +710,27 @@ export default function App() {
     setBusy(true);
     setMsgs((prev) => [...prev, { role: "user", text: msg, recs: [] }]);
 
-    // Search RapidAPI for products matching user's message (non-blocking, adds variety)
+    // Search RapidAPI for products matching user's context (room + style + message keywords)
     let apiProducts: Product[] = [];
     try {
-      const searchTerms = msg.toLowerCase().replace(/[^a-z0-9\s]/g, "").split(/\s+/).filter(w => w.length > 3);
+      const ml = msg.toLowerCase().replace(/[^a-z0-9\s]/g, "");
       const furnitureKws = ["sofa","couch","table","chair","desk","lamp","rug","bed","stool","light","art","shelf","cabinet","mirror","ottoman","bench","dresser","nightstand","chandelier","pendant","sconce","sectional","bookcase","sideboard","credenza","headboard","daybed","armchair","recliner","outdoor","patio"];
-      const matchedKws = searchTerms.filter(w => furnitureKws.some(fk => w.includes(fk) || fk.includes(w)));
-      const searchQuery = matchedKws.length > 0 ? matchedKws.join(" ") : (searchTerms.length > 1 ? searchTerms.slice(0, 3).join(" ") + " furniture" : "");
-      if (searchQuery) {
-        const result = await searchFeaturedProducts(searchQuery, 1);
+      const msgWords = ml.split(/\s+/).filter(w => w.length > 2);
+      const matchedFurn = msgWords.filter(w => furnitureKws.some(fk => w.includes(fk) || fk.includes(w)));
+      // Build a smart search query: furniture keywords + style + room context
+      const styleTerm = vibe ? (vibe as string).toLowerCase() : "";
+      const roomTerm = room ? (room as string).toLowerCase().replace("room", "").trim() : "";
+      let searchQuery = "";
+      if (matchedFurn.length > 0) {
+        // User mentioned specific furniture — search for that + style
+        searchQuery = (styleTerm ? styleTerm + " " : "") + matchedFurn.join(" ");
+      } else if (styleTerm || roomTerm) {
+        // No furniture keywords but we have room/style context — search broadly
+        searchQuery = (styleTerm ? styleTerm + " " : "") + (roomTerm ? roomTerm + " " : "") + "furniture decor";
+      }
+      if (searchQuery.trim()) {
+        const result = await searchFeaturedProducts(searchQuery.trim(), 1);
         apiProducts = result.products;
-        // Cache these products so they can be selected later
         if (apiProducts.length > 0) {
           setFeaturedCache(prev => {
             const next = new Map(prev);
@@ -745,6 +755,18 @@ export default function App() {
       const m = msg.toLowerCase();
       const vibeCompat = vibe ? ((STYLE_COMPAT as Record<string, Record<string, number>>)[vibe as string] || {}) : {};
       const vibePalette = vibe ? ((STYLE_PALETTES as Record<string, StylePalette>)[vibe as string]) : null;
+
+      // Extract room colors from photo analysis for product matching
+      const roomColors: string[] = [];
+      if (roomPhotoAnalysis) {
+        const rpa = roomPhotoAnalysis.toLowerCase();
+        // Common interior colors to look for in the analysis text
+        const allColors = ["white","cream","beige","ivory","gray","grey","charcoal","black","navy","blue","green","sage","olive","teal","brown","tan","taupe","walnut","oak","pine","mahogany","cherry","espresso","gold","brass","copper","bronze","silver","chrome","nickel","red","burgundy","coral","pink","blush","orange","terracotta","rust","yellow","mustard","sand","natural","warm","cool","light","dark","wood","stone","marble","concrete","brick"];
+        for (const c of allColors) {
+          if (rpa.includes(c)) roomColors.push(c);
+        }
+      }
+
       const scored = uniqueDB.map((x) => {
         let s = 0;
         // Room fit
@@ -759,6 +781,17 @@ export default function App() {
           const txt = ((x.n || "") + " " + (x.pr || "")).toLowerCase();
           for (const c of vibePalette.colors) { if (txt.includes(c)) s += 2; }
           for (const mat of vibePalette.materials) { if (txt.includes(mat)) s += 3; }
+        }
+        // Room color harmony — boost products that match the actual room's colors
+        if (roomColors.length > 0) {
+          const txt = ((x.n || "") + " " + (x.pr || "")).toLowerCase();
+          let roomColorHits = 0;
+          for (const rc of roomColors) {
+            if (txt.includes(rc)) roomColorHits++;
+          }
+          // Products matching room colors get a significant boost (they'll coordinate with existing room)
+          s += roomColorHits * 3;
+          if (roomColorHits >= 2) s += 4; // Extra bonus for multiple room color matches
         }
         // Category keyword match from user message
         const catKws: Record<string, string[]> = { sofa:["sofa","couch","sectional"], table:["table","desk","coffee","console","dining"], chair:["chair","seat","lounge","armchair"], stool:["stool","counter","bar"], light:["light","lamp","chandelier","pendant","sconce"], rug:["rug","carpet"], art:["art","painting","print"], accent:["ottoman","bench","mirror","cabinet","bed","dresser","pillow","vase"] };
@@ -787,6 +820,7 @@ export default function App() {
         selProductStr +
         "\n\nDESIGN PRINCIPLES (follow these like a professional designer):" +
         "\n1. COLOR COHESION (60-30-10 rule): 60% dominant neutral/color, 30% secondary, 10% accent. All pieces should share a color temperature (warm OR cool, never random). Palette colors: " + (palette.colors || []).join(", ") +
+        (roomColors.length > 0 ? ". ROOM'S EXISTING COLORS (from photo): " + roomColors.join(", ") + " — products MUST complement these existing colors, not clash with them" : "") +
         "\n2. MATERIAL HARMONY: Stick to 2-3 material families that complement each other. Mix textures (smooth+rough, matte+shiny) but keep undertones consistent. Palette materials: " + (palette.materials || []).join(", ") +
         "\n3. STYLE COHERENCE (80/20 rule): 80% of pieces in the primary style, 20% can be a compatible accent style. Never mix clashing styles." +
         "\n4. PRICE TIER CONSISTENCY: Splurge on anchor pieces (sofa, bed, dining table). Save on accessories (art, throws, candles). Don't pair a $15K sofa with a $20 side table — keep furniture within 3-5x price range of each other." +

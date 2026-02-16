@@ -207,8 +207,28 @@ function getRetailerTier(retailer: string): number {
   return 2; // Default to mid-tier for unknown
 }
 
+// Extract room colors from photo analysis text
+function extractRoomColors(analysis: string | null | undefined): string[] {
+  if (!analysis) return [];
+  const text = analysis.toLowerCase();
+  const allColors = [
+    "white","cream","beige","ivory","gray","grey","charcoal","black",
+    "navy","blue","green","sage","olive","teal",
+    "brown","tan","taupe","walnut","oak","pine","mahogany","cherry","espresso",
+    "gold","brass","copper","bronze","silver","chrome","nickel",
+    "red","burgundy","coral","pink","blush",
+    "orange","terracotta","rust","yellow","mustard","sand",
+    "natural","wood","stone","marble","concrete","brick"
+  ];
+  const found: string[] = [];
+  for (const c of allColors) {
+    if (text.includes(c)) found.push(c);
+  }
+  return found;
+}
+
 /* ─── COHESION-BASED DESIGN ENGINE ─── */
-export function buildDesignBoard(roomType: string, style: string, budgetKey: string, sqft: number | null, existingIds: number[], cadData?: string | null): DesignBoard {
+export function buildDesignBoard(roomType: string, style: string, budgetKey: string, sqft: number | null, existingIds: number[], cadData?: string | null, roomPhotoAnalysis?: string | null): DesignBoard {
   const palette = (STYLE_PALETTES as Record<string, StylePalette>)[style] || STYLE_PALETTES["Warm Modern"];
   const needs = (ROOM_NEEDS as Record<string, RoomNeed>)[roomType] || ROOM_NEEDS["Living Room"];
   const catTiers = (ROOM_CAT_TIERS as Record<string, Record<string, number>>)[roomType] || ROOM_CAT_TIERS["Living Room"];
@@ -229,6 +249,9 @@ export function buildDesignBoard(roomType: string, style: string, budgetKey: str
 
   // ─── PHASE 1: Score every product with design intelligence ───
   const styleCompat = (STYLE_COMPAT as Record<string, Record<string, number>>)[style] || {};
+
+  // Extract room colors from photo analysis for product color matching
+  const roomColors = extractRoomColors(roomPhotoAnalysis);
 
   const scored = DB.map((p) => {
     if (existing.has(p.id)) return null;
@@ -288,6 +311,33 @@ export function buildDesignBoard(roomType: string, style: string, budgetKey: str
 
     // ── KAA / designer-approved ──
     if (p.kaa) score += 8;
+
+    // ── Room photo color harmony — products matching actual room colors get priority ──
+    if (roomColors.length > 0) {
+      const productText = ((p.n || "") + " " + (p.pr || "")).toLowerCase();
+      let roomColorHits = 0;
+      for (const rc of roomColors) {
+        if (productText.includes(rc)) roomColorHits++;
+      }
+      // Each room color match = 5pts (complementing existing room is key)
+      score += roomColorHits * 5;
+      // Extra bonus for products deeply coordinated with the room (2+ matches)
+      if (roomColorHits >= 2) score += 8;
+      // Products matching the room's color temperature get additional boost
+      const productTemp = getProductTemp(p);
+      if (productTemp !== "neutral" && roomColors.length >= 2) {
+        // Determine room's dominant temperature from extracted colors
+        let roomWarm = 0, roomCool = 0;
+        for (const rc of roomColors) {
+          const ct = COLOR_TEMPS[rc];
+          if (ct === "warm") roomWarm++;
+          else if (ct === "cool") roomCool++;
+        }
+        const roomTemp = roomWarm > roomCool ? "warm" : roomCool > roomWarm ? "cool" : "neutral";
+        if (roomTemp !== "neutral" && productTemp === roomTemp) score += 6; // Same temperature family
+        else if (roomTemp !== "neutral" && productTemp !== roomTemp) score -= 3; // Conflicting temperature
+      }
+    }
 
     // ── Tiny random noise to break ties naturally ──
     score += Math.random() * 2;
@@ -411,10 +461,10 @@ export function buildDesignBoard(roomType: string, style: string, budgetKey: str
   };
 }
 
-export function generateMoodBoards(roomType: string, style: string, budgetKey: string, sqft: number | null, cadData?: string | null): MoodBoard[] {
-  const board1 = buildDesignBoard(roomType, style, budgetKey, sqft, [], cadData);
-  const board2 = buildDesignBoard(roomType, style, budgetKey, sqft, board1.items.map(p => p.id), cadData);
-  const board3 = buildDesignBoard(roomType, style, budgetKey, sqft, [...board1.items, ...board2.items].map(p => p.id), cadData);
+export function generateMoodBoards(roomType: string, style: string, budgetKey: string, sqft: number | null, cadData?: string | null, roomPhotoAnalysis?: string | null): MoodBoard[] {
+  const board1 = buildDesignBoard(roomType, style, budgetKey, sqft, [], cadData, roomPhotoAnalysis);
+  const board2 = buildDesignBoard(roomType, style, budgetKey, sqft, board1.items.map(p => p.id), cadData, roomPhotoAnalysis);
+  const board3 = buildDesignBoard(roomType, style, budgetKey, sqft, [...board1.items, ...board2.items].map(p => p.id), cadData, roomPhotoAnalysis);
 
   // For board 3, use a compatible secondary style for "Discovery"
   const styleCompat = (STYLE_COMPAT as Record<string, Record<string, number>>)[style] || {};
@@ -424,7 +474,7 @@ export function generateMoodBoards(roomType: string, style: string, budgetKey: s
   const discoveryStyle = compatStyles.length > 0 ? compatStyles[0][0] : style;
 
   const board3Alt = buildDesignBoard(roomType, discoveryStyle, budgetKey, sqft,
-    [...board1.items, ...board2.items].map(p => p.id), cadData);
+    [...board1.items, ...board2.items].map(p => p.id), cadData, roomPhotoAnalysis);
   // Use the better board between same-style board3 and alt-style board3Alt
   const finalBoard3 = board3Alt.items.length >= board3.items.length ? board3Alt : board3;
 
