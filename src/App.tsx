@@ -434,7 +434,7 @@ export default function App() {
           }
           visionContent.push({ type: "text", text: "Product " + (idx + 1) + ": \"" + (item.n || "") + "\" (" + item.c + ")" });
         });
-        visionContent.push({ type: "text", text: "An AI image generator CANNOT see these photos. Your text is its ONLY reference for what each product looks like. COLOR ACCURACY IS CRITICAL — look closely at each image.\n\nFor EACH product write this format on ONE line:\nPRODUCT [number]: shape=[rectangular/round/oval/L-shaped/curved/square], color=[EXACT hex-level color description — e.g. 'light warm sand beige' or 'deep charcoal grey' or 'rich cognac brown' — be very specific about the shade and tone], material=[material+texture e.g. 'nubby cream boucle' or 'smooth black metal'], legs=[style+color e.g. 'tapered walnut legs' or 'none/platform'], arms=[if sofa/chair: 'wide track arms' or 'rolled arms' or 'no arms'], details=[key distinguishing feature in <10 words]" });
+        visionContent.push({ type: "text", text: "An AI image generator CANNOT see these photos. Your text is its ONLY reference for what each product looks like. COLOR ACCURACY IS CRITICAL — look closely at each image.\n\nFor FURNITURE (sofas, chairs, tables, beds, lights, stools, accents) write on ONE line:\nPRODUCT [number]: shape=[rectangular/round/oval/L-shaped/curved/square], color=[EXACT hex-level color description — e.g. 'light warm sand beige' or 'deep charcoal grey' — be very specific], material=[material+texture e.g. 'nubby cream boucle'], legs=[style+color], arms=[if applicable], details=[key feature in <10 words]\n\nFor RUGS write on ONE line (DIFFERENT format — rugs need pattern and multiple colors):\nPRODUCT [number]: shape=[rectangular/round/runner], dominant_color=[THE main background/field color — e.g. 'warm oatmeal cream' or 'deep navy blue'], accent_colors=[secondary colors in the pattern — e.g. 'rust, ivory, sage'], pattern=[solid/geometric/abstract/floral/medallion/moroccan/striped/trellis/distressed/textured-solid], texture=[flatweave/hand-knotted/shag/tufted/looped/woven/jute], details=[key visual feature in <10 words]\n\nRUG COLOR IS THE #1 PRIORITY — the rug is a huge visual element. Describe its colors with extreme precision." });
 
         const vizHeaders = await authHeaders();
         const visionResp = await Promise.race([
@@ -486,16 +486,39 @@ export default function App() {
         if (!aiDesc) {
           const colors = extractKw(fullText, COLOR_WORDS);
           const mats = extractKw(fullText, MAT_WORDS);
-          let shape = item.c;
-          if (name.includes("round") || name.includes("circular")) shape = "round " + item.c;
-          else if (name.includes("oval")) shape = "oval " + item.c;
-          else if (name.includes("sectional") || name.includes("l-shaped")) shape = "L-shaped " + item.c;
-          aiDesc = "shape=" + shape;
-          if (colors.length > 0) aiDesc += ", color=" + colors.slice(0, 3).join("/");
-          if (mats.length > 0) aiDesc += ", material=" + mats.slice(0, 2).join("/");
+
+          if (item.c === "rug") {
+            // Rug-specific fallback — pattern, texture, and colors matter most
+            const RUG_PATTERNS = ["geometric","abstract","floral","medallion","moroccan","striped","trellis","distressed","solid","textured","herringbone","chevron","diamond","plaid","damask","ikat","kilim","oriental"];
+            const RUG_TEXTURES = ["flatweave","hand-knotted","shag","tufted","looped","woven","jute","hand-loomed","handwoven","braided","sisal","hemp"];
+            const patterns = extractKw(fullText, RUG_PATTERNS);
+            const textures = extractKw(fullText, RUG_TEXTURES);
+            let shape = "rectangular";
+            if (name.includes("round") || name.includes("circular")) shape = "round";
+            else if (name.includes("runner")) shape = "runner";
+            aiDesc = "shape=" + shape;
+            if (colors.length > 0) aiDesc += ", dominant_color=" + colors[0] + (colors.length > 1 ? ", accent_colors=" + colors.slice(1, 4).join("/") : "");
+            if (patterns.length > 0) aiDesc += ", pattern=" + patterns[0];
+            else aiDesc += ", pattern=textured-solid";
+            if (textures.length > 0) aiDesc += ", texture=" + textures[0];
+            else if (mats.length > 0) aiDesc += ", texture=" + mats[0];
+          } else {
+            // Standard furniture fallback
+            let shape = item.c;
+            if (name.includes("round") || name.includes("circular")) shape = "round " + item.c;
+            else if (name.includes("oval")) shape = "oval " + item.c;
+            else if (name.includes("sectional") || name.includes("l-shaped")) shape = "L-shaped " + item.c;
+            aiDesc = "shape=" + shape;
+            if (colors.length > 0) aiDesc += ", color=" + colors.slice(0, 3).join("/");
+            if (mats.length > 0) aiDesc += ", material=" + mats.slice(0, 2).join("/");
+          }
         }
 
-        let spec = (idx + 1) + ". " + (item.n || "Unknown") + " (" + Math.round(dims.w * 12) + '"W × ' + Math.round(dims.d * 12) + '"D): ' + aiDesc;
+        // Rugs use feet (e.g. 8'×10'), furniture uses inches (e.g. 84"W × 36"D)
+        const dimStr = item.c === "rug"
+          ? Math.round(dims.w) + "'" + " × " + Math.round(dims.d) + "'"
+          : Math.round(dims.w * 12) + '"W × ' + Math.round(dims.d * 12) + '"D';
+        let spec = (idx + 1) + ". " + (item.n || "Unknown") + " (" + dimStr + "): " + aiDesc;
         if (qty > 1) spec += " [×" + qty + "]";
         return spec;
       }).join("\n");
@@ -542,6 +565,13 @@ export default function App() {
       prompt += "\n- Render EXACTLY " + numItems + " furniture item" + (numItems > 1 ? "s" : "") + " — no more, no less. Each item appears exactly once unless a quantity is noted.";
       prompt += "\n- DO NOT add ANY furniture, decor, plants, vases, pillows, books, candles, or accessories that are not in the list above. The room should contain ONLY the listed items plus architectural elements (walls, floor, windows, ceiling).";
       prompt += "\n- Match each item's EXACT color shade, shape, material, arm/leg style as described above. The product reference photos (provided as images) show EXACTLY what each item looks like — replicate their appearance as faithfully as possible. These are real products the user is purchasing.";
+
+      // Rug-specific color accuracy rule — rugs are large visual elements and color must be exact
+      const hasRug = items.slice(0, 17).some(i => i.c === "rug");
+      if (hasRug) {
+        prompt += "\n- RUG COLOR ACCURACY IS CRITICAL: The area rug is one of the largest visible surfaces in the room. Its dominant_color and accent_colors MUST match the description exactly. A cream/oatmeal rug must NOT appear grey or white. A navy rug must NOT appear black or blue-grey. Match the rug's pattern (geometric, solid, moroccan, etc.) and texture precisely. The rug reference photo shows the exact product — replicate its colors faithfully.";
+      }
+
       prompt += "\n- " + roomNeeds.layout;
       prompt += "\nHigh resolution, eye-level, natural daylight, wide-angle, sharp detail, 4K quality, Architectural Digest editorial photography. No text or labels.";
 
