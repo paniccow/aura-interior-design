@@ -244,7 +244,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       // Build concise text instruction labeling each image
       let textInstruction = "";
       if (hasRoomPhoto) {
-        textInstruction += "First image: the user's actual room. Place furniture into this exact room.\n";
+        textInstruction += "CRITICAL — First image: the user's ACTUAL room photo. You MUST use this exact room as the setting. Keep the same walls, floor, windows, ceiling, and lighting. Place the listed furniture INTO this room. Do NOT generate a different room.\n";
       }
       if (hasCadImage) {
         textInstruction += (hasRoomPhoto ? "Next" : "First") + " image: floor plan/CAD — use for furniture placement.\n";

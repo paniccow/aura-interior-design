@@ -568,11 +568,12 @@ export default function App() {
 
       // Room context
       if (hasRoomRef) {
-        prompt += "Place furniture into the provided room photo. Keep the room exactly as-is — same walls, floor, windows, lighting.";
+        prompt += "IMPORTANT: The FIRST image provided is a photo of the user's ACTUAL room. You MUST use this room as the setting — keep the exact same walls, flooring, windows, ceiling, lighting, and architectural details. Place the listed furniture items INTO this real room. Do NOT generate a different room — edit/composite the furniture into the provided room photo.";
         // Include the full room analysis so AI knows what it's looking at
         if (roomPhotoAnalysis) {
-          prompt += "\nRoom details: " + roomPhotoAnalysis.slice(0, 500);
+          prompt += "\nRoom analysis: " + roomPhotoAnalysis.slice(0, 500);
         }
+        prompt += "\nStyle direction: " + styleName + ". " + colorStr + " palette.";
       } else {
         prompt += "Photorealistic interior photo of a " + styleName + " " + roomName + ". " + colorStr + " palette. " + matStr + " materials.";
       }
@@ -815,7 +816,7 @@ export default function App() {
           });
         }
       }
-    } catch (_e) { /* API search is best-effort */ }
+    } catch (e) { console.log("API product search failed:", (e as Error)?.message || e); }
 
     const combinedDB = [...DB, ...apiProducts, ...Array.from(featuredCache.values())];
     // Deduplicate by id
@@ -873,8 +874,10 @@ export default function App() {
         Object.entries(catKws).forEach(([cat, kws]) => { kws.forEach((w) => { if (m.includes(w) && x.c === cat) s += 6; }); });
         // Product name word match
         (x.n || "").toLowerCase().split(" ").forEach((w) => { if (w.length > 3 && m.includes(w)) s += 2; });
-        // API products baseline boost
-        if (isApiProduct) s += 6;
+        // API products baseline boost — compensates for empty v[]/rm[] arrays
+        // Curated products can score +5 (room) +8 (style) +material bonuses = ~18+
+        // API products need a strong boost to compete and actually appear in results
+        if (isApiProduct) s += 12;
         // Moderate random noise — enough variety without breaking cohesion
         s += Math.random() * 4;
         return { ...x, _s: s };
@@ -1024,8 +1027,10 @@ export default function App() {
 
         // Step 3: If AI didn't include enough API products, inject top-scored ones
         // This guarantees real purchasable items always appear in recommendations
+        // Check both current apiProducts AND featuredCache (persists across messages)
         const apiInRecs = aiRecs.filter(p => p.id < 0).length;
-        if (apiProducts.length > 0 && apiInRecs < 2) {
+        const hasAnyApiProducts = apiProducts.length > 0 || catalogPicks.some(x => x.id < 0);
+        if (hasAnyApiProducts && apiInRecs < 2) {
           const topApiForRoom = catalogPicks.filter(x => x.id < 0 && !foundIds.has(x.id)).slice(0, 4 - apiInRecs);
           for (const ap of topApiForRoom) {
             aiRecs.push(ap);
