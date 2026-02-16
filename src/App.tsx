@@ -778,66 +778,40 @@ export default function App() {
     setBusy(true);
     setMsgs((prev) => [...prev, { role: "user", text: msg, recs: [] }]);
 
-    // ALWAYS search RapidAPI for products — builds a smart query from message + context
-    let apiProducts: Product[] = [];
-    try {
+    // Build API search query from message + context (non-blocking — fires in parallel with AI)
+    const buildApiQuery = (): string => {
       const ml = msg.toLowerCase().replace(/[^a-z0-9\s]/g, "");
       const furnitureKws = ["sofa","couch","table","chair","desk","lamp","rug","bed","stool","light","art","shelf","cabinet","mirror","ottoman","bench","dresser","nightstand","chandelier","pendant","sconce","sectional","bookcase","sideboard","credenza","headboard","daybed","armchair","recliner","outdoor","patio","furniture","decor","pillow","throw","blanket","vase","planter","bookshelf","wardrobe","mattress"];
       const designKws = ["modern","contemporary","rustic","bohemian","minimalist","scandinavian","industrial","coastal","farmhouse","luxury","elegant","mid-century","japandi","traditional","vintage","retro","wood","leather","velvet","marble","brass","gold","white","black","gray","beige","blue","green","natural"];
       const msgWords = ml.split(/\s+/).filter(w => w.length > 2);
       const matchedFurn = msgWords.filter(w => furnitureKws.some(fk => w.includes(fk) || fk.includes(w)));
       const matchedDesign = msgWords.filter(w => designKws.some(dk => w === dk));
-      // Build search query with multiple fallback layers
       const styleTerm = vibe ? (vibe as string).toLowerCase() : "";
       const roomTerm = room ? (room as string).toLowerCase().replace("room", "").trim() : "";
-      let searchQuery = "";
-      if (matchedFurn.length > 0) {
-        // User mentioned specific furniture — search for that + style context
-        searchQuery = (styleTerm ? styleTerm + " " : "") + matchedFurn.join(" ");
-      } else if (matchedDesign.length > 0) {
-        // User mentioned design/style/material terms — use those
-        searchQuery = matchedDesign.slice(0, 3).join(" ") + " furniture";
-      } else if (styleTerm || roomTerm) {
-        // Have room/style context from selections — search broadly
-        searchQuery = (styleTerm ? styleTerm + " " : "") + (roomTerm ? roomTerm + " " : "") + "furniture decor";
-      } else {
-        // Ultimate fallback — ALWAYS search, use meaningful words from message
-        const meaningful = msgWords.filter(w => !["the","and","for","can","you","help","find","want","need","some","please","show","get","look","any","with","that","this","what","how","about"].includes(w));
-        searchQuery = meaningful.length > 0 ? meaningful.slice(0, 3).join(" ") + " furniture" : "home furniture decor";
-      }
-      if (searchQuery.trim()) {
-        console.log("[AURA] API search query:", searchQuery.trim());
-        const result = await searchFeaturedProducts(searchQuery.trim(), 1);
-        apiProducts = result.products;
-        console.log("[AURA] API search returned:", apiProducts.length, "products");
-        // If specific query returned nothing, try a broader fallback
-        if (apiProducts.length === 0) {
-          const roomTerm = room ? (room as string).toLowerCase().replace("room", "").trim() : "";
-          const fallbackQuery = (roomTerm || "living") + " furniture decor";
-          console.log("[AURA] API search fallback query:", fallbackQuery);
-          const fallbackResult = await searchFeaturedProducts(fallbackQuery, 1);
-          apiProducts = fallbackResult.products;
-          console.log("[AURA] API fallback returned:", apiProducts.length, "products");
-        }
-        if (apiProducts.length > 0) {
-          setFeaturedCache(prev => {
-            const next = new Map(prev);
-            for (const p of apiProducts) next.set(p.id, p);
-            return next;
-          });
-        }
-      }
-    } catch (e) { console.log("[AURA] API product search failed:", (e as Error)?.message || e); }
+      if (matchedFurn.length > 0) return (styleTerm ? styleTerm + " " : "") + matchedFurn.join(" ");
+      if (matchedDesign.length > 0) return matchedDesign.slice(0, 3).join(" ") + " furniture";
+      if (styleTerm || roomTerm) return (styleTerm ? styleTerm + " " : "") + (roomTerm ? roomTerm + " " : "") + "furniture decor";
+      const meaningful = msgWords.filter(w => !["the","and","for","can","you","help","find","want","need","some","please","show","get","look","any","with","that","this","what","how","about"].includes(w));
+      return meaningful.length > 0 ? meaningful.slice(0, 3).join(" ") + " furniture" : "home furniture decor";
+    };
 
-    // Also pull any previously cached API products from Featured tab
+    // Fire API search in background — don't block the AI call
+    const apiSearchQuery = buildApiQuery().trim();
+    console.log("[AURA] API search query:", apiSearchQuery);
+    const apiSearchPromise = apiSearchQuery
+      ? searchFeaturedProducts(apiSearchQuery, 1).catch((e) => {
+          console.log("[AURA] API search failed:", (e as Error)?.message);
+          return { products: [] as Product[], total: 0, retailers: [] as string[], query: apiSearchQuery, page: 1 };
+        })
+      : Promise.resolve({ products: [] as Product[], total: 0, retailers: [] as string[], query: "", page: 1 });
+
+    // Use already-cached API products from previous searches + Featured tab for immediate use
     const cachedApiProducts = Array.from(featuredCache.values());
-    console.log("[AURA] Cached API products:", cachedApiProducts.length, "| Fresh API products:", apiProducts.length);
+    console.log("[AURA] Cached API products available:", cachedApiProducts.length);
 
-    const combinedDB = [...DB, ...apiProducts, ...cachedApiProducts];
-    // Deduplicate by id
+    const combinedDB = [...DB, ...cachedApiProducts];
     const seen = new Set<number>();
     const uniqueDB = combinedDB.filter(p => { if (seen.has(p.id)) return false; seen.add(p.id); return true; });
-    console.log("[AURA] uniqueDB size:", uniqueDB.length, "| API products in uniqueDB:", uniqueDB.filter(p => p.id < 0).length);
 
     let recs = [];
     try { recs = localMatch(msg); } catch (_e) { recs = DB.slice(0, 12); }
@@ -1048,43 +1022,77 @@ export default function App() {
           if (match) { aiRecs.push(match); foundIds.add(match.id); }
         }
 
-        // Step 3: ALWAYS inject API products — don't rely on the AI to reference them
-        // The AI model rarely uses [ID:-N] for API products, so we must force them in
+        // Step 3: ALWAYS inject fresh API products — the AI never references them
+        // Await the API search that was fired in parallel with the AI chat
+        let freshApiProducts: Product[] = [];
+        try {
+          const apiResult = await apiSearchPromise;
+          freshApiProducts = apiResult.products || [];
+          console.log("[AURA] API search completed:", freshApiProducts.length, "products");
+          // Cache them for future use
+          if (freshApiProducts.length > 0) {
+            setFeaturedCache(prev => {
+              const next = new Map(prev);
+              for (const p of freshApiProducts) next.set(p.id, p);
+              return next;
+            });
+          }
+        } catch (e) { console.log("[AURA] API search await failed:", e); }
+
+        // Combine fresh API products with any cached ones, dedup
+        const allApiPool = [...freshApiProducts, ...cachedApiProducts];
+        const apiSeen = new Set<number>();
+        const uniqueApiPool = allApiPool.filter(p => { if (apiSeen.has(p.id)) return false; apiSeen.add(p.id); return true; });
+        console.log("[AURA] Total API product pool:", uniqueApiPool.length, "(fresh:", freshApiProducts.length, "cached:", cachedApiProducts.length, ")");
+
+        // Score API products for relevance to current context
+        const m2 = msg.toLowerCase();
+        const scoredApi = uniqueApiPool.map(p => {
+          let s = 0;
+          const pn = (p.n || "").toLowerCase();
+          const pr = (p.pr || "").toLowerCase();
+          // Category match from user message
+          const catKws2: Record<string, string[]> = { sofa:["sofa","couch","sectional"], table:["table","desk","coffee","console","dining"], chair:["chair","seat","lounge","armchair"], bed:["bed","headboard","mattress"], stool:["stool","counter","bar"], light:["light","lamp","chandelier","pendant","sconce"], rug:["rug","carpet","runner"], art:["art","painting","print","canvas"], accent:["ottoman","bench","mirror","cabinet","dresser","pillow","vase","throw"], storage:["shelf","bookcase","cabinet","sideboard","credenza","dresser"] };
+          Object.entries(catKws2).forEach(([cat, kws]) => { kws.forEach(w => { if (m2.includes(w) && p.c === cat) s += 6; }); });
+          // Name word overlap
+          pn.split(" ").forEach(w => { if (w.length > 3 && m2.includes(w)) s += 2; });
+          // Style/palette match
+          if (vibePalette) {
+            for (const c of vibePalette.colors) { if (pn.includes(c) || pr.includes(c)) s += 2; }
+            for (const mat of vibePalette.materials) { if (pn.includes(mat) || pr.includes(mat)) s += 3; }
+          }
+          s += Math.random() * 2;
+          return { ...p, _s: s };
+        }).sort((a, b) => b._s - a._s);
+
+        // Always inject 3-4 API products, picking diverse categories
         const apiInRecs = aiRecs.filter(p => p.id < 0).length;
-        console.log("[AURA] AI referenced", aiRecs.length, "products total,", apiInRecs, "from API");
+        const targetApi = Math.max(3, Math.min(4, Math.ceil((aiRecs.length + 3) * 0.35)));
+        const neededApi = Math.max(0, targetApi - apiInRecs);
+        console.log("[AURA] API in recs so far:", apiInRecs, "| Need to inject:", neededApi);
 
-        // Get all available API products from multiple sources, best-scored first
-        const allApiAvailable = [
-          ...catalogPicks.filter(x => x.id < 0 && !foundIds.has(x.id)),
-          ...scored.filter(x => x.id < 0 && !foundIds.has(x.id) && !catalogPicks.some(cp => cp.id === x.id))
-        ];
-        console.log("[AURA] Available API products for injection:", allApiAvailable.length);
-
-        // Always inject enough to reach at least 3 API products
-        const targetApiCount = Math.max(3, Math.min(4, Math.ceil(aiRecs.length * 0.4)));
-        const neededApi = Math.max(0, targetApiCount - apiInRecs);
-        if (neededApi > 0 && allApiAvailable.length > 0) {
-          // Try to pick diverse categories
-          const usedCats = new Set(aiRecs.filter(p => p.id < 0).map(p => p.c));
-          const diverseApi: typeof allApiAvailable = [];
-          // First pass: pick from categories not yet represented
-          for (const ap of allApiAvailable) {
-            if (diverseApi.length >= neededApi) break;
-            if (!usedCats.has(ap.c)) { diverseApi.push(ap); usedCats.add(ap.c); }
+        if (neededApi > 0 && scoredApi.length > 0) {
+          const usedCats = new Set(aiRecs.map(p => p.c));
+          const injected: Product[] = [];
+          // First pass: diverse categories not already in recs
+          for (const ap of scoredApi) {
+            if (injected.length >= neededApi) break;
+            if (!foundIds.has(ap.id) && !usedCats.has(ap.c)) {
+              injected.push(ap); foundIds.add(ap.id); usedCats.add(ap.c);
+            }
           }
-          // Second pass: fill remaining from any category
-          for (const ap of allApiAvailable) {
-            if (diverseApi.length >= neededApi) break;
-            if (!diverseApi.some(d => d.id === ap.id)) diverseApi.push(ap);
+          // Second pass: fill remaining slots from any category
+          for (const ap of scoredApi) {
+            if (injected.length >= neededApi) break;
+            if (!foundIds.has(ap.id)) {
+              injected.push(ap); foundIds.add(ap.id);
+            }
           }
-          for (const ap of diverseApi) {
-            aiRecs.push(ap);
-            foundIds.add(ap.id);
-          }
-          console.log("[AURA] Injected", diverseApi.length, "API products. Total recs:", aiRecs.length);
+          for (const ap of injected) aiRecs.push(ap);
+          console.log("[AURA] Injected", injected.length, "API products");
         }
 
-        console.log("[AURA] Final recs:", aiRecs.length, "total,", aiRecs.filter(p => p.id < 0).length, "API,", aiRecs.filter(p => p.id >= 0).length, "curated");
+        console.log("[AURA] Final recs:", aiRecs.length, "total |", aiRecs.filter(p => p.id < 0).length, "API |", aiRecs.filter(p => p.id >= 0).length, "curated");
 
         const cleanText = text.replace(/\[ID:-?\d+\]/g, "").trim();
         setMsgs((prev) => [...prev, { role: "bot", text: cleanText, recs: aiRecs.length > 0 ? aiRecs : topPicks }]);
@@ -1112,8 +1120,28 @@ export default function App() {
     } catch (e) { console.log("AI chat error:", e); }
 
     if (!aiWorked) {
+      // Await API products for fallback too
+      let fallbackApiProducts: Product[] = [];
+      try {
+        const apiResult = await apiSearchPromise;
+        fallbackApiProducts = apiResult.products || [];
+        if (fallbackApiProducts.length > 0) {
+          setFeaturedCache(prev => {
+            const next = new Map(prev);
+            for (const p of fallbackApiProducts) next.set(p.id, p);
+            return next;
+          });
+        }
+      } catch (_e) { /* already logged */ }
+      // Mix API products into fallback recs
+      const fallbackRecs = [...topPicks.slice(0, 6)];
+      const fallbackIds = new Set(fallbackRecs.map(p => p.id));
+      const apiForFallback = [...fallbackApiProducts, ...cachedApiProducts].filter(p => !fallbackIds.has(p.id)).slice(0, 3);
+      for (const ap of apiForFallback) { fallbackRecs.push(ap); fallbackIds.add(ap.id); }
+      console.log("[AURA] Fallback recs:", fallbackRecs.length, "total |", fallbackRecs.filter(p => p.id < 0).length, "API");
+
       const palette = (STYLE_PALETTES as Record<string, StylePalette>)[vibe as string] || {};
-      const reasons = topPicks.slice(0, 8).map((p) => {
+      const reasons = fallbackRecs.slice(0, 8).map((p) => {
         const dims = getProductDims(p);
         const styleMatch = vibe && p.v && p.v.includes(vibe) ? ", perfectly suited to the **" + vibe + "** aesthetic" : "";
         const roomMatch = room && p.rm && p.rm.some(r => r === room) ? " and ideal for your **" + room + "**" : "";
@@ -1124,7 +1152,7 @@ export default function App() {
       setMsgs((prev) => [...prev, {
         role: "bot",
         text: (palette.feel ? "_" + palette.feel + "_\n\n" : "") + "Here's what I'd recommend:\n\n" + reasons + "\n\nWould you like me to go deeper on any of these, or explore a different direction?",
-        recs: topPicks
+        recs: fallbackRecs
       }]);
       // Trigger mood boards from fallback too
       if (room && vibe) {
