@@ -854,10 +854,28 @@ export default function App() {
         ? "\n\nALREADY SELECTED BY USER (" + selItems.length + " items):\n" + selItems.map(p => "- " + p.n + " (" + p.c + ") by " + p.r + " — $" + p.p).join("\n")
         : "";
 
+      // Detect if user is asking for a specific item vs designing a full room
+      const specificItemKws = ["sofa","couch","table","chair","desk","lamp","rug","bed","stool","light","chandelier","pendant","mirror","ottoman","bench","dresser","nightstand","bookshelf","cabinet","art","shelf"];
+      const isSpecificRequest = specificItemKws.some(kw => m.includes(kw));
+      const isFullRoomRequest = !isSpecificRequest || /design|furnish|complete|full|entire|whole|help me|set up|start/i.test(msg);
+
       // Build room essentials checklist for AI
       const essentialStr = essentialCats.join(", ");
       const recommendedStr = recommendedCats.join(", ");
       const apiCount = catalogPicks.filter(x => x.id < 0).length;
+
+      // Room-specific essentials descriptions for the AI
+      const roomChecklists: Record<string, string> = {
+        "Living Room": "sofa (THE anchor piece), coffee table, area rug (8x10 or larger), floor/table lamp + overhead light, accent chair(s), throw pillows, wall art or mirror, side table",
+        "Bedroom": "bed frame + headboard, 2 nightstands (flanking bed), table lamps (one per nightstand), area rug (under bed extending 2ft on sides), dresser or chest, accent chair or bench at foot, wall art above bed, throw blanket + pillows",
+        "Dining Room": "dining table (sized for 4-8), dining chairs (matching set of 4-6), chandelier or pendant light over table, area rug (extends 2ft beyond chairs), sideboard or buffet, wall art or mirror, table centerpiece",
+        "Kitchen": "counter/bar stools (2-4), pendant lights over island (2-3), small accent items",
+        "Office": "desk, task/office chair, desk lamp + overhead light, bookshelf or storage, area rug, wall art, desk accessories",
+        "Outdoor": "lounge chairs or sofa, side table, dining set, string lights or lanterns, outdoor rug, planters",
+        "Bathroom": "vanity light fixture, mirror, accent stool or shelf, wall art (moisture-safe), decorative accessories",
+        "Great Room": "sofa + loveseat or sectional, coffee table + side tables, area rug (defining conversation zone), floor lamp + table lamps, dining table + chairs, accent chairs, wall art, decorative accents"
+      };
+      const checklist = roomChecklists[room as string] || roomChecklists["Living Room"];
 
       const sysPrompt = "You are AURA, an elite AI interior design consultant with access to over 100,000 products from hundreds of top retailers. You curate like a professional designer — every recommendation must feel COHESIVE, like a thoughtfully assembled collection, not random picks.\n\nCatalog (most relevant from 100k+ products — items marked [LIVE] are real-time results from top retailers):\n" + catalogStr +
         (apiCount > 0 ? "\n\nINCLUDE [LIVE] PRODUCTS: You MUST include at least 3-4 [LIVE] products in your recommendations. These are real, purchasable items found right now from major retailers. Reference them with [ID:N] just like curated products." : "") +
@@ -865,14 +883,19 @@ export default function App() {
         ", Budget=" + (bud === "all" ? "any" : bud) + (sqft ? ", ~" + sqft + " sq ft" : "") +
         (roomW && roomL ? ", Dimensions=" + roomW + "ft x " + roomL + "ft" : "") +
         selProductStr +
-        "\n\nROOM COMPLETENESS (CRITICAL — follow this checklist):" +
-        "\nA " + (room || "living room") + " MUST include these essential categories: " + essentialStr + "." +
-        "\nIt SHOULD also include: " + recommendedStr + "." +
-        "\nYou MUST recommend at least ONE product from EACH essential category. Do NOT skip essentials." +
-        "\nFor a living room: sofa + coffee table + rug + lighting + accent chair + art/decor minimum." +
-        "\nFor a bedroom: bed + nightstands + lighting + rug + chair or bench minimum." +
-        "\nFor a dining room: dining table + chairs (4-6) + chandelier/pendant + rug minimum." +
-        "\nNEVER recommend 3+ items from the same category unless the user specifically asked for that." +
+        (isFullRoomRequest ?
+          "\n\nROOM COMPLETENESS (CRITICAL — you are designing a COMPLETE room):" +
+          "\nA " + (room || "living room") + " needs ALL of these: " + checklist + "." +
+          "\nEssential categories (MUST have at least 1 each): " + essentialStr +
+          "\nRecommended (should include): " + recommendedStr +
+          "\nYou MUST recommend at least ONE product from EACH essential category — a room without a sofa, without a rug, without lighting is INCOMPLETE." +
+          "\nRecommend 8-12 DIFFERENT products across DIFFERENT categories. NEVER 3+ of the same category." +
+          "\nThink like a designer walking through the room: what does each zone need?"
+        :
+          "\n\nSPECIFIC REQUEST: The user is asking about a specific type of item." +
+          "\nRecommend 3-6 options that fit with their existing selections and room style." +
+          "\nExplain WHY each option works — color, material, scale, and how it complements what they already have."
+        ) +
         "\n\nDESIGN PRINCIPLES:" +
         "\n1. COLOR COHESION (60-30-10): 60% dominant, 30% secondary, 10% accent. Palette colors: " + (palette.colors || []).join(", ") +
         (roomColors.length > 0 ? ". ROOM'S EXISTING COLORS: " + roomColors.join(", ") + " — complement these" : "") +
@@ -883,7 +906,7 @@ export default function App() {
         (cadAnalysis ? "\nFloor plan: " + cadAnalysis.slice(0, 500) : "") +
         (roomPhotoAnalysis ? "\nROOM PHOTO: " + roomPhotoAnalysis : "") +
         ((roomNeeds as RoomNeed).layout ? "\nLayout: " + (roomNeeds as RoomNeed).layout : "") +
-        "\n\nRULES: Write flowing paragraphs, NOT numbered lists. Bold product names with **name**. Reference as [ID:N]. Recommend 8-12 products covering ALL essential categories. Warm editorial tone. EXPLAIN WHY pieces work together. VARY your recommendations — don't repeat the same products every time.";
+        "\n\nRULES: Write flowing paragraphs, NOT numbered lists. Bold product names with **name**. Reference as [ID:N]. Warm editorial tone. EXPLAIN WHY pieces work together — mention shared colors, materials, or visual weight. VARY your recommendations — never the same products twice.";
 
       const chatHistory = [{ role: "system", content: sysPrompt }];
       // Include full conversation history (last 12 messages) so AI remembers the room, preferences, and prior recommendations
