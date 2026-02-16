@@ -1891,9 +1891,6 @@ export default function App() {
                 <img src={homeHeroImg} alt="Modern living room interior design" style={{ width: "100%", display: "block", height: "auto", minHeight: 320, maxHeight: 480, objectFit: "cover" }} />
               </div>
             </div>
-            <div style={{ position: "absolute", bottom: 36, left: "50%", transform: "translateX(-50%)", animation: "pulse 2s ease infinite" }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#B8A898" strokeWidth="1.5"><path d="M12 5v14m0 0l-6-6m6 6l6-6"/></svg>
-            </div>
           </section>
 
           {/* Feature 1: Define Your Space — with room setup mockup */}
