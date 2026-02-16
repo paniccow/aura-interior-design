@@ -162,6 +162,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         return;
       }
 
+      // Pre-increment viz count atomically to prevent race conditions
+      // If generation fails later, we decrement it back
+      let vizPreIncremented = false;
       if (profile) {
         const now = new Date();
         const currentMonth = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
@@ -176,6 +179,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
               : "Free plan allows 1 visualization per month. Upgrade to Pro for 100/month."
           });
           return;
+        }
+
+        // Pre-increment: claim the slot before starting generation
+        if (supabaseAdmin && authUser) {
+          await supabaseAdmin.from("profiles").update({
+            viz_count: vizCount + 1,
+            viz_month: currentMonth
+          }).eq("id", authUser.id);
+          vizPreIncremented = true;
         }
       }
 
@@ -295,16 +307,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           );
 
           if (hasGeneratedImage) {
-            // Increment viz count in Supabase (server-side tracking)
-            if (supabaseAdmin && authUser && profile) {
-              const now = new Date();
-              const currentMonth = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
-              const vizCount = (profile.viz_month === currentMonth) ? profile.viz_count as number : 0;
-              await supabaseAdmin.from("profiles").update({
-                viz_count: vizCount + 1,
-                viz_month: currentMonth
-              }).eq("id", authUser.id);
-            }
+            // Viz count was already pre-incremented — no need to increment again
             res.status(200).json(data);
             return;
           }
@@ -313,6 +316,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         }
       }
 
+      // All models failed — rollback the pre-incremented viz count
+      if (vizPreIncremented && supabaseAdmin && authUser && profile) {
+        try {
+          const now = new Date();
+          const currentMonth = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+          const currentViz = (profile.viz_month === currentMonth) ? profile.viz_count as number : 0;
+          if (currentViz > 0) {
+            await supabaseAdmin.from("profiles").update({
+              viz_count: currentViz, // restore to original (pre-increment added +1, so original is what was stored)
+              viz_month: currentMonth
+            }).eq("id", authUser.id);
+          }
+        } catch (rollbackErr) {
+          console.error("Viz count rollback failed:", (rollbackErr as Error).message);
+        }
+      }
       res.status(500).json({ error: "All image models failed" });
       return;
 

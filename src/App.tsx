@@ -151,12 +151,33 @@ export default function App() {
 
   // ─── SUPABASE AUTH ───
   const fetchProfile = async (userId: string) => {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
-    if (data && !error) setProfile(data);
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
+      if (data && !error) {
+        setProfile(data);
+      } else if (error) {
+        console.warn("Profile fetch failed:", error.message);
+        // Profile may not exist yet (new signup before DB trigger fires) — retry after short delay
+        if (error.code === "PGRST116") {
+          // "no rows returned" — profile doesn't exist yet, retry once
+          setTimeout(async () => {
+            const { data: retryData, error: retryError } = await supabase
+              .from("profiles")
+              .select("*")
+              .eq("id", userId)
+              .single();
+            if (retryData && !retryError) setProfile(retryData);
+            else console.warn("Profile retry failed:", retryError?.message);
+          }, 2000);
+        }
+      }
+    } catch (err) {
+      console.error("Profile fetch error:", err);
+    }
   };
 
   // Supabase auth state listener — handles session restore, login, logout, email confirm, password reset
@@ -170,6 +191,9 @@ export default function App() {
         });
         fetchProfile(session.user.id);
       }
+      setAuthLoading(false);
+    }).catch((err) => {
+      console.error("Session restore failed:", err);
       setAuthLoading(false);
     });
 
@@ -188,6 +212,13 @@ export default function App() {
           setProfile(null);
         } else if (event === "PASSWORD_RECOVERY") {
           setPg("reset-password");
+        } else if (event === "TOKEN_REFRESHED" && session?.user) {
+          // Session was auto-refreshed — update user in case metadata changed
+          setUser({
+            id: session.user.id,
+            email: session.user.email || "",
+            name: session.user.user_metadata?.name || (session.user.email || "").split("@")[0]
+          });
         }
         setAuthLoading(false);
       }
@@ -1799,7 +1830,7 @@ export default function App() {
           </div>
           <div style={{ display: "flex", gap: 10, marginTop: 32 }}>
             <button onClick={newProject} style={{ background: "#C17550", color: "#fff", border: "none", borderRadius: 12, padding: "14px 28px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>New Project</button>
-            <button onClick={async () => { await supabase.auth.signOut(); setUser(null); setProfile(null); setProjects([]); go("home"); }} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 12, padding: "14px 28px", fontSize: 13, color: "#9B8B7B", cursor: "pointer", fontFamily: "inherit" }}>Sign Out</button>
+            <button onClick={async () => { try { await supabase.auth.signOut(); } catch (err) { console.error("Sign out error:", err); } setUser(null); setProfile(null); setProjects([]); go("home"); }} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 12, padding: "14px 28px", fontSize: 13, color: "#9B8B7B", cursor: "pointer", fontFamily: "inherit" }}>Sign Out</button>
           </div>
         </div>
       </div>

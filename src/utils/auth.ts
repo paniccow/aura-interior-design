@@ -1,11 +1,19 @@
 import { supabase } from "../supabaseClient";
 
 // Get Supabase auth token for API calls
+// Uses getSession() which automatically handles token refresh
 export async function getAuthToken(): Promise<string | null> {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error) {
+      console.warn("Auth token error:", error.message);
+      return null;
+    }
     return session?.access_token || null;
-  } catch (_e) { return null; }
+  } catch (err) {
+    console.error("Auth token fetch failed:", err);
+    return null;
+  }
 }
 
 // Build headers with optional auth token

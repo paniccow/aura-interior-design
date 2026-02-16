@@ -19,10 +19,22 @@ interface ProfileRow {
   updated_at: string | null;
 }
 
+const ALLOWED_ORIGINS: string[] = [
+  "https://aurainteriordesign.org",
+  "https://www.aurainteriordesign.org",
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://localhost:4173"
+];
+
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  const origin = (req.headers.origin || "") as string;
+  const allowedOrigin = ALLOWED_ORIGINS.find(o => origin.startsWith(o)) || ALLOWED_ORIGINS[0];
+  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Cache-Control", "no-store");
   if (req.method === "OPTIONS") { res.status(200).end(); return; }
   if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
 
