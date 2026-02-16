@@ -710,23 +710,32 @@ export default function App() {
     setBusy(true);
     setMsgs((prev) => [...prev, { role: "user", text: msg, recs: [] }]);
 
-    // Search RapidAPI for products matching user's context (room + style + message keywords)
+    // ALWAYS search RapidAPI for products — builds a smart query from message + context
     let apiProducts: Product[] = [];
     try {
       const ml = msg.toLowerCase().replace(/[^a-z0-9\s]/g, "");
-      const furnitureKws = ["sofa","couch","table","chair","desk","lamp","rug","bed","stool","light","art","shelf","cabinet","mirror","ottoman","bench","dresser","nightstand","chandelier","pendant","sconce","sectional","bookcase","sideboard","credenza","headboard","daybed","armchair","recliner","outdoor","patio"];
+      const furnitureKws = ["sofa","couch","table","chair","desk","lamp","rug","bed","stool","light","art","shelf","cabinet","mirror","ottoman","bench","dresser","nightstand","chandelier","pendant","sconce","sectional","bookcase","sideboard","credenza","headboard","daybed","armchair","recliner","outdoor","patio","furniture","decor","pillow","throw","blanket","vase","planter","bookshelf","wardrobe","mattress"];
+      const designKws = ["modern","contemporary","rustic","bohemian","minimalist","scandinavian","industrial","coastal","farmhouse","luxury","elegant","mid-century","japandi","traditional","vintage","retro","wood","leather","velvet","marble","brass","gold","white","black","gray","beige","blue","green","natural"];
       const msgWords = ml.split(/\s+/).filter(w => w.length > 2);
       const matchedFurn = msgWords.filter(w => furnitureKws.some(fk => w.includes(fk) || fk.includes(w)));
-      // Build a smart search query: furniture keywords + style + room context
+      const matchedDesign = msgWords.filter(w => designKws.some(dk => w === dk));
+      // Build search query with multiple fallback layers
       const styleTerm = vibe ? (vibe as string).toLowerCase() : "";
       const roomTerm = room ? (room as string).toLowerCase().replace("room", "").trim() : "";
       let searchQuery = "";
       if (matchedFurn.length > 0) {
-        // User mentioned specific furniture — search for that + style
+        // User mentioned specific furniture — search for that + style context
         searchQuery = (styleTerm ? styleTerm + " " : "") + matchedFurn.join(" ");
+      } else if (matchedDesign.length > 0) {
+        // User mentioned design/style/material terms — use those
+        searchQuery = matchedDesign.slice(0, 3).join(" ") + " furniture";
       } else if (styleTerm || roomTerm) {
-        // No furniture keywords but we have room/style context — search broadly
+        // Have room/style context from selections — search broadly
         searchQuery = (styleTerm ? styleTerm + " " : "") + (roomTerm ? roomTerm + " " : "") + "furniture decor";
+      } else {
+        // Ultimate fallback — ALWAYS search, use meaningful words from message
+        const meaningful = msgWords.filter(w => !["the","and","for","can","you","help","find","want","need","some","please","show","get","look","any","with","that","this","what","how","about"].includes(w));
+        searchQuery = meaningful.length > 0 ? meaningful.slice(0, 3).join(" ") + " furniture" : "home furniture decor";
       }
       if (searchQuery.trim()) {
         const result = await searchFeaturedProducts(searchQuery.trim(), 1);
@@ -998,8 +1007,12 @@ export default function App() {
     setFeaturedLoading(false);
   }, [featuredQuery, featuredCat]);
 
-  // Note: Featured/external product search is available for AI visualization
-  // but not auto-triggered. AI calls doFeaturedSearch() when needed.
+  // Auto-fetch featured products when Featured tab is opened (or on first load)
+  useEffect(() => {
+    if (tab === "featured" && featuredProducts.length === 0 && !featuredLoading) {
+      doFeaturedSearch("", "all", 1);
+    }
+  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Combined selected items: DB products + featured products
   const allProducts = [...DB, ...Array.from(featuredCache.values())];
