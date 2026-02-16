@@ -843,7 +843,12 @@ export default function App() {
         pickedIds.add(p.id);
       }
 
-      const catalogStr = catalogPicks.slice(0, 35).map((x) => "[ID:" + x.id + "] " + x.n + " by " + x.r + " $" + x.p + " (" + x.c + ")" + (x.id < 0 ? " [LIVE]" : "")).join("\n");
+      // Show product names which already describe the sub-type (e.g. "Coffee Table" vs "Nightstand")
+      // This helps the AI pick appropriate items for the room (no nightstands in living rooms)
+      const catalogStr = catalogPicks.slice(0, 35).map((x) => {
+        const src = x.id < 0 ? " [LIVE]" : "";
+        return "[ID:" + x.id + "] " + x.n + " — " + x.r + ", $" + x.p + " (" + x.c + ")" + src;
+      }).join("\n");
       const palette = (STYLE_PALETTES as Record<string, StylePalette>)[vibe as string] || {};
 
       // Build furniture dimension reference for AI
@@ -890,6 +895,7 @@ export default function App() {
           "\nRecommended (should include): " + recommendedStr +
           "\nYou MUST recommend at least ONE product from EACH essential category — a room without a sofa, without a rug, without lighting is INCOMPLETE." +
           "\nRecommend 8-12 DIFFERENT products across DIFFERENT categories. NEVER 3+ of the same category." +
+          "\nIMPORTANT: Pick products APPROPRIATE for the room type. Nightstands belong in BEDROOMS, not living rooms. Coffee tables and side tables go in living rooms. Dining tables go in dining rooms. READ the product name carefully." +
           "\nThink like a designer walking through the room: what does each zone need?"
         :
           "\n\nSPECIFIC REQUEST: The user is asking about a specific type of item." +
@@ -920,32 +926,46 @@ export default function App() {
       const text = await aiChat(chatHistory);
 
       if (text && text.length > 20 && text !== "[object Object]") {
+        // Step 1: Extract all referenced product IDs (supports negative IDs for API products)
         const ids: number[] = []; const rx = /\[ID:(-?\d+)\]/g; let mt;
         while ((mt = rx.exec(text)) !== null) ids.push(parseInt(mt[1]));
-        let apiRecs = ids.map((id) => uniqueDB.find((p) => p.id === id)).filter((x): x is Product => Boolean(x));
+        let aiRecs = ids.map((id) => uniqueDB.find((p) => p.id === id)).filter((x): x is Product => Boolean(x));
 
-        if (apiRecs.length === 0) {
-          const boldNames = []; const bx = /\*\*([^*]+)\*\*/g; let bm;
-          while ((bm = bx.exec(text)) !== null) boldNames.push(bm[1].toLowerCase().trim());
-          const found = new Set();
-          for (const bn of boldNames) {
-            let match = uniqueDB.find(p => (p.n || "").toLowerCase() === bn);
-            if (!match) match = uniqueDB.find(p => (p.n || "").toLowerCase().includes(bn) || bn.includes((p.n || "").toLowerCase()));
-            if (!match) {
-              const words = bn.split(/[\s,\-\/]+/).filter(w => w.length > 2);
-              if (words.length >= 2) {
-                match = uniqueDB.find(p => {
-                  const pn = (p.n || "").toLowerCase();
-                  return words.filter(w => pn.includes(w)).length >= Math.ceil(words.length * 0.6);
-                });
-              }
+        // Step 2: ALSO try bold name matching (always, not just when IDs fail)
+        // The AI often mentions products by name without [ID:N]
+        const boldNames: string[] = []; const bx = /\*\*([^*]+)\*\*/g; let bm;
+        while ((bm = bx.exec(text)) !== null) boldNames.push(bm[1].toLowerCase().trim());
+        const foundIds = new Set(aiRecs.map(p => p.id));
+        for (const bn of boldNames) {
+          if (foundIds.size >= 12) break;
+          let match = uniqueDB.find(p => !foundIds.has(p.id) && (p.n || "").toLowerCase() === bn);
+          if (!match) match = uniqueDB.find(p => !foundIds.has(p.id) && ((p.n || "").toLowerCase().includes(bn) || bn.includes((p.n || "").toLowerCase())));
+          if (!match) {
+            const words = bn.split(/[\s,\-\/]+/).filter(w => w.length > 2);
+            if (words.length >= 2) {
+              match = uniqueDB.find(p => {
+                if (foundIds.has(p.id)) return false;
+                const pn = (p.n || "").toLowerCase();
+                return words.filter(w => pn.includes(w)).length >= Math.ceil(words.length * 0.6);
+              });
             }
-            if (match && !found.has(match.id)) { apiRecs.push(match); found.add(match.id); }
+          }
+          if (match) { aiRecs.push(match); foundIds.add(match.id); }
+        }
+
+        // Step 3: If AI didn't include enough API products, inject top-scored ones
+        // This guarantees real purchasable items always appear in recommendations
+        const apiInRecs = aiRecs.filter(p => p.id < 0).length;
+        if (apiProducts.length > 0 && apiInRecs < 2) {
+          const topApiForRoom = catalogPicks.filter(x => x.id < 0 && !foundIds.has(x.id)).slice(0, 4 - apiInRecs);
+          for (const ap of topApiForRoom) {
+            aiRecs.push(ap);
+            foundIds.add(ap.id);
           }
         }
 
         const cleanText = text.replace(/\[ID:-?\d+\]/g, "").trim();
-        setMsgs((prev) => [...prev, { role: "bot", text: cleanText, recs: apiRecs.length > 0 ? apiRecs : topPicks }]);
+        setMsgs((prev) => [...prev, { role: "bot", text: cleanText, recs: aiRecs.length > 0 ? aiRecs : topPicks }]);
         aiWorked = true;
 
         const ml = msg.toLowerCase();
@@ -960,7 +980,7 @@ export default function App() {
         if (detectedRoom && detectedStyle) {
           setTimeout(() => triggerMoodBoards(detectedRoom, detectedStyle, bud, sqft), 300);
           setBoardsGenHint("Mood boards generated based on your conversation");
-        } else if (detectedRoom || detectedStyle || apiRecs.length > 4) {
+        } else if (detectedRoom || detectedStyle || aiRecs.length > 4) {
           const fallbackRoom = detectedRoom || "Living Room";
           const fallbackStyle = detectedStyle || "Warm Modern";
           setTimeout(() => triggerMoodBoards(fallbackRoom, fallbackStyle, bud, sqft), 300);
