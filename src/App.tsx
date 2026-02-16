@@ -261,10 +261,12 @@ export default function App() {
   }, [room, vibe, bud, sqft, cadAnalysis, roomPhotoAnalysis]);
 
   // Auto-generate CAD layout for Pro users when selection changes
+  // Uses allProducts (DB + featuredCache) so API products with negative IDs are included
   useEffect(() => {
     if (userPlan === "pro" && sel.size > 0 && room) {
       try {
-        const items = DB.filter(p => sel.has(p.id));
+        const allProds = [...DB, ...Array.from(featuredCache.values())];
+        const items = allProds.filter(p => sel.has(p.id));
         const expandedItems = items.flatMap(p => Array.from({ length: sel.get(p.id) || 1 }, (_, i) => ({ ...p, _qtyIdx: i })));
         const sq = parseInt(sqft) || ((ROOM_NEEDS as Record<string, RoomNeed>)[room]?.minSqft || 200);
         const layout = generateCADLayout(expandedItems, sq, room, cadAnalysis);
@@ -535,9 +537,13 @@ export default function App() {
       // Furniture list — numbered, one per line
       prompt += "\n\nFurniture — exactly " + numItems + " item" + (numItems > 1 ? "s" : "") + ", one of each unless noted:\n" + productSpecs;
 
-      // Rules — short and direct
-      prompt += "\n\nRender ONLY these " + numItems + " items. No extra furniture, decor, plants, vases, or pillows. Each item appears exactly once unless a quantity is noted. Match each item's exact color shade, shape, material, arm style, and leg style. " + roomNeeds.layout;
-      prompt += " High resolution, eye-level, natural daylight, wide-angle, sharp detail, 4K quality, Architectural Digest editorial photography. No text or labels.";
+      // Rules — strict and explicit about ONLY rendering selected products
+      prompt += "\n\nCRITICAL RULES:";
+      prompt += "\n- Render EXACTLY " + numItems + " furniture item" + (numItems > 1 ? "s" : "") + " — no more, no less. Each item appears exactly once unless a quantity is noted.";
+      prompt += "\n- DO NOT add ANY furniture, decor, plants, vases, pillows, books, candles, or accessories that are not in the list above. The room should contain ONLY the listed items plus architectural elements (walls, floor, windows, ceiling).";
+      prompt += "\n- Match each item's EXACT color shade, shape, material, arm/leg style as described above. The product references show what each item looks like — replicate them faithfully.";
+      prompt += "\n- " + roomNeeds.layout;
+      prompt += "\nHigh resolution, eye-level, natural daylight, wide-angle, sharp detail, 4K quality, Architectural Digest editorial photography. No text or labels.";
 
       // Pass room photo and CAD as reference images so AI edits the actual room
       const refImg = roomPhoto?.data || null;
@@ -808,8 +814,8 @@ export default function App() {
         (x.n || "").toLowerCase().split(" ").forEach((w) => { if (w.length > 3 && m.includes(w)) s += 2; });
         // API products baseline boost
         if (isApiProduct) s += 6;
-        // SIGNIFICANT random noise so results VARY each time (not the same products every query)
-        s += Math.random() * 8;
+        // Moderate random noise — enough variety without breaking cohesion
+        s += Math.random() * 4;
         return { ...x, _s: s };
       }).sort((a, b) => b._s - a._s);
 
@@ -838,14 +844,14 @@ export default function App() {
       // Step 2: Fill remaining slots with highest-scored products not yet picked
       const remaining = scored.filter(x => !pickedIds.has(x.id));
       for (const p of remaining) {
-        if (catalogPicks.length >= 35) break;
+        if (catalogPicks.length >= 25) break;
         catalogPicks.push(p);
         pickedIds.add(p.id);
       }
 
       // Show product names which already describe the sub-type (e.g. "Coffee Table" vs "Nightstand")
       // This helps the AI pick appropriate items for the room (no nightstands in living rooms)
-      const catalogStr = catalogPicks.slice(0, 35).map((x) => {
+      const catalogStr = catalogPicks.slice(0, 25).map((x) => {
         const src = x.id < 0 ? " [LIVE]" : "";
         return "[ID:" + x.id + "] " + x.n + " — " + x.r + ", $" + x.p + " (" + x.c + ")" + src;
       }).join("\n");
@@ -894,9 +900,9 @@ export default function App() {
           "\nEssential categories (MUST have at least 1 each): " + essentialStr +
           "\nRecommended (should include): " + recommendedStr +
           "\nYou MUST recommend at least ONE product from EACH essential category — a room without a sofa, without a rug, without lighting is INCOMPLETE." +
-          "\nRecommend 8-12 DIFFERENT products across DIFFERENT categories. NEVER 3+ of the same category." +
+          "\nRecommend 6-8 DIFFERENT products total. Quality over quantity — each piece must EARN its place. NEVER 2+ of the same category unless it's chairs for a dining table." +
           "\nIMPORTANT: Pick products APPROPRIATE for the room type. Nightstands belong in BEDROOMS, not living rooms. Coffee tables and side tables go in living rooms. Dining tables go in dining rooms. READ the product name carefully." +
-          "\nThink like a designer walking through the room: what does each zone need?"
+          "\nThink like a designer assembling a curated collection: every piece should share a visual thread — a common color tone, material family, or design language."
         :
           "\n\nSPECIFIC REQUEST: The user is asking about a specific type of item." +
           "\nRecommend 3-6 options that fit with their existing selections and room style." +
@@ -912,7 +918,9 @@ export default function App() {
         (cadAnalysis ? "\nFloor plan: " + cadAnalysis.slice(0, 500) : "") +
         (roomPhotoAnalysis ? "\nROOM PHOTO: " + roomPhotoAnalysis : "") +
         ((roomNeeds as RoomNeed).layout ? "\nLayout: " + (roomNeeds as RoomNeed).layout : "") +
-        "\n\nRULES: Write flowing paragraphs, NOT numbered lists. Bold product names with **name**. Reference as [ID:N]. Warm editorial tone. EXPLAIN WHY pieces work together — mention shared colors, materials, or visual weight. VARY your recommendations — never the same products twice.";
+        "\n\nRULES: Write flowing paragraphs, NOT numbered lists. Bold product names with **name**. Reference as [ID:N]. Warm editorial tone." +
+        "\nCOHESION IS EVERYTHING: Before finalizing your picks, verify they work as a SET — shared color temperature (all warm or all cool), 2-3 material families max, consistent design era. If a piece doesn't harmonize with the others, SWAP it for one that does. Explain the visual thread tying pieces together." +
+        "\nVARY your recommendations — never the same products twice.";
 
       const chatHistory = [{ role: "system", content: sysPrompt }];
       // Include full conversation history (last 12 messages) so AI remembers the room, preferences, and prior recommendations
@@ -937,7 +945,7 @@ export default function App() {
         while ((bm = bx.exec(text)) !== null) boldNames.push(bm[1].toLowerCase().trim());
         const foundIds = new Set(aiRecs.map(p => p.id));
         for (const bn of boldNames) {
-          if (foundIds.size >= 12) break;
+          if (foundIds.size >= 8) break;
           let match = uniqueDB.find(p => !foundIds.has(p.id) && (p.n || "").toLowerCase() === bn);
           if (!match) match = uniqueDB.find(p => !foundIds.has(p.id) && ((p.n || "").toLowerCase().includes(bn) || bn.includes((p.n || "").toLowerCase())));
           if (!match) {
