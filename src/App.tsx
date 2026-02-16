@@ -806,8 +806,19 @@ export default function App() {
         searchQuery = meaningful.length > 0 ? meaningful.slice(0, 3).join(" ") + " furniture" : "home furniture decor";
       }
       if (searchQuery.trim()) {
+        console.log("[AURA] API search query:", searchQuery.trim());
         const result = await searchFeaturedProducts(searchQuery.trim(), 1);
         apiProducts = result.products;
+        console.log("[AURA] API search returned:", apiProducts.length, "products");
+        // If specific query returned nothing, try a broader fallback
+        if (apiProducts.length === 0) {
+          const roomTerm = room ? (room as string).toLowerCase().replace("room", "").trim() : "";
+          const fallbackQuery = (roomTerm || "living") + " furniture decor";
+          console.log("[AURA] API search fallback query:", fallbackQuery);
+          const fallbackResult = await searchFeaturedProducts(fallbackQuery, 1);
+          apiProducts = fallbackResult.products;
+          console.log("[AURA] API fallback returned:", apiProducts.length, "products");
+        }
         if (apiProducts.length > 0) {
           setFeaturedCache(prev => {
             const next = new Map(prev);
@@ -816,12 +827,17 @@ export default function App() {
           });
         }
       }
-    } catch (e) { console.log("API product search failed:", (e as Error)?.message || e); }
+    } catch (e) { console.log("[AURA] API product search failed:", (e as Error)?.message || e); }
 
-    const combinedDB = [...DB, ...apiProducts, ...Array.from(featuredCache.values())];
+    // Also pull any previously cached API products from Featured tab
+    const cachedApiProducts = Array.from(featuredCache.values());
+    console.log("[AURA] Cached API products:", cachedApiProducts.length, "| Fresh API products:", apiProducts.length);
+
+    const combinedDB = [...DB, ...apiProducts, ...cachedApiProducts];
     // Deduplicate by id
     const seen = new Set<number>();
     const uniqueDB = combinedDB.filter(p => { if (seen.has(p.id)) return false; seen.add(p.id); return true; });
+    console.log("[AURA] uniqueDB size:", uniqueDB.length, "| API products in uniqueDB:", uniqueDB.filter(p => p.id < 0).length);
 
     let recs = [];
     try { recs = localMatch(msg); } catch (_e) { recs = DB.slice(0, 12); }
@@ -913,6 +929,9 @@ export default function App() {
         pickedIds.add(p.id);
       }
 
+      const apiInCatalog = catalogPicks.filter(x => x.id < 0).length;
+      console.log("[AURA] Catalog built:", catalogPicks.length, "total,", apiInCatalog, "API products");
+
       // Show product names which already describe the sub-type (e.g. "Coffee Table" vs "Nightstand")
       // This helps the AI pick appropriate items for the room (no nightstands in living rooms)
       const catalogStr = catalogPicks.slice(0, 25).map((x) => {
@@ -1001,7 +1020,11 @@ export default function App() {
         // Step 1: Extract all referenced product IDs (supports negative IDs for API products)
         const ids: number[] = []; const rx = /\[ID:(-?\d+)\]/g; let mt;
         while ((mt = rx.exec(text)) !== null) ids.push(parseInt(mt[1]));
+        const apiIds = ids.filter(id => id < 0);
+        const dbIds = ids.filter(id => id >= 0);
+        console.log("[AURA] AI referenced IDs — DB:", dbIds.length, "API:", apiIds.length, "(IDs:", apiIds.join(","), ")");
         let aiRecs = ids.map((id) => uniqueDB.find((p) => p.id === id)).filter((x): x is Product => Boolean(x));
+        console.log("[AURA] Resolved from IDs:", aiRecs.length, "products");
 
         // Step 2: ALSO try bold name matching (always, not just when IDs fail)
         // The AI often mentions products by name without [ID:N]
@@ -1025,18 +1048,43 @@ export default function App() {
           if (match) { aiRecs.push(match); foundIds.add(match.id); }
         }
 
-        // Step 3: If AI didn't include enough API products, inject top-scored ones
-        // This guarantees real purchasable items always appear in recommendations
-        // Check both current apiProducts AND featuredCache (persists across messages)
+        // Step 3: ALWAYS inject API products — don't rely on the AI to reference them
+        // The AI model rarely uses [ID:-N] for API products, so we must force them in
         const apiInRecs = aiRecs.filter(p => p.id < 0).length;
-        const hasAnyApiProducts = apiProducts.length > 0 || catalogPicks.some(x => x.id < 0);
-        if (hasAnyApiProducts && apiInRecs < 2) {
-          const topApiForRoom = catalogPicks.filter(x => x.id < 0 && !foundIds.has(x.id)).slice(0, 4 - apiInRecs);
-          for (const ap of topApiForRoom) {
+        console.log("[AURA] AI referenced", aiRecs.length, "products total,", apiInRecs, "from API");
+
+        // Get all available API products from multiple sources, best-scored first
+        const allApiAvailable = [
+          ...catalogPicks.filter(x => x.id < 0 && !foundIds.has(x.id)),
+          ...scored.filter(x => x.id < 0 && !foundIds.has(x.id) && !catalogPicks.some(cp => cp.id === x.id))
+        ];
+        console.log("[AURA] Available API products for injection:", allApiAvailable.length);
+
+        // Always inject enough to reach at least 3 API products
+        const targetApiCount = Math.max(3, Math.min(4, Math.ceil(aiRecs.length * 0.4)));
+        const neededApi = Math.max(0, targetApiCount - apiInRecs);
+        if (neededApi > 0 && allApiAvailable.length > 0) {
+          // Try to pick diverse categories
+          const usedCats = new Set(aiRecs.filter(p => p.id < 0).map(p => p.c));
+          const diverseApi: typeof allApiAvailable = [];
+          // First pass: pick from categories not yet represented
+          for (const ap of allApiAvailable) {
+            if (diverseApi.length >= neededApi) break;
+            if (!usedCats.has(ap.c)) { diverseApi.push(ap); usedCats.add(ap.c); }
+          }
+          // Second pass: fill remaining from any category
+          for (const ap of allApiAvailable) {
+            if (diverseApi.length >= neededApi) break;
+            if (!diverseApi.some(d => d.id === ap.id)) diverseApi.push(ap);
+          }
+          for (const ap of diverseApi) {
             aiRecs.push(ap);
             foundIds.add(ap.id);
           }
+          console.log("[AURA] Injected", diverseApi.length, "API products. Total recs:", aiRecs.length);
         }
+
+        console.log("[AURA] Final recs:", aiRecs.length, "total,", aiRecs.filter(p => p.id < 0).length, "API,", aiRecs.filter(p => p.id >= 0).length, "curated");
 
         const cleanText = text.replace(/\[ID:-?\d+\]/g, "").trim();
         setMsgs((prev) => [...prev, { role: "bot", text: cleanText, recs: aiRecs.length > 0 ? aiRecs : topPicks }]);

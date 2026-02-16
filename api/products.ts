@@ -108,6 +108,8 @@ interface MappedProduct {
   img: string;
 }
 
+// Use timestamp-based offset to ensure unique IDs across different API calls
+// Each call starts at a different range to prevent ID collisions
 let idCounter = -1;
 
 function mapProduct(raw: RapidAPIProduct): MappedProduct | null {
@@ -207,9 +209,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const data = await response.json();
     const rawProducts: RapidAPIProduct[] = data?.data?.products || data?.data || [];
 
-    // Reset ID counter for each fresh search to keep IDs predictable
-    // (page 1 = -1 to -40, page 2 = -41 to -80, etc.)
-    idCounter = -(((page - 1) * 40) + 1);
+    // Use timestamp-based offset to generate unique IDs across different searches
+    // This prevents ID collisions when client caches products from different queries
+    // Each search gets a unique range: -(offset+1) to -(offset+40)
+    const timeOffset = (Date.now() % 1_000_000) * 100; // unique per-millisecond, wraps every ~16 min
+    const pageOffset = (page - 1) * 40;
+    idCounter = -(timeOffset + pageOffset + 1);
 
     const products: MappedProduct[] = [];
     for (const raw of rawProducts) {

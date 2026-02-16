@@ -132,7 +132,7 @@ export async function searchFeaturedProducts(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query, page, category })
       }),
-      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 15000))
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 20000))
     ]);
     if (resp.ok) {
       const data = await resp.json();
