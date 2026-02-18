@@ -2749,7 +2749,7 @@ export default function App() {
           </section>
 
           {/* Mobile-only: Simple feature highlights (replaces comparison table) */}
-          <section className="aura-home-section aura-mobile-features" style={{ padding: "60px 6%", display: "none" }}>
+          <section className="aura-home-section aura-mobile-features" style={{ padding: "60px 6%", background: "#F0EDE8", display: "none" }}>
             <RevealSection>
               <div style={{ maxWidth: 600, margin: "0 auto" }}>
                 <div style={{ textAlign: "center", marginBottom: 32 }}>
