@@ -2389,6 +2389,8 @@ export default function App() {
           .aura-fp-preview{height:260px!important}
           .aura-fp-statusbar{display:none!important}
           .aura-mobile-features{display:block!important}
+          .aura-brands-section{background:#fff!important}
+          .aura-cta-section{background:#F8F5F0!important}
         }
       `}</style>
 
@@ -2749,7 +2751,7 @@ export default function App() {
           </section>
 
           {/* Mobile-only: Simple feature highlights (replaces comparison table) */}
-          <section className="aura-home-section aura-mobile-features" style={{ padding: "60px 6%", background: "#F0EDE8", display: "none" }}>
+          <section className="aura-home-section aura-mobile-features" style={{ padding: "60px 6%", background: "#F8F5F0", display: "none" }}>
             <RevealSection>
               <div style={{ maxWidth: 600, margin: "0 auto" }}>
                 <div style={{ textAlign: "center", marginBottom: 32 }}>
@@ -2854,7 +2856,7 @@ export default function App() {
           </section>
 
           {/* Brands */}
-          <section style={{ padding: "80px 6%", background: "#F8F5F0" }}>
+          <section className="aura-brands-section" style={{ padding: "80px 6%", background: "#F8F5F0" }}>
             <RevealSection style={{ maxWidth: 1100, margin: "0 auto", textAlign: "center" }}>
               <p style={{ fontSize: 12, letterSpacing: ".2em", textTransform: "uppercase", color: "#C17550", fontWeight: 600, marginBottom: 16 }}>Curated From</p>
               <h2 style={{ fontFamily: "Georgia,serif", fontSize: 36, fontWeight: 400, marginBottom: 40 }}>Premium brands, real products</h2>
@@ -2870,7 +2872,7 @@ export default function App() {
           </section>
 
           {/* CTA */}
-          <section style={{ padding: "80px 6% 100px", textAlign: "center" }}>
+          <section className="aura-cta-section" style={{ padding: "80px 6% 100px", textAlign: "center" }}>
             <RevealSection>
               <h2 style={{ fontFamily: "Georgia,serif", fontSize: "clamp(32px,4vw,48px)", fontWeight: 400, marginBottom: 20 }}>Ready to see your space come to life?</h2>
               <p style={{ fontSize: 16, color: "#9B8B7B", marginBottom: 36 }}>No credit card required. Start with 3 free mood boards.</p>
