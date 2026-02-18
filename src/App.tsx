@@ -2364,8 +2364,7 @@ export default function App() {
           .aura-purchase-footer{grid-template-columns:36px 1fr 70px 60px!important}
           .aura-purchase-retailer,.aura-purchase-unit,.aura-purchase-qty{display:none!important}
           .aura-admin-grid{grid-template-columns:1fr!important}
-          .aura-compare-header,.aura-compare-row{grid-template-columns:1fr 56px!important;gap:4px!important;padding:12px 14px!important}
-          .aura-compare-header>div:nth-child(n+3),.aura-compare-row>div:nth-child(n+3){display:none!important}
+          .aura-compare-section{display:none!important}
           .aura-setup-grid{grid-template-columns:1fr!important}
           .aura-budget-dims{grid-template-columns:1fr!important}
           .aura-brands-grid{grid-template-columns:repeat(2,1fr)!important;gap:10px!important}
@@ -2748,8 +2747,8 @@ export default function App() {
             </RevealSection>
           </section>
 
-          {/* Feature Comparison Table */}
-          <section className="aura-home-section" style={{ padding: "100px 6%", background: "#F8F5F0" }}>
+          {/* Feature Comparison Table — hidden on mobile */}
+          <section className="aura-home-section aura-compare-section" style={{ padding: "100px 6%", background: "#F8F5F0" }}>
             <RevealSection>
               <div style={{ maxWidth: 1100, margin: "0 auto" }}>
                 <div style={{ textAlign: "center", marginBottom: 56 }}>
