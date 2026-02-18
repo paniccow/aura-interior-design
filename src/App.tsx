@@ -2388,6 +2388,7 @@ export default function App() {
           .aura-fp-toolbar{overflow-x:auto!important;flex-wrap:nowrap!important;-webkit-overflow-scrolling:touch;padding:6px 8px!important}
           .aura-fp-preview{height:260px!important}
           .aura-fp-statusbar{display:none!important}
+          .aura-mobile-features{display:block!important}
         }
       `}</style>
 
@@ -2747,7 +2748,40 @@ export default function App() {
             </RevealSection>
           </section>
 
-          {/* Feature Comparison Table — hidden on mobile */}
+          {/* Mobile-only: Simple feature highlights (replaces comparison table) */}
+          <section className="aura-home-section aura-mobile-features" style={{ padding: "60px 6%", background: "#F8F5F0", display: "none" }}>
+            <RevealSection>
+              <div style={{ maxWidth: 600, margin: "0 auto" }}>
+                <div style={{ textAlign: "center", marginBottom: 32 }}>
+                  <span style={{ display: "inline-block", background: "#C1755012", color: "#C17550", padding: "6px 16px", borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 16 }}>Why AURA</span>
+                  <h2 style={{ fontFamily: "Georgia,serif", fontSize: 28, fontWeight: 400, marginBottom: 10, lineHeight: 1.15 }}>Everything in one platform</h2>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {[
+                    ["AI room visualization", "Photorealistic renders of your space"],
+                    ["Chat with an AI designer", "Personalized suggestions in plain language"],
+                    ["CAD floor plans", "Professional layouts with real dimensions"],
+                    [DB.length + " curated products", "Hand-picked from premium brands"],
+                    ["Smart fit scoring", "AI checks style & room compatibility"],
+                    ["Free tier available", "Start designing at no cost"],
+                  ].map(([title, desc]) => (
+                    <div key={title} style={{ display: "flex", gap: 14, alignItems: "flex-start", padding: "16px 18px", background: "#fff", borderRadius: 12, border: "1px solid #EDE8E0" }}>
+                      <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#C17550", marginTop: 7, flexShrink: 0 }} />
+                      <div>
+                        <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1815", margin: "0 0 2px" }}>{title}</p>
+                        <p style={{ fontSize: 12, color: "#9B8B7B", margin: 0, lineHeight: 1.4 }}>{desc}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ textAlign: "center", marginTop: 28 }}>
+                  <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#C17550", color: "#fff", padding: "14px 32px", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Start designing for free</button>
+                </div>
+              </div>
+            </RevealSection>
+          </section>
+
+          {/* Feature Comparison Table — desktop only */}
           <section className="aura-home-section aura-compare-section" style={{ padding: "100px 6%", background: "#F8F5F0" }}>
             <RevealSection>
               <div style={{ maxWidth: 1100, margin: "0 auto" }}>
@@ -2908,7 +2942,7 @@ export default function App() {
 
                   {/* Sub-step 0: Room Type */}
                   {setupSubStep === 0 && (
-                    <div style={{ animation: "fadeUp .4s ease" }}>
+                    <div>
                       <h2 style={{ fontFamily: "Georgia,serif", fontSize: 28, fontWeight: 400, marginBottom: 8, color: "#1A1815" }}>What room are you designing?</h2>
                       <p style={{ fontSize: 14, color: "#9B8B7B", lineHeight: 1.5, marginBottom: 28 }}>Choose the room type so we can tailor recommendations.</p>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -2926,7 +2960,7 @@ export default function App() {
 
                   {/* Sub-step 1: Style */}
                   {setupSubStep === 1 && (
-                    <div style={{ animation: "fadeUp .4s ease" }}>
+                    <div>
                       <h2 style={{ fontFamily: "Georgia,serif", fontSize: 28, fontWeight: 400, marginBottom: 8, color: "#1A1815" }}>What's your style?</h2>
                       <p style={{ fontSize: 14, color: "#9B8B7B", lineHeight: 1.5, marginBottom: 28 }}>Pick the aesthetic that speaks to you. This guides your AI designer.</p>
                       <div className="aura-style-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
@@ -2954,7 +2988,7 @@ export default function App() {
 
                   {/* Sub-step 2: Budget */}
                   {setupSubStep === 2 && (
-                    <div style={{ animation: "fadeUp .4s ease" }}>
+                    <div>
                       <h2 style={{ fontFamily: "Georgia,serif", fontSize: 28, fontWeight: 400, marginBottom: 8, color: "#1A1815" }}>What's your budget?</h2>
                       <p style={{ fontSize: 14, color: "#9B8B7B", lineHeight: 1.5, marginBottom: 28 }}>We'll find pieces that match your price range.</p>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
@@ -2973,7 +3007,7 @@ export default function App() {
 
                   {/* Sub-step 3: Dimensions + Uploads (optional details) */}
                   {setupSubStep === 3 && (
-                    <div style={{ animation: "fadeUp .4s ease" }}>
+                    <div>
                       <h2 style={{ fontFamily: "Georgia,serif", fontSize: 28, fontWeight: 400, marginBottom: 8, color: "#1A1815" }}>Room details <span style={{ fontSize: 14, color: "#B8A898", fontWeight: 400 }}>(optional)</span></h2>
                       <p style={{ fontSize: 14, color: "#9B8B7B", lineHeight: 1.5, marginBottom: 28 }}>Add dimensions or photos for better results. You can skip this and add later.</p>
 
