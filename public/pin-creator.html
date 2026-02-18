@@ -37,43 +37,48 @@
   }
   .pin1 .overlay {
     position: absolute;
-    bottom: 0;
+    top: 0;
     left: 0;
     right: 0;
-    height: 50%;
-    background: linear-gradient(to top, rgba(10,8,6,0.88) 0%, rgba(10,8,6,0.6) 40%, transparent 100%);
+    bottom: 0;
+    background: radial-gradient(ellipse at center, rgba(10,8,6,0.65) 0%, rgba(10,8,6,0.35) 60%, rgba(10,8,6,0.15) 100%);
   }
   .pin1 .content {
     position: absolute;
-    bottom: 72px;
+    top: 50%;
     left: 72px;
     right: 72px;
+    transform: translateY(-50%);
     color: #fff;
+    text-align: center;
   }
   .pin1 .logo {
     font-family: 'Playfair Display', Georgia, serif;
     font-size: 28px;
     font-weight: 500;
     letter-spacing: 0.14em;
-    margin-bottom: 32px;
-    opacity: 0.85;
+    margin-bottom: 28px;
+    opacity: 0.9;
   }
   .pin1 .headline {
     font-family: 'Playfair Display', Georgia, serif;
-    font-size: 62px;
+    font-size: 64px;
     font-weight: 500;
     line-height: 1.12;
     margin-bottom: 20px;
     letter-spacing: -0.01em;
+    text-shadow: 0 2px 20px rgba(0,0,0,0.3);
   }
   .pin1 .sub {
     font-family: 'Inter', -apple-system, sans-serif;
     font-size: 20px;
-    color: rgba(255,255,255,0.65);
+    color: rgba(255,255,255,0.75);
     line-height: 1.6;
-    margin-bottom: 40px;
+    margin-bottom: 36px;
     max-width: 560px;
     font-weight: 300;
+    margin-left: auto;
+    margin-right: auto;
   }
   .pin1 .cta {
     display: inline-block;
