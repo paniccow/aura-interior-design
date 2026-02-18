@@ -111,6 +111,29 @@ export interface DoorDef {
   y: number;
   w: number;
   side: WallSide;
+  swingDir?: "inward" | "outward";
+}
+
+export interface ClearanceZone {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  label: string;
+  distFt: number;
+}
+
+export interface TrafficPath {
+  points: { x: number; y: number }[];
+  label: string;
+}
+
+export interface DimensionLine {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  label: string;
 }
 
 export interface PlacedItem {
@@ -133,6 +156,94 @@ export interface CADLayout {
   windows: WindowDef[];
   doors: DoorDef[];
   scale: number;
+  clearances: ClearanceZone[];
+  trafficPaths: TrafficPath[];
+  dimensions: DimensionLine[];
+}
+
+// ─── Floor Plan Editor State ───
+export interface EditorWall {
+  id: string;
+  x1: number; y1: number;
+  x2: number; y2: number;
+  thickness: number;
+}
+
+export interface EditorWindow {
+  id: string;
+  wallId: string;
+  position: number;
+  width: number;
+}
+
+export interface EditorDoor {
+  id: string;
+  wallId: string;
+  position: number;
+  width: number;
+  swingAngle: number;
+  swingDir: "left" | "right";
+}
+
+export interface EditorFurniture {
+  id: string;
+  productId: number;
+  x: number; y: number;
+  w: number; h: number;
+  rotation: number;
+  locked: boolean;
+  color: string;
+  shape: string;
+  label: string;
+  category: string;
+}
+
+export interface RoomVertex {
+  x: number;
+  y: number;
+}
+
+export interface EditorRoom {
+  vertices: RoomVertex[];
+  wallThickness: number;
+}
+
+export interface EditorGuide {
+  type: "horizontal" | "vertical";
+  position: number;
+}
+
+export type EditorTool =
+  | "select" | "pan" | "wall" | "door" | "window"
+  | "furniture" | "measure" | "eraser";
+
+export interface EditorHistoryEntry {
+  furniture: EditorFurniture[];
+  room: EditorRoom;
+  doors: EditorDoor[];
+  windows: EditorWindow[];
+  walls: EditorWall[];
+}
+
+export interface FloorPlanEditorState {
+  room: EditorRoom;
+  walls: EditorWall[];
+  doors: EditorDoor[];
+  windows: EditorWindow[];
+  furniture: EditorFurniture[];
+  gridSize: number;
+  snapToGrid: boolean;
+  showGrid: boolean;
+  showDimensions: boolean;
+  showClearances: boolean;
+  showTrafficFlow: boolean;
+  zoom: number;
+  panX: number;
+  panY: number;
+  roomWidthFt: number;
+  roomHeightFt: number;
+  roomType: string;
+  style: string;
 }
 
 // ─── Project (localStorage persistence) ───
@@ -153,6 +264,7 @@ export interface Project {
   roomPhoto: { name: string; data: string; type: string } | null;
   roomPhotoAnalysis: string | null;
   bud: string;
+  floorPlanState: string | null;
 }
 
 // ─── User / Auth ───

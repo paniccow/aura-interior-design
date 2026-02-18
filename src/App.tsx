@@ -7,15 +7,16 @@ import { compressImage } from "./utils/compress";
 import { sanitizeHtml, formatChatMessage } from "./utils/sanitize";
 import { getAuthToken, authHeaders } from "./utils/auth";
 import { AI_API, aiChat, analyzeImage, generateAIImage, searchFeaturedProducts } from "./api";
-import { ROOMS, VIBES, fmt, budgets, FURN_DIMS, STYLE_PALETTES, ROOM_NEEDS, STYLE_COMPAT } from "./constants";
+import { ROOMS, VIBES, fmt, budgets, FURN_DIMS, STYLE_PALETTES, ROOM_NEEDS, STYLE_COMPAT, COLOR_TEMPS, RETAILER_TIERS, CATEGORY_INVESTMENT, ROOM_CAT_TIERS } from "./constants";
 import { getProductDims, buildDesignBoard, generateMoodBoards } from "./engine/designEngine";
 import { generateCADLayout } from "./engine/cadLayout";
 import Card, { CAT_COLORS } from "./components/Card";
 import AuraLogo from "./components/AuraLogo";
 import Pill from "./components/Pill";
 import RevealSection, { useScrollReveal } from "./components/RevealSection";
-import CADFloorPlan from "./components/CADFloorPlan";
-import type { Product, ChatMessage, MoodBoard, CADLayout as CADLayoutType, Project, AppUser, UserProfile, AdminStats, StylePalette, RoomNeed, BudgetKey, FurnitureCategory } from "./types";
+import FloorPlanEditor from "./components/FloorPlanEditor";
+import { serializeEditorState, deserializeEditorState } from "./engine/floorPlanState";
+import type { Product, ChatMessage, MoodBoard, CADLayout as CADLayoutType, Project, AppUser, UserProfile, AdminStats, StylePalette, RoomNeed, BudgetKey, FurnitureCategory, FloorPlanEditorState } from "./types";
 
 /* ─── Local Types ─── */
 interface CadFileState {
@@ -39,6 +40,67 @@ interface VizUrl {
   products?: string[];
 }
 
+/** Deduplicate products by ID — keeps first occurrence */
+const dedupRecsById = (arr: Product[]): Product[] => {
+  const seen = new Set<number>();
+  return arr.filter(p => { if (seen.has(p.id)) return false; seen.add(p.id); return true; });
+};
+
+/* ─── ANALYTICS TRACKER ─── */
+interface AnalyticsEvent {
+  event: string;
+  page?: string;
+  ts: number;
+  sessionId: string;
+  meta?: Record<string, string | number>;
+}
+
+const SESSION_ID = (() => {
+  let sid = sessionStorage.getItem("aura_sid");
+  if (!sid) { sid = Date.now().toString(36) + Math.random().toString(36).slice(2, 8); sessionStorage.setItem("aura_sid", sid); }
+  return sid;
+})();
+
+function trackEvent(event: string, meta?: Record<string, string | number>) {
+  try {
+    const entry: AnalyticsEvent = { event, ts: Date.now(), sessionId: SESSION_ID, meta };
+    // Store in localStorage (persists across sessions for admin dashboard)
+    const KEY = "aura_analytics";
+    const raw = localStorage.getItem(KEY);
+    const events: AnalyticsEvent[] = raw ? JSON.parse(raw) : [];
+    events.push(entry);
+    // Keep last 2000 events to prevent bloat
+    if (events.length > 2000) events.splice(0, events.length - 2000);
+    localStorage.setItem(KEY, JSON.stringify(events));
+  } catch (_e) { /* storage full or disabled */ }
+  // Forward to Google Analytics 4
+  try {
+    const w = window as unknown as { gtag?: (...args: unknown[]) => void };
+    if (w.gtag) w.gtag("event", event, { ...meta, session_id: SESSION_ID });
+  } catch (_e) { /* GA not loaded */ }
+}
+
+function getAnalyticsSummary(): { total: number; byEvent: Record<string, number>; last7Days: Record<string, number>; uniqueSessions: number; buyPageVisits: number; checkoutClicks: number; recentEvents: AnalyticsEvent[] } {
+  try {
+    const raw = localStorage.getItem("aura_analytics");
+    const events: AnalyticsEvent[] = raw ? JSON.parse(raw) : [];
+    const byEvent: Record<string, number> = {};
+    const last7Days: Record<string, number> = {};
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const sessions = new Set<string>();
+    let buyPageVisits = 0;
+    let checkoutClicks = 0;
+    for (const e of events) {
+      byEvent[e.event] = (byEvent[e.event] || 0) + 1;
+      sessions.add(e.sessionId);
+      if (e.ts > sevenDaysAgo) last7Days[e.event] = (last7Days[e.event] || 0) + 1;
+      if (e.event === "page_view" && e.meta?.page === "purchase") buyPageVisits++;
+      if (e.event === "checkout_click") checkoutClicks++;
+    }
+    return { total: events.length, byEvent, last7Days, uniqueSessions: sessions.size, buyPageVisits, checkoutClicks, recentEvents: events.slice(-20).reverse() };
+  } catch (_e) { return { total: 0, byEvent: {}, last7Days: {}, uniqueSessions: 0, buyPageVisits: 0, checkoutClicks: 0, recentEvents: [] }; }
+}
+
 /* ─── MAIN APP ─── */
 export default function App() {
   const [pg, setPg] = useState<string>("home");
@@ -53,7 +115,8 @@ export default function App() {
   const [grantEmail, setGrantEmail] = useState<string>("");
   const [grantStatus, setGrantStatus] = useState<string>(""); // "success", "error", or ""
   const [grantMsg, setGrantMsg] = useState<string>("");
-  const ADMIN_PASS = "aura2025admin";
+  // Admin password is entered by user and sent to the server-side API for validation
+  // The server checks it against the ADMIN_PASSWORD environment variable
   const [adminStats, setAdminStats] = useState<AdminStats | null>(null); // { totalUsers, proUsers, totalViz, recentUsers }
   const [projects, setProjects] = useState<Project[]>(() => {
     try { const p = localStorage.getItem("aura_projects"); return p ? JSON.parse(p) : []; } catch (_e) { return []; }
@@ -121,9 +184,12 @@ export default function App() {
   const [featuredPage, setFeaturedPage] = useState<number>(1);
   const [featuredRetailers, setFeaturedRetailers] = useState<string[]>([]);
   const [featuredCache, setFeaturedCache] = useState<Map<number, Product>>(new Map());
+  const [floorPlanState, setFloorPlanState] = useState<FloorPlanEditorState | null>(null);
+  const [editorFullScreen, setEditorFullScreen] = useState(false);
 
   const [designStep, _setDesignStep] = useState<number>(0); // 0=setup, 1=chat, 2=review
   const setDesignStep = (step: number) => { _setDesignStep(step); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const [setupSubStep, setSetupSubStep] = useState<number>(0); // 0=room, 1=style, 2=budget, 3=dimensions+uploads
   const chatEnd = useRef<HTMLDivElement>(null);
   const chatBoxRef = useRef<HTMLDivElement>(null);
   const vizAreaRef = useRef<HTMLDivElement>(null);
@@ -227,6 +293,13 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // ─── WARMUP + ANALYTICS: pre-warm serverless functions, track visit ───
+  useEffect(() => {
+    fetch("/api/products", { method: "OPTIONS" }).catch(() => {});
+    fetch("/api/ai", { method: "OPTIONS" }).catch(() => {});
+    trackEvent("site_visit", { referrer: document.referrer || "direct", page: "home" });
+  }, []);
+
   // Handle Stripe checkout redirect (?checkout=success or ?checkout=cancel)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -300,7 +373,9 @@ export default function App() {
         const items = allProds.filter(p => sel.has(p.id));
         const expandedItems = items.flatMap(p => Array.from({ length: sel.get(p.id) || 1 }, (_, i) => ({ ...p, _qtyIdx: i })));
         const sq = parseInt(sqft) || ((ROOM_NEEDS as Record<string, RoomNeed>)[room]?.minSqft || 200);
-        const layout = generateCADLayout(expandedItems, sq, room, cadAnalysis);
+        const userW = parseFloat(roomW as string) || null;
+        const userL = parseFloat(roomL as string) || null;
+        const layout = generateCADLayout(expandedItems, sq, room, cadAnalysis, userW, userL);
         setCadLayout(layout);
       } catch (err) {
         console.error("CAD layout error:", err);
@@ -309,10 +384,10 @@ export default function App() {
     } else {
       setCadLayout(null);
     }
-  }, [sel, room, sqft, cadAnalysis, user]);
+  }, [sel, room, sqft, cadAnalysis, user, roomW, roomL]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const go = (p: string) => { setPg(p); window.scrollTo(0, 0); };
-  const toggle = (id: number) => setSel((prev) => { const n = new Map(prev); n.has(id) ? n.delete(id) : n.set(id, 1); return n; });
+  const go = (p: string) => { setPg(p); window.scrollTo(0, 0); trackEvent("page_view", { page: p }); };
+  const toggle = (id: number) => { setSel((prev) => { const n = new Map(prev); if (n.has(id)) { n.delete(id); } else { n.set(id, 1); trackEvent("product_add", { productId: id }); } return n; }); };
   const setQty = (id: number, qty: number) => setSel((prev) => { const n = new Map(prev); if (qty <= 0) n.delete(id); else n.set(id, qty); return n; });
   // selItems/selTotal/selCount are computed below (after featuredCache), combining DB + featured products
 
@@ -432,8 +507,8 @@ export default function App() {
     }
     if (vizRemaining <= 0) {
       setVizErr(userPlan === "pro"
-        ? "You've used all 100 visualizations this month. Your limit resets next month."
-        : "You've used your free visualization for this month. Upgrade to Pro for 100 visualizations per month!");
+        ? "You've reached the visualization limit for this billing period. Your access resets next month."
+        : "You've used your free visualization for this month. Upgrade to Pro for unlimited visualizations!");
       return;
     }
     try {
@@ -465,7 +540,7 @@ export default function App() {
           }
           visionContent.push({ type: "text", text: "Product " + (idx + 1) + ": \"" + (item.n || "") + "\" (" + item.c + ")" });
         });
-        visionContent.push({ type: "text", text: "An AI image generator CANNOT see these photos. Your text is its ONLY reference for what each product looks like. COLOR ACCURACY IS CRITICAL — look closely at each image.\n\nFor FURNITURE (sofas, chairs, tables, beds, lights, stools, accents) write on ONE line:\nPRODUCT [number]: shape=[rectangular/round/oval/L-shaped/curved/square], color=[EXACT hex-level color description — e.g. 'light warm sand beige' or 'deep charcoal grey' — be very specific], material=[material+texture e.g. 'nubby cream boucle'], legs=[style+color], arms=[if applicable], details=[key feature in <10 words]\n\nFor RUGS write on ONE line (DIFFERENT format — rugs need pattern and multiple colors):\nPRODUCT [number]: shape=[rectangular/round/runner], dominant_color=[THE main background/field color — e.g. 'warm oatmeal cream' or 'deep navy blue'], accent_colors=[secondary colors in the pattern — e.g. 'rust, ivory, sage'], pattern=[solid/geometric/abstract/floral/medallion/moroccan/striped/trellis/distressed/textured-solid], texture=[flatweave/hand-knotted/shag/tufted/looped/woven/jute], details=[key visual feature in <10 words]\n\nRUG COLOR IS THE #1 PRIORITY — the rug is a huge visual element. Describe its colors with extreme precision." });
+        visionContent.push({ type: "text", text: "An AI image generator CANNOT see these photos. Your text is its ONLY reference. COLOR ACCURACY IS CRITICAL.\n\nFURNITURE — one line each:\nPRODUCT [n]: shape=[rect/round/oval/L-shaped/curved], color=[EXACT shade e.g. 'warm sand beige' not just 'beige'], material=[e.g. cream boucle], legs=[style+color], details=[<8 words]\n\nRUGS — one line each, be VERY specific about pattern:\nPRODUCT [n]: shape=[rect/round/runner], colors=[background color FIRST then accent colors e.g. 'cream background, rust+sage accents'], pattern=[name AND visual description e.g. 'geometric: repeating diamond lattice with thin angular lines' or 'solid: uniform cream with subtle texture' or 'moroccan: ogee trellis lattice' or 'floral: scattered flower motifs with curving stems'], texture=[flatweave/shag/tufted/woven/jute/etc]" });
 
         const vizHeaders = await authHeaders();
         const visionResp = await Promise.race([
@@ -499,9 +574,29 @@ export default function App() {
       const MAT_WORDS = ["leather","velvet","boucle","bouclé","linen","cotton","wool","silk","jute","rattan","wicker","cane","marble","travertine","granite","concrete","wood","oak","walnut","teak","metal","iron","steel","brass","bronze","glass","ceramic","fabric","upholstered","performance","slipcovered","woven"];
       const extractKw = (text: string, words: string[]) => words.filter((w: string) => (text || "").toLowerCase().includes(w.toLowerCase()));
 
+      // Detect set/piece count from product name (e.g. "3-piece sofa set", "set of 2 chairs")
+      const detectSetCount = (name: string): number => {
+        const n = name.toLowerCase();
+        // "3-piece", "3 piece", "3pc"
+        const pieceMatch = n.match(/(\d+)\s*-?\s*(?:piece|pc|pcs)/);
+        if (pieceMatch) return parseInt(pieceMatch[1], 10);
+        // "set of 3", "set of two"
+        const setOfMatch = n.match(/set\s+of\s+(\d+|two|three|four|five|six)/i);
+        if (setOfMatch) {
+          const numWords: Record<string, number> = { two: 2, three: 3, four: 4, five: 5, six: 6 };
+          const v = setOfMatch[1].toLowerCase();
+          return numWords[v] || parseInt(v, 10) || 1;
+        }
+        // "pair" = 2
+        if (/\bpair\b/.test(n)) return 2;
+        return 1;
+      };
+
       const productSpecs = items.slice(0, 17).map((item, idx) => {
         const dims = dims_cache[idx];
-        const qty = sel.get(item.id) || 1;
+        const userQty = sel.get(item.id) || 1;
+        const setCount = detectSetCount(item.n || "");
+        const qty = Math.max(userQty, setCount); // use whichever is larger
         const name = (item.n || "").toLowerCase();
         const fullText = (item.n || "") + " " + (item.pr || "");
 
@@ -519,18 +614,45 @@ export default function App() {
           const mats = extractKw(fullText, MAT_WORDS);
 
           if (item.c === "rug") {
-            // Rug-specific fallback — pattern, texture, and colors matter most
-            const RUG_PATTERNS = ["geometric","abstract","floral","medallion","moroccan","striped","trellis","distressed","solid","textured","herringbone","chevron","diamond","plaid","damask","ikat","kilim","oriental"];
-            const RUG_TEXTURES = ["flatweave","hand-knotted","shag","tufted","looped","woven","jute","hand-loomed","handwoven","braided","sisal","hemp"];
+            // Rug-specific fallback — short, dense format matching vision prompt
+            const RUG_PATTERNS = ["geometric","abstract","floral","medallion","moroccan","striped","trellis","distressed","solid","textured","herringbone","chevron","diamond","plaid","damask","ikat","kilim","oriental","lattice","tribal","botanical","paisley"];
+            const RUG_TEXTURES = ["flatweave","hand-knotted","shag","tufted","looped","woven","jute","hand-loomed","handwoven","braided","sisal","hemp","low-pile","high-pile"];
             const patterns = extractKw(fullText, RUG_PATTERNS);
             const textures = extractKw(fullText, RUG_TEXTURES);
             let shape = "rectangular";
             if (name.includes("round") || name.includes("circular")) shape = "round";
             else if (name.includes("runner")) shape = "runner";
+            const PATTERN_SHORT: Record<string, string> = {
+              geometric: "repeating angular diamonds/triangles in structured grid",
+              abstract: "irregular organic brushstrokes scattered randomly",
+              floral: "flowers+stems in decorative arrangement",
+              medallion: "large ornate central medallion with border",
+              moroccan: "ogee trellis lattice with curved diamonds",
+              striped: "parallel stripes alternating colors",
+              trellis: "interlocking lattice grid of diamond shapes",
+              distressed: "faded vintage pattern with worn areas",
+              solid: "uniform single color, subtle texture",
+              textured: "single color with dimensional ribbing/loops",
+              herringbone: "zigzag V-shaped weave pattern",
+              chevron: "bold V-shaped zigzag stripes",
+              diamond: "repeating diamond/rhombus grid",
+              plaid: "intersecting horizontal+vertical stripes",
+              damask: "ornate symmetrical tone-on-tone medallions",
+              ikat: "blurred-edge geometric with fuzzy transitions",
+              kilim: "bold flat-woven geometric tribal shapes",
+              oriental: "intricate symmetrical floral+geometric with border",
+              lattice: "intersecting lines forming open framework",
+              tribal: "bold primitive geometric symbols, earthy",
+              botanical: "naturalistic leaves+branches, organic",
+              paisley: "teardrop curved motifs, ornamental"
+            };
             aiDesc = "shape=" + shape;
-            if (colors.length > 0) aiDesc += ", dominant_color=" + colors[0] + (colors.length > 1 ? ", accent_colors=" + colors.slice(1, 4).join("/") : "");
-            if (patterns.length > 0) aiDesc += ", pattern=" + patterns[0];
-            else aiDesc += ", pattern=textured-solid";
+            if (colors.length > 0) aiDesc += ", colors=" + colors[0] + " background" + (colors.length > 1 ? " + " + colors.slice(1, 4).join("+") + " accents" : "");
+            if (patterns.length > 0) {
+              aiDesc += ", pattern=" + patterns[0] + ": " + (PATTERN_SHORT[patterns[0]] || patterns[0]);
+            } else {
+              aiDesc += ", pattern=solid: uniform color with subtle texture";
+            }
             if (textures.length > 0) aiDesc += ", texture=" + textures[0];
             else if (mats.length > 0) aiDesc += ", texture=" + mats[0];
           } else {
@@ -550,7 +672,7 @@ export default function App() {
           ? Math.round(dims.w) + "'" + " × " + Math.round(dims.d) + "'"
           : Math.round(dims.w * 12) + '"W × ' + Math.round(dims.d * 12) + '"D';
         let spec = (idx + 1) + ". " + (item.n || "Unknown") + " (" + dimStr + "): " + aiDesc;
-        if (qty > 1) spec += " [×" + qty + "]";
+        if (qty > 1) spec += " — QUANTITY " + qty + ": render exactly " + qty + " of this item";
         return spec;
       }).join("\n");
 
@@ -589,19 +711,26 @@ export default function App() {
       if (hasCadImg) prompt += " Use the provided floor plan for placement.";
       if (cadAnalysis) prompt += "\nFloor plan notes: " + cadAnalysis.slice(0, 250);
 
+      // Count total pieces including quantities/sets
+      const totalPieces = items.slice(0, 17).reduce((sum, item) => {
+        const uq = sel.get(item.id) || 1;
+        const sc = detectSetCount(item.n || "");
+        return sum + Math.max(uq, sc);
+      }, 0);
+
       // Furniture list — numbered, one per line
-      prompt += "\n\nFurniture — exactly " + numItems + " item" + (numItems > 1 ? "s" : "") + ", one of each unless noted:\n" + productSpecs;
+      prompt += "\n\nFurniture — " + totalPieces + " total pieces (" + numItems + " line items, some have quantity > 1):\n" + productSpecs;
 
       // Rules — strict and explicit about ONLY rendering selected products
       prompt += "\n\nCRITICAL RULES:";
-      prompt += "\n- Render EXACTLY " + numItems + " furniture item" + (numItems > 1 ? "s" : "") + " — no more, no less. Each item appears exactly once unless a quantity is noted.";
+      prompt += "\n- Render EXACTLY " + totalPieces + " total furniture pieces. Items marked 'QUANTITY N' MUST appear exactly N times (e.g. QUANTITY 3 = show 3 separate pieces of that item). Count carefully.";
       prompt += "\n- DO NOT add ANY furniture, decor, plants, vases, pillows, books, candles, or accessories that are not in the list above. The room should contain ONLY the listed items plus architectural elements (walls, floor, windows, ceiling).";
       prompt += "\n- Match each item's EXACT color shade, shape, material, arm/leg style as described above. The product reference photos (provided as images) show EXACTLY what each item looks like — replicate their appearance as faithfully as possible. These are real products the user is purchasing.";
 
-      // Rug-specific color accuracy rule — rugs are large visual elements and color must be exact
+      // Rug accuracy — short, dense
       const hasRug = items.slice(0, 17).some(i => i.c === "rug");
       if (hasRug) {
-        prompt += "\n- RUG COLOR ACCURACY IS CRITICAL: The area rug is one of the largest visible surfaces in the room. Its dominant_color and accent_colors MUST match the description exactly. A cream/oatmeal rug must NOT appear grey or white. A navy rug must NOT appear black or blue-grey. Match the rug's pattern (geometric, solid, moroccan, etc.) and texture precisely. The rug reference photo shows the exact product — replicate its colors faithfully.";
+        prompt += "\n- RUGS: Match the rug product photo EXACTLY — same pattern type, same colors, same density. The first color listed is the BACKGROUND color, accent colors appear IN the pattern on top. Do NOT swap them. Rug must be large enough to anchor the seating (8'×10'+).";
       }
 
       prompt += "\n- " + roomNeeds.layout;
@@ -659,6 +788,7 @@ export default function App() {
     roomPhoto: roomPhoto || null,
     roomPhotoAnalysis: roomPhotoAnalysis || null,
     bud: bud || "all",
+    floorPlanState: floorPlanState ? serializeEditorState(floorPlanState) : null,
   });
 
   const saveProject = () => {
@@ -694,6 +824,7 @@ export default function App() {
     if (pr.roomPhoto) setRoomPhoto(pr.roomPhoto); else setRoomPhoto(null);
     if (pr.roomPhotoAnalysis) setRoomPhotoAnalysis(pr.roomPhotoAnalysis); else setRoomPhotoAnalysis(null);
     if (pr.bud) setBud(pr.bud); else setBud("all");
+    if (pr.floorPlanState) setFloorPlanState(deserializeEditorState(pr.floorPlanState)); else setFloorPlanState(null);
     setActiveProjectId(pr.id);
     go("design"); setTab("studio");
   };
@@ -709,6 +840,7 @@ export default function App() {
     setCadLayout(null); setCadFile(null); setCadAnalysis(null);
     setRoomPhoto(null); setRoomPhotoAnalysis(null);
     setBoards(null); setActiveBoard(0); setBoardsGenHint(null);
+    setFloorPlanState(null); setEditorFullScreen(false);
     setActiveProjectId(null);
     go("design"); setTab("studio");
   };
@@ -729,6 +861,7 @@ export default function App() {
         }
       });
       if (error) return error.message;
+      trackEvent("signup", { method: "email" });
       // If email confirmation is required, session is null until confirmed
       if (data.user && !data.session) {
         setConfirmationPending(true);
@@ -777,20 +910,28 @@ export default function App() {
     setInp("");
     setBusy(true);
     setMsgs((prev) => [...prev, { role: "user", text: msg, recs: [] }]);
+    trackEvent("ai_chat", { msgLength: msg.length, room: (room || "none") as string, style: (vibe || "none") as string });
 
     // Search RapidAPI for real products — awaited so the AI can design with them
     let apiProducts: Product[] = [];
     try {
-      const ml = msg.toLowerCase().replace(/[^a-z0-9\s]/g, "");
+      const ml = msg.toLowerCase().replace(/[^a-z0-9\s&]/g, "");
       const furnitureKws = ["sofa","couch","table","chair","desk","lamp","rug","bed","stool","light","art","shelf","cabinet","mirror","ottoman","bench","dresser","nightstand","chandelier","pendant","sconce","sectional","bookcase","sideboard","credenza","headboard","daybed","armchair","recliner","outdoor","patio","furniture","decor","pillow","throw","blanket","vase","planter","bookshelf","wardrobe","mattress"];
       const designKws = ["modern","contemporary","rustic","bohemian","minimalist","scandinavian","industrial","coastal","farmhouse","luxury","elegant","mid-century","japandi","traditional","vintage","retro","wood","leather","velvet","marble","brass","gold","white","black","gray","beige","blue","green","natural"];
+      const retailerNames = ["walmart","ikea","target","amazon","wayfair","west elm","cb2","pottery barn","crate & barrel","crate and barrel","restoration hardware","article","joybird","castlery","arhaus","world market","pier 1","overstock","ashley","rooms to go","ethan allen","z gallerie","anthropologie","urban outfitters","h&m home","zara home","serena & lily","mcgee & co","lulu & georgia","room & board","design within reach"];
       const msgWords = ml.split(/\s+/).filter(w => w.length > 2);
       const matchedFurn = msgWords.filter(w => furnitureKws.some(fk => w.includes(fk) || fk.includes(w)));
       const matchedDesign = msgWords.filter(w => designKws.some(dk => w === dk));
+      // Detect retailer mentions in message
+      const matchedRetailer = retailerNames.find(r => ml.includes(r)) || "";
       const styleTerm = vibe ? (vibe as string).toLowerCase() : "";
       const roomTerm = room ? (room as string).toLowerCase().replace("room", "").trim() : "";
       let searchQuery = "";
-      if (matchedFurn.length > 0) {
+      if (matchedRetailer) {
+        // Retailer-specific search: prioritize the retailer name + any furniture keywords
+        const furnPart = matchedFurn.length > 0 ? " " + matchedFurn.join(" ") : " furniture";
+        searchQuery = matchedRetailer + furnPart;
+      } else if (matchedFurn.length > 0) {
         searchQuery = (styleTerm ? styleTerm + " " : "") + matchedFurn.join(" ");
       } else if (matchedDesign.length > 0) {
         searchQuery = matchedDesign.slice(0, 3).join(" ") + " furniture";
@@ -805,6 +946,22 @@ export default function App() {
         const result = await searchFeaturedProducts(searchQuery.trim(), 1);
         apiProducts = result.products;
         console.log("[AURA] API returned:", apiProducts.length, "products");
+        // Retry once if first attempt returned empty (handles cold-start / transient failures)
+        if (apiProducts.length === 0) {
+          console.log("[AURA] API empty on first try — retrying with delay...");
+          await new Promise(r => setTimeout(r, 2000));
+          const retry = await searchFeaturedProducts(searchQuery.trim(), 1);
+          apiProducts = retry.products;
+          console.log("[AURA] API retry returned:", apiProducts.length, "products");
+          // If still empty, try a broader fallback query
+          if (apiProducts.length === 0) {
+            const fallbackQuery = (vibe ? vibe.toLowerCase() + " " : "") + (room ? room.toLowerCase() + " " : "") + "furniture";
+            console.log("[AURA] API still empty — trying fallback query:", fallbackQuery);
+            const retry2 = await searchFeaturedProducts(fallbackQuery, 1);
+            apiProducts = retry2.products;
+            console.log("[AURA] API fallback returned:", apiProducts.length, "products");
+          }
+        }
         if (apiProducts.length > 0) {
           setFeaturedCache(prev => {
             const next = new Map(prev);
@@ -819,7 +976,15 @@ export default function App() {
     const cachedApiProducts = Array.from(featuredCache.values());
     const combinedDB = [...DB, ...apiProducts, ...cachedApiProducts];
     const seen = new Set<number>();
-    const uniqueDB = combinedDB.filter(p => { if (seen.has(p.id)) return false; seen.add(p.id); return true; });
+    const seenUrls = new Set<string>();
+    const uniqueDB = combinedDB.filter(p => {
+      if (seen.has(p.id)) return false;
+      // Also deduplicate by URL to prevent same product with different IDs
+      if (p.u && seenUrls.has(p.u)) return false;
+      seen.add(p.id);
+      if (p.u) seenUrls.add(p.u);
+      return true;
+    });
     console.log("[AURA] Product pool:", uniqueDB.length, "total |", uniqueDB.filter(p => p.id < 0).length, "API");
 
     let recs = [];
@@ -843,42 +1008,219 @@ export default function App() {
         }
       }
 
-      // Score all products with relevance + randomization for variety
+      // ── DESIGN-ENGINE-LEVEL SCORER ──
+      // Ports the full scoring intelligence from designEngine.ts into the chat flow.
+      // Uses: style coherence, color palette, material harmony, color temperature,
+      // budget fit, retailer tier, category investment, room category tiers,
+      // room photo colors, KAA bonus — same factors the design board uses.
+
+      // Budget boundaries (same logic as designEngine)
+      let minP = 0, maxP = Infinity;
+      if (bud === "u500") maxP = 500;
+      if (bud === "u1k") maxP = 1000;
+      if (bud === "1k5k") { minP = 500; maxP = 5000; }
+      if (bud === "5k10k") { minP = 2000; maxP = 10000; }
+      if (bud === "10k25k") { minP = 5000; maxP = 25000; }
+      if (bud === "25k") minP = 10000;
+
+      // Room category tier priorities
+      const catTiers = (ROOM_CAT_TIERS as Record<string, Record<string, number>>)[room || "Living Room"] || ROOM_CAT_TIERS["Living Room"];
+
+      // Helper: detect color temperature from product text
+      const getProductTemp = (text: string): "warm" | "cool" | "neutral" => {
+        let warm = 0, cool = 0;
+        for (const [color, temp] of Object.entries(COLOR_TEMPS)) {
+          if (text.includes(color)) { if (temp === "warm") warm++; else if (temp === "cool") cool++; }
+        }
+        return warm > cool ? "warm" : cool > warm ? "cool" : "neutral";
+      };
+
+      // Helper: get retailer tier (1=budget, 2=mid, 3=premium, 4=luxury)
+      const getRetailerTier = (retailer: string): number => {
+        if (!retailer) return 2;
+        if (RETAILER_TIERS[retailer]) return RETAILER_TIERS[retailer];
+        const lower = retailer.toLowerCase();
+        for (const [name, tier] of Object.entries(RETAILER_TIERS)) {
+          if (lower.includes(name.toLowerCase()) || name.toLowerCase().includes(lower)) return tier;
+        }
+        return 2;
+      };
+
+      // Helper: word-boundary check for keyword matching (fixes "table" matching "comfortable")
+      const wordMatch = (text: string, word: string): boolean => {
+        const re = new RegExp("\\b" + word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + "\\b");
+        return re.test(text);
+      };
+
+      // Determine room's dominant color temperature from photo analysis
+      let roomTemp: "warm" | "cool" | "neutral" = "neutral";
+      if (roomColors.length >= 2) {
+        let rw = 0, rc = 0;
+        for (const c of roomColors) { const ct = COLOR_TEMPS[c]; if (ct === "warm") rw++; else if (ct === "cool") rc++; }
+        roomTemp = rw > rc ? "warm" : rc > rw ? "cool" : "neutral";
+      }
+
       const scored = uniqueDB.map((x) => {
         let s = 0;
         const isApiProduct = x.id < 0;
-        // Room fit
-        if (room && x.rm && x.rm.includes(room)) s += 5;
-        // Style match
+        const txt = ((x.n || "") + " " + (x.pr || "") + " " + (x.r || "")).toLowerCase();
+
+        // ── 1. STYLE COHERENCE (80/20 rule) — max ~35 pts ──
         if (vibe && x.v && x.v.length > 0) {
-          if (x.v.includes(vibe)) s += 8;
-          else { let best = 0; for (const st of x.v) { best = Math.max(best, vibeCompat[st] || 0); } s += Math.round(best * 5); if (best < 0.4) s -= 3; }
+          if (x.v.includes(vibe)) s += 35;
+          else {
+            let best = 0;
+            for (const st of x.v) { best = Math.max(best, vibeCompat[st] || 0); }
+            s += Math.round(best * 25);
+            if (best < 0.4) s -= 15; // Clashing style penalty
+          }
+        } else if (vibe && isApiProduct) {
+          // API products lack v[] — infer style fit from name/description text
+          // Check if product text matches the style's palette materials/colors/feel keywords
+          const styleKws: Record<string, string[]> = {
+            "Warm Modern": ["modern","clean","warm","oak","walnut","linen","bouclé","neutral"],
+            "Minimalist": ["minimal","simple","clean","sleek","modern","white","steel","glass"],
+            "Bohemian": ["bohemian","boho","rattan","woven","jute","macramé","eclectic","colorful"],
+            "Scandinavian": ["scandinavian","nordic","birch","pine","simple","light","natural","white"],
+            "Mid-Century": ["mid-century","midcentury","retro","vintage","teak","walnut","tapered","atomic"],
+            "Luxury": ["luxury","elegant","marble","velvet","gold","crystal","silk","premium"],
+            "Coastal": ["coastal","beach","nautical","navy","whitewashed","rattan","rope","driftwood"],
+            "Japandi": ["japandi","zen","minimal","ash","ceramic","natural","simple","wabi"],
+            "Industrial": ["industrial","metal","steel","iron","reclaimed","pipe","rustic","urban"],
+            "Art Deco": ["art deco","deco","geometric","gold","lacquer","velvet","glamorous"],
+            "Rustic": ["rustic","farmhouse","reclaimed","wood","barn","distressed","natural","country"],
+            "Glam": ["glam","glamorous","velvet","mirror","crystal","gold","silver","fur","tufted"],
+            "Transitional": ["transitional","classic","timeless","traditional","neutral","elegant"],
+            "Organic Modern": ["organic","natural","stone","clay","linen","earthy","raw","handmade"],
+          };
+          const kws = styleKws[vibe] || [];
+          let styleHits = 0;
+          for (const kw of kws) { if (txt.includes(kw)) styleHits++; }
+          if (styleHits >= 3) s += 28; // Strong style match from text
+          else if (styleHits >= 2) s += 18;
+          else if (styleHits >= 1) s += 8;
         }
-        // Color & material harmony
+
+        // ── 2. COLOR PALETTE HARMONY — max ~18 pts ──
         if (vibePalette) {
-          const txt = ((x.n || "") + " " + (x.pr || "")).toLowerCase();
-          for (const c of vibePalette.colors) { if (txt.includes(c)) s += 2; }
-          for (const mat of vibePalette.materials) { if (txt.includes(mat)) s += 3; }
+          let colorHits = 0;
+          for (const c of vibePalette.colors) { if (txt.includes(c)) colorHits++; }
+          s += colorHits * 8;
+          if (colorHits >= 2) s += 10; // Deeply in-palette bonus
         }
-        // Room color harmony
+
+        // ── 3. MATERIAL FAMILY HARMONY — max ~28 pts ──
+        if (vibePalette) {
+          let matHits = 0;
+          for (const mat of vibePalette.materials) { if (txt.includes(mat)) matHits++; }
+          s += matHits * 10;
+          if (matHits >= 2) s += 8; // Multiple material families bonus
+        }
+
+        // ── 4. ROOM TYPE FIT — +22 pts ──
+        if (room && x.rm && x.rm.includes(room)) s += 22;
+        else if (room && isApiProduct) {
+          // API products have rm:[] — infer room fit from product name
+          const roomInference: Record<string, string[]> = {
+            "Living Room": ["sofa","couch","coffee table","side table","floor lamp","area rug","throw pillow","accent chair"],
+            "Bedroom": ["bed","nightstand","dresser","headboard","mattress","bedding","duvet","pillow sham"],
+            "Dining Room": ["dining","buffet","sideboard","hutch","centerpiece","wine rack"],
+            "Kitchen": ["bar stool","counter stool","kitchen","island"],
+            "Office": ["desk","office chair","bookshelf","filing","task lamp","monitor"],
+            "Outdoor": ["patio","outdoor","garden","adirondack","fire pit","umbrella"],
+            "Bathroom": ["bath","vanity","towel","shower","mirror"],
+            "Great Room": ["sofa","sectional","console","entertainment","media"],
+          };
+          const roomKws = roomInference[room] || [];
+          for (const kw of roomKws) { if (txt.includes(kw)) { s += 18; break; } }
+        }
+
+        // ── 5. CATEGORY TIER PRIORITY (Tier 1 > 2 > 3) — max 30 pts ──
+        const tier = catTiers[x.c as string] || 3;
+        if (tier === 1) s += 30;
+        else if (tier === 2) s += 15;
+        else s += 5;
+
+        // ── 6. BUDGET FIT with investment logic — max +15, min -20 ──
+        if (bud !== "all" && maxP < Infinity) {
+          const investLevel = CATEGORY_INVESTMENT[x.c] || "flexible";
+          if (x.p >= minP && x.p <= maxP) {
+            s += 15;
+          } else if (x.p < minP * 0.5 || x.p > maxP * 2) {
+            s -= 20; // Way out of budget
+          } else {
+            s -= 5;
+          }
+          // Investment pieces should be higher-quality
+          if (investLevel === "splurge" && x.p > maxP * 0.5) s += 5;
+          // Save pieces should be budget-friendly
+          if (investLevel === "save" && x.p < maxP * 0.4) s += 5;
+        }
+
+        // ── 7. COLOR TEMPERATURE CONSISTENCY — max +6, min -3 ──
+        if (roomTemp !== "neutral") {
+          const pTemp = getProductTemp(txt);
+          if (pTemp !== "neutral") {
+            if (pTemp === roomTemp) s += 6;
+            else s -= 3;
+          }
+        } else if (vibePalette) {
+          // No room photo — use style palette's temperature
+          const paletteTemp = getProductTemp(vibePalette.colors.join(" "));
+          const pTemp = getProductTemp(txt);
+          if (paletteTemp !== "neutral" && pTemp !== "neutral") {
+            if (pTemp === paletteTemp) s += 6;
+            else s -= 3;
+          }
+        }
+
+        // ── 8. ROOM PHOTO COLOR HARMONY — max ~23 pts ──
         if (roomColors.length > 0) {
-          const txt = ((x.n || "") + " " + (x.pr || "")).toLowerCase();
           let hits = 0;
           for (const rc of roomColors) { if (txt.includes(rc)) hits++; }
-          s += hits * 3;
-          if (hits >= 2) s += 4;
+          s += hits * 5;
+          if (hits >= 2) s += 8; // Deeply coordinated with room
         }
-        // Category keyword match from user message
-        const catKws: Record<string, string[]> = { sofa:["sofa","couch","sectional"], table:["table","desk","coffee","console","dining"], chair:["chair","seat","lounge","armchair"], bed:["bed","headboard","mattress"], stool:["stool","counter","bar"], light:["light","lamp","chandelier","pendant","sconce"], rug:["rug","carpet","runner"], art:["art","painting","print","canvas"], accent:["ottoman","bench","mirror","cabinet","dresser","pillow","vase","throw"], storage:["shelf","bookcase","cabinet","sideboard","credenza","dresser"] };
-        Object.entries(catKws).forEach(([cat, kws]) => { kws.forEach((w) => { if (m.includes(w) && x.c === cat) s += 6; }); });
-        // Product name word match
-        (x.n || "").toLowerCase().split(" ").forEach((w) => { if (w.length > 3 && m.includes(w)) s += 2; });
-        // API products baseline boost — compensates for empty v[]/rm[] arrays
-        // Curated products can score +5 (room) +8 (style) +material bonuses = ~18+
-        // API products need a strong boost to compete and actually appear in results
-        if (isApiProduct) s += 12;
-        // Moderate random noise — enough variety without breaking cohesion
-        s += Math.random() * 4;
+
+        // ── 9. KAA / DESIGNER-APPROVED — +8 pts ──
+        if (x.kaa) s += 8;
+
+        // ── 10. CATEGORY KEYWORD MATCH from user message (word-boundary) ──
+        const catKws: Record<string, string[]> = {
+          sofa: ["sofa","couch","sectional","loveseat"],
+          table: ["table","desk","coffee table","console","dining table","nightstand"],
+          chair: ["chair","seat","lounge","armchair","recliner"],
+          bed: ["bed","headboard","mattress"],
+          stool: ["stool","counter stool","bar stool"],
+          light: ["lamp","chandelier","pendant","sconce","light fixture"],
+          rug: ["rug","carpet","runner"],
+          art: ["art","painting","print","canvas","poster"],
+          accent: ["ottoman","bench","mirror","cabinet","dresser","pillow","vase","throw"],
+          storage: ["shelf","bookcase","cabinet","sideboard","credenza","dresser"],
+        };
+        Object.entries(catKws).forEach(([cat, kws]) => {
+          kws.forEach((w) => { if (wordMatch(m, w) && x.c === cat) s += 6; });
+        });
+
+        // ── 11. PRODUCT NAME WORD MATCH (word-boundary) ──
+        (x.n || "").toLowerCase().split(/\s+/).forEach((w) => {
+          if (w.length > 3 && wordMatch(m, w)) s += 2;
+        });
+
+        // ── 12. RETAILER TIER HARMONY (prefer consistent tier range) ──
+        // Slight preference for mid-to-premium retailers with established furniture lines
+        const rTier = getRetailerTier(x.r);
+        if (rTier >= 2 && rTier <= 3) s += 3; // Mid-premium sweet spot
+
+        // ── 13. API PRODUCT BOOST — real-time, purchasable items from major retailers ──
+        // Strong boost ensures API products are well-represented in recommendations.
+        // API products miss KAA (+8), room fit from rm[] (+22), style from v[] (+35) = ~65 pts gap.
+        // +60 closes that gap so API products compete strongly even on generic asks.
+        if (isApiProduct) s += 60;
+
+        // ── Tiny random noise to break ties naturally ──
+        s += Math.random() * 2;
+
         return { ...x, _s: s };
       }).sort((a, b) => b._s - a._s);
 
@@ -891,15 +1233,16 @@ export default function App() {
       const recommendedCats = (roomNeeds as RoomNeed).recommended || ["table","chair","rug","light","art","accent"];
       const allNeededCats = [...new Set([...essentialCats, ...recommendedCats])];
 
-      // Step 1: Pick best 2-3 products per needed category (from both DB and API)
+      // Step 1: Pick best 3-4 products per needed category — purely by score
+      // No forced DB/API split: scoring already accounts for style, color, material,
+      // budget, room fit, and retailer tier. The best products win regardless of source.
       const catalogPicks: (typeof scored[0])[] = [];
       const pickedIds = new Set<number>();
       for (const cat of allNeededCats) {
         const catItems = scored.filter(x => x.c === cat && !pickedIds.has(x.id));
-        // Take top 2 from DB + top 2 from API for each category
-        const dbPicks = catItems.filter(x => x.id >= 0).slice(0, 2);
-        const apiPicks = catItems.filter(x => x.id < 0).slice(0, 2);
-        for (const p of [...dbPicks, ...apiPicks]) {
+        // Take top 3 by score (DB and API compete equally)
+        const topForCat = catItems.slice(0, 3);
+        for (const p of topForCat) {
           catalogPicks.push(p);
           pickedIds.add(p.id);
         }
@@ -915,11 +1258,28 @@ export default function App() {
       const apiInCatalog = catalogPicks.filter(x => x.id < 0).length;
       console.log("[AURA] Catalog built:", catalogPicks.length, "total,", apiInCatalog, "API products");
 
-      // Show product names which already describe the sub-type (e.g. "Coffee Table" vs "Nightstand")
-      // This helps the AI pick appropriate items for the room (no nightstands in living rooms)
+      // Rich catalog entries: include colors, materials, style for each product
+      // so the AI can make informed design decisions about cohesion and fit
       const catalogStr = catalogPicks.slice(0, 25).map((x) => {
         const src = x.id < 0 ? " [LIVE]" : "";
-        return "[ID:" + x.id + "] " + x.n + " — " + x.r + ", $" + x.p + " (" + x.c + ")" + src;
+        const styles = (x.v && x.v.length > 0) ? " | Styles: " + x.v.join(", ") : "";
+        // Extract visible colors & materials from product name/description for AI context
+        const ptxt = ((x.n || "") + " " + (x.pr || "")).toLowerCase();
+        const pColors: string[] = [];
+        const pMats: string[] = [];
+        if (vibePalette) {
+          for (const c of vibePalette.colors) { if (ptxt.includes(c)) pColors.push(c); }
+          for (const mt of vibePalette.materials) { if (ptxt.includes(mt)) pMats.push(mt); }
+        }
+        // Also check common universal colors/materials not in the current palette
+        const universalColors = ["white","black","gray","grey","cream","beige","ivory","brown","tan","navy","blue","green","red","gold","silver","natural","walnut","oak","teak","mahogany","espresso"];
+        const universalMats = ["wood","metal","steel","glass","leather","velvet","linen","cotton","marble","ceramic","rattan","fabric","iron","brass","chrome","stone"];
+        for (const c of universalColors) { if (ptxt.includes(c) && !pColors.includes(c)) pColors.push(c); }
+        for (const mt of universalMats) { if (ptxt.includes(mt) && !pMats.includes(mt)) pMats.push(mt); }
+        const colorStr = pColors.length > 0 ? " | Colors: " + pColors.slice(0, 4).join(", ") : "";
+        const matStr = pMats.length > 0 ? " | Materials: " + pMats.slice(0, 3).join(", ") : "";
+        const desc = x.pr ? " | " + (x.pr.length > 60 ? x.pr.slice(0, 60) + "…" : x.pr) : "";
+        return "[ID:" + x.id + "] " + x.n + " — " + x.r + ", $" + x.p + " (" + x.c + ")" + src + styles + colorStr + matStr + desc;
       }).join("\n");
       const palette = (STYLE_PALETTES as Record<string, StylePalette>)[vibe as string] || {};
 
@@ -931,9 +1291,10 @@ export default function App() {
         ? "\n\nALREADY SELECTED BY USER (" + selItems.length + " items):\n" + selItems.map(p => "- " + p.n + " (" + p.c + ") by " + p.r + " — $" + p.p).join("\n")
         : "";
 
-      // Detect if user is asking for a specific item vs designing a full room
+      // Detect if user is asking for a specific item/retailer vs designing a full room
       const specificItemKws = ["sofa","couch","table","chair","desk","lamp","rug","bed","stool","light","chandelier","pendant","mirror","ottoman","bench","dresser","nightstand","bookshelf","cabinet","art","shelf"];
-      const isSpecificRequest = specificItemKws.some(kw => m.includes(kw));
+      const retailerKws = ["walmart","ikea","target","amazon","wayfair","west elm","cb2","pottery barn","crate","restoration hardware","article","joybird","castlery","arhaus"];
+      const isSpecificRequest = specificItemKws.some(kw => m.includes(kw)) || retailerKws.some(kw => m.includes(kw));
       const isFullRoomRequest = !isSpecificRequest || /design|furnish|complete|full|entire|whole|help me|set up|start/i.test(msg);
 
       // Build room essentials checklist for AI
@@ -955,7 +1316,7 @@ export default function App() {
       const checklist = roomChecklists[room as string] || roomChecklists["Living Room"];
 
       const sysPrompt = "You are AURA, an elite AI interior design consultant with access to over 100,000 products from hundreds of top retailers. You curate like a professional designer — every recommendation must feel COHESIVE, like a thoughtfully assembled collection, not random picks.\n\nCatalog (most relevant from 100k+ products — items marked [LIVE] are real-time results from top retailers):\n" + catalogStr +
-        (apiCount > 0 ? "\n\nINCLUDE [LIVE] PRODUCTS: You MUST include at least 3-4 [LIVE] products in your recommendations. These are real, purchasable items found right now from major retailers. Reference them with [ID:N] just like curated products." : "") +
+        (apiCount > 0 ? "\n\n[LIVE] items are real-time results from top retailers — include them when they genuinely fit the design. Prioritize COHESION over source. Only pick [LIVE] products that harmonize with the room's style, color palette, and material family." : "") +
         "\n\nContext: Room=" + (room || "any") + ", Style=" + (vibe || "any") +
         ", Budget=" + (bud === "all" ? "any" : bud) + (sqft ? ", ~" + sqft + " sq ft" : "") +
         (roomW && roomL ? ", Dimensions=" + roomW + "ft x " + roomL + "ft" : "") +
@@ -970,9 +1331,11 @@ export default function App() {
           "\nIMPORTANT: Pick products APPROPRIATE for the room type. Nightstands belong in BEDROOMS, not living rooms. Coffee tables and side tables go in living rooms. Dining tables go in dining rooms. READ the product name carefully." +
           "\nThink like a designer assembling a curated collection: every piece should share a visual thread — a common color tone, material family, or design language."
         :
-          "\n\nSPECIFIC REQUEST: The user is asking about a specific type of item." +
-          "\nRecommend 3-6 options that fit with their existing selections and room style." +
-          "\nExplain WHY each option works — color, material, scale, and how it complements what they already have."
+          "\n\nSPECIFIC REQUEST: The user is asking about a specific type of item or retailer." +
+          "\nRecommend ALL matching products from the catalog above. Show EVERY option that fits their request." +
+          "\nCRITICAL: ONLY recommend products that are in the catalog above with [ID:N]. Do NOT invent or describe products that aren't listed." +
+          "\nFor each product, explain WHY it works — color, material, scale, and how it complements their room and style." +
+          "\nIf few matching products are in the catalog, be honest about how many options are available rather than padding with non-existent items."
         ) +
         "\n\nDESIGN PRINCIPLES:" +
         "\n1. COLOR COHESION (60-30-10): 60% dominant, 30% secondary, 10% accent. Palette colors: " + (palette.colors || []).join(", ") +
@@ -984,7 +1347,8 @@ export default function App() {
         (cadAnalysis ? "\nFloor plan: " + cadAnalysis.slice(0, 500) : "") +
         (roomPhotoAnalysis ? "\nROOM PHOTO: " + roomPhotoAnalysis : "") +
         ((roomNeeds as RoomNeed).layout ? "\nLayout: " + (roomNeeds as RoomNeed).layout : "") +
-        "\n\nRULES: Write flowing paragraphs, NOT numbered lists. Bold product names with **name**. Reference as [ID:N]. Warm editorial tone." +
+        "\n\nRULES: Write flowing paragraphs, NOT numbered lists. Bold product names with **name**. Reference EVERY product as [ID:N]. Warm editorial tone." +
+        "\nCRITICAL: ONLY recommend products from the catalog above. Every product you mention MUST have an [ID:N] reference. NEVER describe or recommend products that aren't in the catalog — the user can only add items you reference by ID." +
         "\nCOHESION IS EVERYTHING: Before finalizing your picks, verify they work as a SET — shared color temperature (all warm or all cool), 2-3 material families max, consistent design era. If a piece doesn't harmonize with the others, SWAP it for one that does. Explain the visual thread tying pieces together." +
         "\nVARY your recommendations — never the same products twice.";
 
@@ -1006,7 +1370,9 @@ export default function App() {
         const apiIds = ids.filter(id => id < 0);
         const dbIds = ids.filter(id => id >= 0);
         console.log("[AURA] AI referenced IDs — DB:", dbIds.length, "API:", apiIds.length, "(IDs:", apiIds.join(","), ")");
-        let aiRecs = ids.map((id) => uniqueDB.find((p) => p.id === id)).filter((x): x is Product => Boolean(x));
+        // Deduplicate IDs first — AI may reference same product multiple times
+        const uniqueIds = [...new Set(ids)];
+        let aiRecs = uniqueIds.map((id) => uniqueDB.find((p) => p.id === id)).filter((x): x is Product => Boolean(x));
         console.log("[AURA] Resolved from IDs:", aiRecs.length, "products");
 
         // Step 2: ALSO try bold name matching (always, not just when IDs fail)
@@ -1031,26 +1397,22 @@ export default function App() {
           if (match) { aiRecs.push(match); foundIds.add(match.id); }
         }
 
-        // Step 3: Safety net — if AI didn't pick enough API products, inject top-scored ones
+        // No forced injection — scoring + AI decide which products earn their place
         const apiInRecs = aiRecs.filter(p => p.id < 0).length;
-        console.log("[AURA] After AI + name matching:", aiRecs.length, "recs |", apiInRecs, "from API");
+        console.log("[AURA] Final recs:", aiRecs.length, "total |", apiInRecs, "API |", aiRecs.filter(p => p.id >= 0).length, "curated");
 
-        // Only inject if AI completely missed API products (it should pick them from catalog)
-        if (apiInRecs < 2) {
-          const topApi = catalogPicks
-            .filter(x => x.id < 0 && !foundIds.has(x.id))
-            .slice(0, 3 - apiInRecs);
-          for (const ap of topApi) {
-            aiRecs.push(ap);
-            foundIds.add(ap.id);
-          }
-          if (topApi.length > 0) console.log("[AURA] Safety injected", topApi.length, "API products");
+        // Cache ALL API products from recs + catalog so they persist for selection/purchase list
+        const apiToCache = [...aiRecs, ...catalogPicks].filter(p => p.id < 0);
+        if (apiToCache.length > 0) {
+          setFeaturedCache(prev => {
+            const next = new Map(prev);
+            for (const p of apiToCache) { if (!next.has(p.id)) next.set(p.id, p); }
+            return next;
+          });
         }
 
-        console.log("[AURA] Final recs:", aiRecs.length, "total |", aiRecs.filter(p => p.id < 0).length, "API |", aiRecs.filter(p => p.id >= 0).length, "curated");
-
         const cleanText = text.replace(/\[ID:-?\d+\]/g, "").trim();
-        setMsgs((prev) => [...prev, { role: "bot", text: cleanText, recs: aiRecs.length > 0 ? aiRecs : topPicks }]);
+        setMsgs((prev) => [...prev, { role: "bot", text: cleanText, recs: dedupRecsById(aiRecs.length > 0 ? aiRecs : topPicks) }]);
         aiWorked = true;
 
         const ml = msg.toLowerCase();
@@ -1094,7 +1456,7 @@ export default function App() {
       setMsgs((prev) => [...prev, {
         role: "bot",
         text: (palette.feel ? "_" + palette.feel + "_\n\n" : "") + "Here's what I'd recommend:\n\n" + reasons + "\n\nWould you like me to go deeper on any of these, or explore a different direction?",
-        recs: fallbackRecs
+        recs: dedupRecsById(fallbackRecs)
       }]);
       // Trigger mood boards from fallback too
       if (room && vibe) {
@@ -1194,11 +1556,26 @@ export default function App() {
     }
   }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Combined selected items: DB products + featured products
+  // Combined selected items: DB products + featured products (including chat-cached API products)
   const allProducts = [...DB, ...Array.from(featuredCache.values())];
   const selItems = allProducts.filter((p) => sel.has(p.id));
   const selTotal = selItems.reduce((s, p) => s + p.p * (sel.get(p.id) || 1), 0);
-  const selCount = Array.from(sel.values()).reduce((s, q) => s + q, 0);
+  // Use resolved items count (not raw sel.size which may include stale/unresolvable IDs)
+  const selCount = selItems.reduce((s, p) => s + (sel.get(p.id) || 1), 0);
+
+  // Prune stale selection IDs that can't resolve to any known product
+  useEffect(() => {
+    const knownIds = new Set(allProducts.map(p => p.id));
+    const staleIds = Array.from(sel.keys()).filter(id => !knownIds.has(id));
+    if (staleIds.length > 0) {
+      console.log("[AURA] Pruning", staleIds.length, "stale selection IDs");
+      setSel(prev => {
+        const next = new Map(prev);
+        for (const id of staleIds) next.delete(id);
+        return next;
+      });
+    }
+  }, [featuredCache.size]); // Re-check when cache updates // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ─── ADMIN ANALYTICS PAGE ─── */
   if (pg === "admin") {
@@ -1210,7 +1587,7 @@ export default function App() {
             <div style={{ marginBottom: 24 }}><AuraLogo size={36} /></div>
             <h2 style={{ fontFamily: "Georgia,serif", fontSize: 24, fontWeight: 400, margin: "0 0 6px" }}>Admin Access</h2>
             <p style={{ fontSize: 13, color: "#9B8B7B", margin: "0 0 28px" }}>Enter the admin password to continue</p>
-            <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); if (adminPassInput === ADMIN_PASS) { setAdminAuthed(true); setAdminPassErr(""); } else { setAdminPassErr("Incorrect password"); } }}>
+            <form onSubmit={async (e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); try { const resp = await fetch("/api/admin-stats", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ adminPass: adminPassInput }) }); if (resp.ok) { setAdminAuthed(true); setAdminPassErr(""); const d = await resp.json(); if (!d.error) setAdminStats(d); } else { setAdminPassErr("Incorrect password"); } } catch { setAdminPassErr("Network error"); } }}>
               <input type="password" placeholder="Admin password" value={adminPassInput} onChange={e => { setAdminPassInput(e.target.value); setAdminPassErr(""); }}
                 style={{ width: "100%", padding: "14px 16px", border: "1px solid " + (adminPassErr ? "#D45B5B" : "#E8E0D8"), borderRadius: 10, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 12 }} />
               {adminPassErr && <p style={{ fontSize: 12, color: "#D45B5B", margin: "0 0 12px" }}>{adminPassErr}</p>}
@@ -1227,7 +1604,7 @@ export default function App() {
       fetch("/api/admin-stats", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ adminPass: ADMIN_PASS })
+        body: JSON.stringify({ adminPass: adminPassInput })
       }).then(r => r.json()).then(d => { if (!d.error) setAdminStats(d); }).catch(() => {});
     }
 
@@ -1342,7 +1719,7 @@ export default function App() {
                 const resp = await fetch("/api/grant-pro", {
                   method: "POST",
                   headers: { "Content-Type": "application/json", ...(token ? { Authorization: "Bearer " + token } : {}) },
-                  body: JSON.stringify({ email: grantEmail.trim(), adminPass: ADMIN_PASS })
+                  body: JSON.stringify({ email: grantEmail.trim(), adminPass: adminPassInput })
                 });
                 const data = await resp.json();
                 if (resp.ok) { setGrantStatus("success"); setGrantMsg(data.message || "User upgraded to Pro!"); setGrantEmail(""); }
@@ -1401,6 +1778,52 @@ export default function App() {
               )}
             </>
           )}
+
+          {/* ─── CONVERSION ANALYTICS ─── */}
+          {(() => {
+            const a = getAnalyticsSummary();
+            return (
+              <div style={{ background: "#fff", borderRadius: 14, border: "1px solid #EDE8E2", overflow: "hidden", marginBottom: 32 }}>
+                <div style={{ padding: "18px 24px", borderBottom: "1px solid #F0EBE4", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <h3 style={{ fontFamily: "Georgia,serif", fontSize: 18, fontWeight: 400, margin: 0 }}>Conversion Analytics</h3>
+                  <span style={{ fontSize: 10, color: "#9B8B7B" }}>{a.total} events · {a.uniqueSessions} sessions</span>
+                </div>
+                <div style={{ display: "flex", gap: 16, flexWrap: "wrap", padding: 20 }}>
+                  {statCard("Buy Page Views", a.buyPageVisits, "Users who saw purchase list", "#C17550")}
+                  {statCard("Buy Clicks", a.byEvent["buy_click"] || 0, "Clicked Buy → on a product", "#5B8B6B")}
+                  {statCard("Checkout Clicks", a.checkoutClicks, "Clicked Subscribe", "#5B4B9B")}
+                  {statCard("Sign Ups", a.byEvent["signup"] || 0, "New accounts created", "#8B7355")}
+                  {statCard("AI Chats", a.byEvent["ai_chat"] || 0, "Messages sent to AI", "#3B7B9B")}
+                  {statCard("Products Added", a.byEvent["product_add"] || 0, "Items added to selection", "#9B5B5B")}
+                  {statCard("CTA Clicks", a.byEvent["cta_click"] || 0, "Start Designing clicks", "#6B8B5B")}
+                </div>
+                {a.last7Days && Object.keys(a.last7Days).length > 0 && (
+                  <div style={{ padding: "0 20px 16px" }}>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: "#9B8B7B", marginBottom: 8, textTransform: "uppercase", letterSpacing: ".06em" }}>Last 7 Days</p>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {Object.entries(a.last7Days).map(([ev, ct]) => (
+                        <span key={ev} style={{ fontSize: 11, background: "#F5F2ED", padding: "4px 12px", borderRadius: 12, color: "#5A5045" }}>{ev}: <b>{ct}</b></span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {a.recentEvents.length > 0 && (
+                  <div style={{ padding: "0 20px 20px" }}>
+                    <p style={{ fontSize: 11, fontWeight: 600, color: "#9B8B7B", marginBottom: 8, textTransform: "uppercase", letterSpacing: ".06em" }}>Recent Events</p>
+                    <div style={{ maxHeight: 200, overflowY: "auto", fontSize: 11, lineHeight: 1.6 }}>
+                      {a.recentEvents.map((ev, i) => (
+                        <div key={i} style={{ padding: "3px 0", borderBottom: "1px solid #F8F6F2", color: "#7A6B5B" }}>
+                          <span style={{ fontWeight: 600, color: "#1A1815" }}>{ev.event}</span>
+                          <span style={{ marginLeft: 8, color: "#B8A898" }}>{new Date(ev.ts).toLocaleString()}</span>
+                          {ev.meta && <span style={{ marginLeft: 8, color: "#9B8B7B" }}>{Object.entries(ev.meta).map(([k, v]) => `${k}=${v}`).join(", ")}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* KPI Row */}
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 32 }}>
@@ -1751,7 +2174,7 @@ export default function App() {
       <div style={{ minHeight: "100vh", padding: "120px 5% 60px", background: "linear-gradient(160deg,#FDFCFA,#F0EBE4)" }}>
         <div style={{ textAlign: "center", maxWidth: 720, margin: "0 auto" }}>
           <p style={{ fontSize: 12, letterSpacing: ".2em", textTransform: "uppercase", color: "#C17550", fontWeight: 600, marginBottom: 12 }}>Pricing</p>
-          <h1 style={{ fontFamily: "Georgia,serif", fontSize: 42, fontWeight: 400, marginBottom: 48 }}>Design without limits</h1>
+          <h1 className="aura-pricing-h" style={{ fontFamily: "Georgia,serif", fontSize: 42, fontWeight: 400, marginBottom: 48 }}>Design without limits</h1>
           <div className="aura-pricing-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 24 }}>
             <div style={{ background: "#fff", borderRadius: 20, padding: "40px 32px", textAlign: "left" }}>
               <p style={{ fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", color: "#A89B8B", marginBottom: 8 }}>Free</p>
@@ -1762,8 +2185,9 @@ export default function App() {
               <div style={{ position: "absolute", top: 0, right: 20, background: "#C17550", color: "#fff", fontSize: 10, fontWeight: 700, padding: "6px 16px", borderRadius: "0 0 12px 12px", letterSpacing: ".1em" }}>POPULAR</div>
               <p style={{ fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", color: "#C17550", marginBottom: 8 }}>Pro</p>
               <div style={{ fontFamily: "Georgia,serif", fontSize: 48, fontWeight: 400, marginBottom: 24 }}>$20<span style={{ fontSize: 16, color: "#B8A898" }}>/mo</span></div>
-              {["Unlimited mood boards", "Full " + DB.length + " product catalog", "100 AI room visualizations/month", "CAD/PDF floor plan analysis", "AI-powered furniture layout plans", "Exact placement with dimensions", "Spatial fit verification", "Unlimited projects", "All 14 design styles"].map((f) => <p key={f} style={{ fontSize: 14, color: "#7A6B5B", padding: "10px 0", borderBottom: "1px solid #F5F0EB", margin: 0 }}>&#10003; {f}</p>)}
+              {["Unlimited mood boards", "Full " + DB.length + " product catalog", "Unlimited AI room visualizations", "CAD/PDF floor plan analysis", "AI-powered furniture layout plans", "Exact placement with dimensions", "Spatial fit verification", "Unlimited projects", "All 14 design styles"].map((f) => <p key={f} style={{ fontSize: 14, color: "#7A6B5B", padding: "10px 0", borderBottom: "1px solid #F5F0EB", margin: 0 }}>&#10003; {f}</p>)}
               <button onClick={async () => {
+                trackEvent("checkout_click", { plan: "pro", loggedIn: user ? "yes" : "no" });
                 if (!user) { go("auth"); return; }
                 if (userPlan === "pro") return;
                 try {
@@ -1831,7 +2255,7 @@ export default function App() {
               </div>
               <span style={{ background: userPlan === "pro" ? "#C17550" : "#F0EBE4", color: userPlan === "pro" ? "#fff" : "#9B8B7B", padding: "5px 14px", borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase" }}>{userPlan === "pro" ? "Active" : "Free"}</span>
             </div>
-            <p style={{ fontSize: 13, color: "#7A6B5B" }}>Visualizations: {vizCount}/{vizLimit} used this month · {vizRemaining} remaining</p>
+            <p style={{ fontSize: 13, color: "#7A6B5B" }}>{userPlan === "pro" ? "Visualizations: " + vizCount + " used this month · Unlimited access" : "Visualizations: " + vizCount + "/" + vizLimit + " used this month · " + vizRemaining + " remaining"}</p>
             <div style={{ marginTop: 16 }}>
               {userPlan === "pro" ? (
                 <button onClick={async () => {
@@ -1876,38 +2300,93 @@ export default function App() {
         @keyframes slideInRight{from{opacity:0;transform:translateX(60px)}to{opacity:1;transform:translateX(0)}}
         @keyframes scaleIn{from{opacity:0;transform:scale(.5)}to{opacity:1;transform:scale(1)}}
         @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+        @keyframes bentoScrollLeft{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+        @keyframes bentoScrollRight{0%{transform:translateX(-50%)}100%{transform:translateX(0)}}
+        .aura-bento-scroll-left{animation:bentoScrollLeft 40s linear infinite}
+        .aura-bento-scroll-right{animation:bentoScrollRight 40s linear infinite}
+        .aura-bento-scroll-left:hover,.aura-bento-scroll-right:hover{animation-play-state:paused}
         *{-webkit-tap-highlight-color:transparent}
         input,button,select,textarea{font-size:16px!important}
+        /* ─── TABLET: 768px–1024px ─── */
+        @media(max-width:1024px){
+          .aura-hero{padding-top:90px!important}
+          .aura-grid-2col{gap:24px!important}
+          .aura-brands-grid{grid-template-columns:repeat(2,1fr)!important}
+          .aura-setup-grid{grid-template-columns:1fr!important}
+          .aura-budget-dims{grid-template-columns:1fr!important}
+          .aura-upload-row{grid-template-columns:1fr!important}
+          .aura-nav-links>button,.aura-nav-links>span{font-size:11px!important;padding:6px 10px!important}
+          .aura-catalog-header{flex-direction:column!important;align-items:flex-start!important}
+          .aura-catalog-search{width:100%!important}
+          .aura-ext-search{flex-direction:column!important}
+          .aura-ext-search input{width:100%!important}
+          .aura-step-nav .aura-step-label{display:none!important}
+          .aura-fp-sidebar{width:200px!important}
+          .aura-fp-toolbar{overflow-x:auto!important;flex-wrap:nowrap!important;-webkit-overflow-scrolling:touch}
+          .aura-fp-preview{height:320px!important}
+        }
+        /* ─── MOBILE: ≤768px ─── */
         @media(max-width:768px){
           .aura-timeline-left,.aura-timeline-right{flex:none!important;width:100%!important;padding:0 8px!important;justify-content:center!important}
           .aura-timeline-left>div,.aura-timeline-right>div{max-width:100%!important}
           .aura-timeline-line{display:none!important}
-          .aura-grid-2col{grid-template-columns:1fr!important;gap:24px!important}
+          .aura-grid-2col{grid-template-columns:1fr!important;gap:16px!important}
           .aura-pricing-grid{grid-template-columns:1fr!important}
-          .aura-nav-links{gap:4px!important}
-          .aura-nav-links>button,.aura-nav-links>span{font-size:10px!important;padding:5px 8px!important}
+          .aura-nav-links{gap:4px!important;flex-wrap:nowrap!important}
+          .aura-nav-links>button,.aura-nav-links>span{font-size:10px!important;padding:4px 8px!important}
+          .aura-nav-cart{display:none!important}
+          nav{padding:8px 4%!important}
           .aura-filter-wrap{flex-direction:column!important}
-          .aura-hero h1{font-size:36px!important}
-          .aura-hero p{font-size:15px!important}
+          .aura-hero{padding-top:64px!important;min-height:auto!important;padding-bottom:24px!important}
+          .aura-hero .aura-grid-2col{padding:0 5%!important}
+          .aura-hero h1{font-size:28px!important;line-height:1.12!important;margin-bottom:12px!important}
+          .aura-hero p{font-size:13px!important;margin-bottom:18px!important}
+          .aura-hero-sub{font-size:9px!important;margin-bottom:8px!important}
+          .aura-hero-btns{flex-direction:row!important;gap:8px!important}
+          .aura-hero-btns button{padding:12px 20px!important;font-size:13px!important;flex:1!important}
+          .aura-home-section{padding-top:48px!important;padding-bottom:48px!important}
+          .aura-home-section h2{font-size:24px!important}
           .aura-studio-filters{padding:16px 4%!important}
-          .aura-card-grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))!important;gap:10px!important}
-          .aura-chat-box{padding:16px!important}
+          .aura-card-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))!important;gap:8px!important}
+          .aura-chat-box{padding:0!important}
           .aura-chat-input{flex-direction:column!important}
           .aura-chat-input input{width:100%!important}
           .aura-chat-input button{width:100%!important}
           .aura-viz-grid{grid-template-columns:1fr!important}
           .aura-mood-tabs{flex-wrap:wrap!important}
-          .aura-upload-row{flex-direction:column!important;gap:12px!important}
+          .aura-upload-row{grid-template-columns:1fr!important;gap:12px!important}
           .aura-sel-header{flex-direction:column!important;align-items:flex-start!important;gap:12px!important}
           .aura-sel-actions{width:100%!important}
           .aura-sel-actions button{flex:1!important}
-          .aura-purchase-row{grid-template-columns:40px 1fr 60px 70px 60px!important}
+          .aura-purchase-row{grid-template-columns:36px 1fr 70px 60px!important}
           .aura-purchase-header{display:none!important}
-          .aura-purchase-footer{grid-template-columns:40px 1fr 60px 70px 60px!important}
-          .aura-purchase-retailer,.aura-purchase-unit{display:none!important}
+          .aura-purchase-footer{grid-template-columns:36px 1fr 70px 60px!important}
+          .aura-purchase-retailer,.aura-purchase-unit,.aura-purchase-qty{display:none!important}
           .aura-admin-grid{grid-template-columns:1fr!important}
           .aura-compare-header,.aura-compare-row{grid-template-columns:1fr repeat(3,48px)!important;gap:2px!important;padding:12px 14px!important}
           .aura-compare-header>div:nth-child(n+5),.aura-compare-row>div:nth-child(n+5){display:none!important}
+          .aura-setup-grid{grid-template-columns:1fr!important}
+          .aura-budget-dims{grid-template-columns:1fr!important}
+          .aura-brands-grid{grid-template-columns:repeat(2,1fr)!important;gap:10px!important}
+          .aura-catalog-header{flex-direction:column!important;align-items:flex-start!important}
+          .aura-catalog-search{width:100%!important}
+          .aura-ext-search{flex-direction:column!important}
+          .aura-ext-search input{width:100%!important}
+          .aura-ext-search button{width:100%!important}
+          .aura-section-pad{padding-left:4%!important;padding-right:4%!important}
+          .aura-section-gap60{gap:24px!important}
+          .aura-step-nav{overflow-x:auto!important;-webkit-overflow-scrolling:touch}
+          .aura-step-nav .aura-step-label{display:none!important}
+          .aura-step-connector{min-width:12px!important;margin:0 6px!important}
+          .aura-design-tabs{overflow-x:auto!important;-webkit-overflow-scrolling:touch}
+          .aura-design-tabs button{white-space:nowrap!important;flex-shrink:0!important}
+          .aura-project-actions{display:none!important}
+          .aura-chat-msgs{max-height:50vh!important}
+          .aura-pricing-h{font-size:32px!important}
+          .aura-fp-sidebar{display:none!important}
+          .aura-fp-toolbar{overflow-x:auto!important;flex-wrap:nowrap!important;-webkit-overflow-scrolling:touch;padding:6px 8px!important}
+          .aura-fp-preview{height:260px!important}
+          .aura-fp-statusbar{display:none!important}
         }
       `}</style>
 
@@ -1915,7 +2394,7 @@ export default function App() {
       <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000, padding: sc ? "10px 5%" : "16px 5%", display: "flex", alignItems: "center", justifyContent: "space-between", background: sc ? "rgba(253,252,250,.96)" : "transparent", backdropFilter: sc ? "blur(20px)" : "none", transition: "all .3s", borderBottom: sc ? "1px solid #F0EBE4" : "none" }}>
         <div onClick={() => go("home")} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}><AuraLogo size={30} /><span style={{ fontFamily: "Georgia,serif", fontSize: 24, fontWeight: 400 }}>AURA</span></div>
         <div className="aura-nav-links" style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          {sel.size > 0 && <span style={{ fontSize: 11, color: "#C17550", fontWeight: 600, background: "rgba(193,117,80,.06)", padding: "5px 12px", borderRadius: 20, whiteSpace: "nowrap" }}>{selCount} items - {fmt(selTotal)}</span>}
+          {sel.size > 0 && <span className="aura-nav-cart" style={{ fontSize: 11, color: "#C17550", fontWeight: 600, background: "rgba(193,117,80,.06)", padding: "5px 12px", borderRadius: 20, whiteSpace: "nowrap" }}>{selCount} items - {fmt(selTotal)}</span>}
           <button onClick={() => go("pricing")} style={{ background: "none", border: "none", fontSize: 12, color: "#9B8B7B", cursor: "pointer", fontFamily: "inherit" }}>Pricing</button>
           {user ? <button onClick={() => go("account")} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 24, padding: "7px 14px", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>{user.name || "Account"}</button> : <button onClick={() => go("auth")} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 24, padding: "7px 14px", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>Sign In</button>}
           <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#C17550", color: "#fff", borderRadius: 24, padding: "8px 16px", border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Design</button>
@@ -1928,15 +2407,15 @@ export default function App() {
         return (
         <div>
           {/* Hero — wide side-by-side layout */}
-          <section style={{ minHeight: "100vh", display: "flex", alignItems: "center", position: "relative", background: "linear-gradient(135deg, #FDFCFA 0%, #F5F0E8 100%)" }}>
+          <section className="aura-hero" style={{ minHeight: "85vh", display: "flex", alignItems: "center", position: "relative", background: "linear-gradient(135deg, #FDFCFA 0%, #F5F0E8 100%)", paddingTop: 80 }}>
             <div className="aura-grid-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40, alignItems: "center", padding: "0 6%", maxWidth: 1300, margin: "0 auto", width: "100%" }}>
               {/* Left — text */}
               <div style={{ animation: "fadeUp .8s ease" }}>
-                <p style={{ fontSize: 11, letterSpacing: ".3em", textTransform: "uppercase", color: "#C17550", fontWeight: 600, marginBottom: 20 }}>AI-Powered Interior Design</p>
+                <p className="aura-hero-sub" style={{ fontSize: 11, letterSpacing: ".3em", textTransform: "uppercase", color: "#C17550", fontWeight: 600, marginBottom: 20 }}>AI-Powered Interior Design</p>
                 <h1 style={{ fontFamily: "Georgia,serif", fontSize: "clamp(36px,4.5vw,64px)", fontWeight: 400, lineHeight: 1.08, marginBottom: 20, color: "#1A1815" }}>Design spaces<br />that feel like you</h1>
                 <p style={{ fontSize: 16, color: "#7A6B5B", lineHeight: 1.7, maxWidth: 460, marginBottom: 28 }}>{DB.length} designer-curated products paired with AI that understands your room, style, and how every piece fits together.</p>
-                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                  <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#C17550", color: "#fff", padding: "16px 36px", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 20px rgba(193,117,80,.25)" }}>Start designing</button>
+                <div className="aura-hero-btns" style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                  <button onClick={() => { go("design"); setTab("studio"); trackEvent("cta_click", { button: "hero_start_designing" }); }} style={{ background: "#C17550", color: "#fff", padding: "16px 36px", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 20px rgba(193,117,80,.25)" }}>Start designing</button>
                   <button onClick={() => { go("design"); setTab("catalog"); }} style={{ background: "transparent", border: "1px solid #D8D0C8", padding: "16px 36px", borderRadius: 12, fontSize: 15, color: "#7A6B5B", cursor: "pointer", fontFamily: "inherit" }}>Browse catalog</button>
                 </div>
               </div>
@@ -1948,7 +2427,7 @@ export default function App() {
           </section>
 
           {/* Feature 1: Define Your Space — with room setup mockup */}
-          <section style={{ padding: "120px 6%", maxWidth: 1200, margin: "0 auto" }}>
+          <section className="aura-home-section" style={{ padding: "120px 6%", maxWidth: 1200, margin: "0 auto" }}>
             <RevealSection>
               <div className="aura-grid-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 60, alignItems: "center" }}>
                 <div>
@@ -2000,7 +2479,7 @@ export default function App() {
           </section>
 
           {/* Feature 2: Discover Your Style — with style palette mockup */}
-          <section style={{ padding: "100px 6%", background: "#F8F5F0" }}>
+          <section className="aura-home-section" style={{ padding: "100px 6%", background: "#F8F5F0" }}>
             <RevealSection>
               <div className="aura-grid-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 60, alignItems: "center", maxWidth: 1200, margin: "0 auto" }}>
                 {/* Mockup: Style palette selector */}
@@ -2045,7 +2524,7 @@ export default function App() {
           </section>
 
           {/* Feature 3: AI Chat & Mood Boards — with chat + product card mockup */}
-          <section style={{ padding: "100px 6%", maxWidth: 1200, margin: "0 auto" }}>
+          <section className="aura-home-section" style={{ padding: "100px 6%", maxWidth: 1200, margin: "0 auto" }}>
             <RevealSection>
               <div className="aura-grid-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 60, alignItems: "center" }}>
                 <div>
@@ -2096,44 +2575,58 @@ export default function App() {
             </RevealSection>
           </section>
 
-          {/* Feature 4: Catalog — with product grid mockup */}
-          <section style={{ padding: "100px 6%", background: "#F8F5F0" }}>
+          {/* Feature 4: Catalog — animated bento grid */}
+          <section className="aura-home-section" style={{ padding: "100px 0", background: "#F8F5F0", overflow: "hidden" }}>
             <RevealSection>
-              <div style={{ maxWidth: 1200, margin: "0 auto", textAlign: "center", marginBottom: 48 }}>
+              <div style={{ maxWidth: 1200, margin: "0 auto", textAlign: "center", marginBottom: 36, padding: "0 6%" }}>
                 <span style={{ display: "inline-block", background: "#8B735515", color: "#8B7355", padding: "6px 16px", borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 20 }}>Featured Catalog</span>
                 <h2 style={{ fontFamily: "Georgia,serif", fontSize: "clamp(28px,3.5vw,42px)", fontWeight: 400, marginBottom: 14, lineHeight: 1.15 }}>100,000+ products, {DB.length} hand-picked by designers</h2>
-                <p style={{ fontSize: 16, color: "#7A6B5B", lineHeight: 1.7, maxWidth: 600, margin: "0 auto" }}>Browse our featured collection of designer-curated pieces, sourced from premium brands. Every item links directly to the product page for purchase — from sofas to sconces, quality and lasting style.</p>
+                <p style={{ fontSize: 16, color: "#7A6B5B", lineHeight: 1.7, maxWidth: 600, margin: "0 auto" }}>Designer-curated pieces from premium brands. Every item links directly to the product page.</p>
               </div>
-              {/* Product grid preview using real images */}
-              <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 14 }}>
-                  {previewProducts.slice(0, 8).map(p => (
-                    <div key={p.id} style={{ background: "#fff", borderRadius: 14, overflow: "hidden", border: "1px solid #EDE8E2", transition: "transform .3s, box-shadow .3s" }}
-                      onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 12px 40px rgba(0,0,0,.08)"; }}
-                      onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "none"; }}
-                    >
-                      <div style={{ height: 180, overflow: "hidden" }}>
-                        <img src={p.img} alt={p.n} loading="lazy" referrerPolicy="no-referrer" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                      </div>
-                      <div style={{ padding: "14px 16px" }}>
-                        <p style={{ fontFamily: "Georgia,serif", fontSize: 14, fontWeight: 500, margin: 0, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.n}</p>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
-                          <span style={{ fontSize: 10, letterSpacing: ".08em", textTransform: "uppercase", color: "#A89B8B" }}>{p.r}</span>
-                          <span style={{ fontWeight: 700, fontSize: 15 }}>{fmt(p.p)}</span>
-                        </div>
+              {/* Animated bento marquee — two rows scrolling in opposite directions */}
+              {(() => {
+                const bentoProducts = DB.filter(p => p.img && p.img.includes("shopify")).filter((_, i) => i % 23 === 0).slice(0, 16);
+                const row1 = bentoProducts.slice(0, 8);
+                const row2 = bentoProducts.slice(8, 16);
+                const BentoCard = ({ p, tall }: { p: typeof DB[0]; tall?: boolean }) => (
+                  <div style={{ flex: "0 0 auto", width: tall ? 260 : 200, background: "#fff", borderRadius: 16, overflow: "hidden", border: "1px solid #EDE8E2", boxShadow: "0 2px 12px rgba(0,0,0,.04)" }}>
+                    <div style={{ height: tall ? 220 : 160, overflow: "hidden" }}>
+                      <img src={p.img} alt={p.n} loading="lazy" referrerPolicy="no-referrer" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    </div>
+                    <div style={{ padding: "12px 14px" }}>
+                      <p style={{ fontFamily: "Georgia,serif", fontSize: 13, fontWeight: 500, margin: 0, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.n}</p>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
+                        <span style={{ fontSize: 9, letterSpacing: ".08em", textTransform: "uppercase", color: "#A89B8B" }}>{p.r}</span>
+                        <span style={{ fontWeight: 700, fontSize: 14 }}>{fmt(p.p)}</span>
                       </div>
                     </div>
-                  ))}
-                </div>
-                <div style={{ textAlign: "center", marginTop: 32 }}>
-                  <button onClick={() => { go("design"); setTab("catalog"); }} style={{ background: "#1A1815", color: "#fff", padding: "16px 40px", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Browse full catalog {"→"}</button>
-                </div>
+                  </div>
+                );
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    {/* Row 1 — scrolls left */}
+                    <div style={{ overflow: "hidden", width: "100%", maskImage: "linear-gradient(90deg, transparent, black 5%, black 95%, transparent)", WebkitMaskImage: "linear-gradient(90deg, transparent, black 5%, black 95%, transparent)" }}>
+                      <div className="aura-bento-scroll-left" style={{ display: "flex", gap: 14, width: "max-content" }}>
+                        {[...row1, ...row1].map((p, i) => <BentoCard key={`r1-${i}`} p={p} tall={i % 3 === 0} />)}
+                      </div>
+                    </div>
+                    {/* Row 2 — scrolls right */}
+                    <div style={{ overflow: "hidden", width: "100%", maskImage: "linear-gradient(90deg, transparent, black 5%, black 95%, transparent)", WebkitMaskImage: "linear-gradient(90deg, transparent, black 5%, black 95%, transparent)" }}>
+                      <div className="aura-bento-scroll-right" style={{ display: "flex", gap: 14, width: "max-content" }}>
+                        {[...row2, ...row2].map((p, i) => <BentoCard key={`r2-${i}`} p={p} />)}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+              <div style={{ textAlign: "center", marginTop: 32, padding: "0 6%" }}>
+                <button onClick={() => { go("design"); setTab("catalog"); }} style={{ background: "#1A1815", color: "#fff", padding: "16px 40px", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Browse full catalog {"→"}</button>
               </div>
             </RevealSection>
           </section>
 
           {/* Feature 5: AI Visualization */}
-          <section style={{ padding: "100px 6%", maxWidth: 1200, margin: "0 auto" }}>
+          <section className="aura-home-section" style={{ padding: "100px 6%", maxWidth: 1200, margin: "0 auto" }}>
             <RevealSection>
               <div style={{ textAlign: "center", marginBottom: 48 }}>
                 <span style={{ display: "inline-block", background: "#6B5B8B15", color: "#6B5B8B", padding: "6px 16px", borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase", marginBottom: 20 }}>Step 4</span>
@@ -2254,7 +2747,7 @@ export default function App() {
           </section>
 
           {/* Feature Comparison Table */}
-          <section style={{ padding: "100px 6%", background: "#F8F5F0" }}>
+          <section className="aura-home-section" style={{ padding: "100px 6%", background: "#F8F5F0" }}>
             <RevealSection>
               <div style={{ maxWidth: 1100, margin: "0 auto" }}>
                 <div style={{ textAlign: "center", marginBottom: 56 }}>
@@ -2327,7 +2820,7 @@ export default function App() {
             <RevealSection style={{ maxWidth: 1100, margin: "0 auto", textAlign: "center" }}>
               <p style={{ fontSize: 12, letterSpacing: ".2em", textTransform: "uppercase", color: "#C17550", fontWeight: 600, marginBottom: 16 }}>Curated From</p>
               <h2 style={{ fontFamily: "Georgia,serif", fontSize: 36, fontWeight: 400, marginBottom: 40 }}>Premium brands, real products</h2>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20, maxWidth: 900, margin: "0 auto 24px", alignItems: "center" }}>
+              <div className="aura-brands-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20, maxWidth: 900, margin: "0 auto 24px", alignItems: "center" }}>
                 {["Lulu & Georgia", "McGee & Co", "Shoppe Amber Interiors", "West Elm"].map(b => (
                   <div key={b} style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 12px" }}>
                     <span style={{ fontFamily: "Georgia,serif", fontSize: 17, color: "#8B7355", fontWeight: 400, textAlign: "center", lineHeight: 1.3 }}>{b}</span>
@@ -2354,11 +2847,11 @@ export default function App() {
       {pg === "design" && (
         <div style={{ paddingTop: 60 }}>
           <div style={{ borderBottom: "1px solid #F0EBE4", background: "#fff" }}>
-            <div style={{ display: "flex", padding: "0 5%", overflowX: "auto" }}>
+            <div className="aura-design-tabs" style={{ display: "flex", padding: "0 5%", overflowX: "auto" }}>
               {[["studio", "Studio"], ["catalog", "Featured Catalog"], ["projects", "Projects" + (projects.length ? " (" + projects.length + ")" : "")]].map(([id, lb]) => (
                 <button key={id} onClick={() => { setTab(id); setPage(0); }} style={{ padding: "16px 22px", fontSize: 12, fontWeight: tab === id ? 700 : 500, background: "none", border: "none", borderBottom: tab === id ? "2px solid #1A1815" : "2px solid transparent", color: tab === id ? "#1A1815" : "#B8A898", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", letterSpacing: ".02em", transition: "all .15s" }}>{lb}</button>
               ))}
-              <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8, padding: "10px 0" }}>
+              <div className="aura-project-actions" style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8, padding: "10px 0" }}>
                 {activeProjectId && <span style={{ fontSize: 10, color: "#B8A898", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{(projects.find(p => p.id === activeProjectId) || {}).name || "Project"}</span>}
                 <button onClick={saveProject} style={{ background: "#1A1815", color: "#fff", border: "none", borderRadius: 10, padding: "8px 18px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>{activeProjectId ? "Save" : "Save as Project"}</button>
                 <button onClick={newProject} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 10, padding: "8px 14px", fontSize: 12, color: "#9B8B7B", cursor: "pointer", fontFamily: "inherit" }}>+ New</button>
@@ -2371,7 +2864,7 @@ export default function App() {
             <div>
               {/* ─── Step Navigation Bar ─── */}
               <div style={{ padding: "0 5%", background: "linear-gradient(180deg, #FDFCFA, #F8F5F0)", borderBottom: "1px solid #EDE8E0" }}>
-                <div style={{ display: "flex", alignItems: "center", maxWidth: 640, margin: "0 auto", padding: "20px 0 18px" }}>
+                <div className="aura-step-nav" style={{ display: "flex", alignItems: "center", maxWidth: 640, margin: "0 auto", padding: "20px 0 18px" }}>
                   {[
                     { label: "Set Up", sub: "Room & Style", icon: "1", done: !!(room && vibe) },
                     { label: "Design", sub: "AI + Products", icon: "2", done: sel.size > 0 },
@@ -2383,119 +2876,157 @@ export default function App() {
                         <div style={{ width: 32, height: 32, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, background: designStep === i ? "#1A1815" : s.done ? "#5B8B6B" : "#E8E0D8", color: designStep === i || s.done ? "#fff" : "#9B8B7B", transition: "all .3s", boxShadow: designStep === i ? "0 2px 8px rgba(26,24,21,.2)" : "none" }}>
                           {s.done && designStep !== i ? "\u2713" : s.icon}
                         </div>
-                        <div>
+                        <div className="aura-step-label">
                           <div style={{ fontSize: 13, fontWeight: designStep === i ? 700 : 500, color: designStep === i ? "#1A1815" : "#9B8B7B", transition: "all .2s", lineHeight: 1.2 }}>{s.label}</div>
                           <div style={{ fontSize: 10, color: designStep === i ? "#9B8B7B" : "#C8BEB4", lineHeight: 1.2, marginTop: 1 }}>{s.sub}</div>
                         </div>
                       </button>
-                      {i < arr.length - 1 && <div style={{ flex: 1, height: 1, background: s.done ? "linear-gradient(90deg, #5B8B6B60, #5B8B6B20)" : "#E8E0D8", margin: "0 16px", minWidth: 24, borderRadius: 1 }} />}
+                      {i < arr.length - 1 && <div className="aura-step-connector" style={{ flex: 1, height: 1, background: s.done ? "linear-gradient(90deg, #5B8B6B60, #5B8B6B20)" : "#E8E0D8", margin: "0 16px", minWidth: 24, borderRadius: 1 }} />}
                     </React.Fragment>
                   ))}
                 </div>
               </div>
 
-              {/* ═══════ STEP 0: SET UP YOUR SPACE ═══════ */}
+              {/* ═══════ STEP 0: SET UP YOUR SPACE — STEP-BY-STEP WIZARD ═══════ */}
               {designStep === 0 && (
-                <div style={{ maxWidth: 1100, margin: "0 auto", padding: "36px 5% 48px" }}>
-                  <div style={{ marginBottom: 32 }}>
-                    <h2 style={{ fontFamily: "Georgia,serif", fontSize: 32, fontWeight: 400, marginBottom: 6, color: "#1A1815", letterSpacing: "-0.02em" }}>Set up your space</h2>
-                    <p style={{ fontSize: 14, color: "#9B8B7B", lineHeight: 1.5, margin: 0 }}>Tell us about the room you're designing</p>
+                <div style={{ maxWidth: 640, margin: "0 auto", padding: "36px 5% 48px" }}>
+                  {/* Progress indicator */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 32 }}>
+                    {["Room", "Style", "Budget", "Details"].map((label, i) => (
+                      <React.Fragment key={label}>
+                        <button onClick={() => { if (i <= setupSubStep) setSetupSubStep(i); }} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", cursor: i <= setupSubStep ? "pointer" : "default", padding: 0, fontFamily: "inherit" }}>
+                          <div style={{ width: 28, height: 28, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, background: setupSubStep === i ? "#1A1815" : i < setupSubStep ? "#5B8B6B" : "#E8E0D8", color: setupSubStep === i || i < setupSubStep ? "#fff" : "#9B8B7B", transition: "all .3s" }}>
+                            {i < setupSubStep ? "\u2713" : i + 1}
+                          </div>
+                          <span style={{ fontSize: 12, fontWeight: setupSubStep === i ? 700 : 400, color: setupSubStep === i ? "#1A1815" : "#9B8B7B", transition: "all .2s" }}>{label}</span>
+                        </button>
+                        {i < 3 && <div style={{ flex: 1, height: 1, background: i < setupSubStep ? "#5B8B6B40" : "#E8E0D8", minWidth: 16, borderRadius: 1 }} />}
+                      </React.Fragment>
+                    ))}
                   </div>
 
-                  {/* Room Type + Style — side by side on desktop */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
-                    <div style={{ background: "#fff", borderRadius: 14, padding: "22px 24px", border: "1px solid #EDE8E0", boxShadow: "0 1px 3px rgba(0,0,0,.03)" }}>
-                      <div style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "#1A1815", fontWeight: 700, marginBottom: 14 }}>Room</div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {/* Sub-step 0: Room Type */}
+                  {setupSubStep === 0 && (
+                    <div style={{ animation: "fadeUp .4s ease" }}>
+                      <h2 style={{ fontFamily: "Georgia,serif", fontSize: 28, fontWeight: 400, marginBottom: 8, color: "#1A1815" }}>What room are you designing?</h2>
+                      <p style={{ fontSize: 14, color: "#9B8B7B", lineHeight: 1.5, marginBottom: 28 }}>Choose the room type so we can tailor recommendations.</p>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                         {ROOMS.map((rm) => (
-                          <button key={rm} onClick={() => setRoom(room === rm ? null : rm)} style={{ padding: "10px 16px", borderRadius: 8, border: room === rm ? "1.5px solid #1A1815" : "1px solid #E8E0D8", background: room === rm ? "#1A1815" : "#FDFCFA", fontSize: 12, fontWeight: room === rm ? 600 : 400, color: room === rm ? "#fff" : "#5A5045", cursor: "pointer", fontFamily: "inherit", transition: "all .15s" }}>{rm}</button>
+                          <button key={rm} onClick={() => { setRoom(rm); setTimeout(() => setSetupSubStep(1), 200); }} style={{ padding: "18px 16px", borderRadius: 12, border: room === rm ? "2px solid #1A1815" : "1px solid #E8E0D8", background: room === rm ? "#1A1815" : "#fff", fontSize: 14, fontWeight: room === rm ? 600 : 400, color: room === rm ? "#fff" : "#5A5045", cursor: "pointer", fontFamily: "inherit", transition: "all .15s", textAlign: "left" }}>{rm}</button>
                         ))}
-                      </div>
-                    </div>
-                    <div style={{ background: "#fff", borderRadius: 14, padding: "22px 24px", border: "1px solid #EDE8E0", boxShadow: "0 1px 3px rgba(0,0,0,.03)" }}>
-                      <div style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "#1A1815", fontWeight: 700, marginBottom: 14 }}>Style</div>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                        {VIBES.map((v) => (
-                          <button key={v} onClick={() => setVibe(vibe === v ? null : v)} style={{ padding: "10px 14px", borderRadius: 8, border: vibe === v ? "1.5px solid #1A1815" : "1px solid #E8E0D8", background: vibe === v ? "#1A1815" : "#FDFCFA", fontSize: 12, fontWeight: vibe === v ? 600 : 400, color: vibe === v ? "#fff" : "#5A5045", cursor: "pointer", fontFamily: "inherit", transition: "all .15s" }}>{v}</button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Palette preview */}
-                  {currentPalette && (
-                    <div style={{ marginBottom: 20, padding: "16px 20px", background: "#fff", borderRadius: 14, border: "1px solid #EDE8E0", boxShadow: "0 1px 3px rgba(0,0,0,.03)" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-                        <div style={{ flex: 1, minWidth: 200 }}>
-                          <p style={{ fontSize: 13, fontStyle: "italic", color: "#5A5045", lineHeight: 1.5, margin: 0 }}>{currentPalette.feel}</p>
-                        </div>
-                        <div style={{ display: "flex", gap: 16, fontSize: 11, color: "#7A6B5B" }}>
-                          <div><span style={{ fontWeight: 700, color: "#1A1815", fontSize: 10, letterSpacing: ".08em", textTransform: "uppercase" }}>Colors</span><br/>{currentPalette.colors.join(" · ")}</div>
-                          <div><span style={{ fontWeight: 700, color: "#1A1815", fontSize: 10, letterSpacing: ".08em", textTransform: "uppercase" }}>Materials</span><br/>{currentPalette.materials.join(" · ")}</div>
-                        </div>
                       </div>
                     </div>
                   )}
 
-                  {/* Budget + Dimensions — compact row */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 16, marginBottom: 20 }}>
-                    <div style={{ background: "#fff", borderRadius: 14, padding: "22px 24px", border: "1px solid #EDE8E0", boxShadow: "0 1px 3px rgba(0,0,0,.03)" }}>
-                      <div style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "#1A1815", fontWeight: 700, marginBottom: 14 }}>Budget</div>
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{budgets.map(([id, lb]) => <Pill key={id} active={bud === id} onClick={() => setBud(id)}>{lb}</Pill>)}</div>
-                    </div>
-                    <div style={{ background: "#fff", borderRadius: 14, padding: "22px 24px", border: "1px solid #EDE8E0", boxShadow: "0 1px 3px rgba(0,0,0,.03)" }}>
-                      <div style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "#1A1815", fontWeight: 700, marginBottom: 14 }}>Dimensions</div>
-                      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
-                        <input value={roomW} onChange={(e) => { const v = e.target.value.replace(/[^\d.]/g, ""); setRoomW(v); if (v && roomL) setSqft(String(Math.round(parseFloat(v) * parseFloat(roomL)))); }} placeholder="W (ft)" style={{ flex: 1, padding: "9px 10px", border: "1px solid #E8E0D8", borderRadius: 8, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box", minWidth: 0, background: "#FDFCFA" }} />
-                        <span style={{ color: "#C8BEB4", fontSize: 12 }}>{"×"}</span>
-                        <input value={roomL} onChange={(e) => { const v = e.target.value.replace(/[^\d.]/g, ""); setRoomL(v); if (roomW && v) setSqft(String(Math.round(parseFloat(roomW) * parseFloat(v)))); }} placeholder="L (ft)" style={{ flex: 1, padding: "9px 10px", border: "1px solid #E8E0D8", borderRadius: 8, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box", minWidth: 0, background: "#FDFCFA" }} />
+                  {/* Sub-step 1: Style */}
+                  {setupSubStep === 1 && (
+                    <div style={{ animation: "fadeUp .4s ease" }}>
+                      <h2 style={{ fontFamily: "Georgia,serif", fontSize: 28, fontWeight: 400, marginBottom: 8, color: "#1A1815" }}>What's your style?</h2>
+                      <p style={{ fontSize: 14, color: "#9B8B7B", lineHeight: 1.5, marginBottom: 28 }}>Pick the aesthetic that speaks to you. This guides your AI designer.</p>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                        {VIBES.map((v) => (
+                          <button key={v} onClick={() => { setVibe(v); setTimeout(() => setSetupSubStep(2), 200); }} style={{ padding: "16px 16px", borderRadius: 12, border: vibe === v ? "2px solid #1A1815" : "1px solid #E8E0D8", background: vibe === v ? "#1A1815" : "#fff", fontSize: 14, fontWeight: vibe === v ? 600 : 400, color: vibe === v ? "#fff" : "#5A5045", cursor: "pointer", fontFamily: "inherit", transition: "all .15s", textAlign: "left" }}>{v}</button>
+                        ))}
                       </div>
-                      <input value={sqft} onChange={(e) => setSqft(e.target.value.replace(/\D/g, ""))} placeholder="or total sqft" style={{ width: "100%", padding: "9px 10px", border: "1px solid #E8E0D8", borderRadius: 8, fontSize: 13, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: "#FDFCFA" }} />
-                      {sqft && <div style={{ marginTop: 6, fontSize: 11, color: "#8A7B6B" }}>{roomW && roomL ? roomW + "' × " + roomL + "' = " + sqft + " sqft" : sqft + " sqft"}</div>}
-                    </div>
-                  </div>
-
-                  {/* Uploads — clean drag area style */}
-                  <div className="aura-upload-row" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 32 }}>
-                    <div style={{ background: "#fff", borderRadius: 14, padding: "22px 24px", border: "1px solid #EDE8E0", boxShadow: "0 1px 3px rgba(0,0,0,.03)" }}>
-                      <div style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "#1A1815", fontWeight: 700, marginBottom: 4 }}>Floor Plan / CAD</div>
-                      <div style={{ fontSize: 11, color: "#9B8B7B", marginBottom: 12, lineHeight: 1.4 }}>For precise furniture placement</div>
-                      <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "20px", background: "#FDFCFA", border: "1.5px dashed #D8D0C8", borderRadius: 10, fontSize: 12, color: "#7A6B5B", cursor: "pointer", transition: "all .15s" }}>
-                        <span style={{ fontSize: 18, opacity: 0.5 }}>{"\uD83D\uDCC0"}</span>
-                        <span style={{ fontWeight: 500 }}>{cadLoading ? "Analyzing..." : "Upload floor plan"}</span>
-                        <input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={handleCad} style={{ display: "none" }} disabled={cadLoading} />
-                      </label>
-                      {cadFile && <div style={{ fontSize: 11, color: "#5B8B6B", fontWeight: 600, marginTop: 8 }}>{cadFile.name}</div>}
-                      {cadLoading && <div style={{ width: 14, height: 14, border: "2px solid #E8E0D8", borderTopColor: "#1A1815", borderRadius: "50%", animation: "spin .8s linear infinite", display: "inline-block", marginTop: 8 }} />}
-                      {cadAnalysis && (
-                        <div style={{ marginTop: 10, padding: "10px 12px", background: "#F8F5F0", borderRadius: 8, fontSize: 11, color: "#5A5045", lineHeight: 1.5, maxHeight: 80, overflowY: "auto" }}>
-                          {cadAnalysis.slice(0, 150)}{cadAnalysis.length > 150 ? "..." : ""}
+                      {currentPalette && (
+                        <div style={{ marginTop: 16, padding: "14px 18px", background: "#fff", borderRadius: 12, border: "1px solid #EDE8E0" }}>
+                          <p style={{ fontSize: 13, fontStyle: "italic", color: "#5A5045", lineHeight: 1.5, margin: "0 0 8px" }}>{currentPalette.feel}</p>
+                          <div style={{ display: "flex", gap: 12, fontSize: 11, color: "#7A6B5B", flexWrap: "wrap" }}>
+                            <div><span style={{ fontWeight: 700, color: "#1A1815", fontSize: 10, letterSpacing: ".08em", textTransform: "uppercase" }}>Colors</span><br/>{currentPalette.colors.join(" · ")}</div>
+                            <div><span style={{ fontWeight: 700, color: "#1A1815", fontSize: 10, letterSpacing: ".08em", textTransform: "uppercase" }}>Materials</span><br/>{currentPalette.materials.join(" · ")}</div>
+                          </div>
                         </div>
                       )}
+                      <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
+                        <button onClick={() => setSetupSubStep(0)} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 10, padding: "12px 20px", fontSize: 13, color: "#9B8B7B", cursor: "pointer", fontFamily: "inherit" }}>Back</button>
+                      </div>
                     </div>
-                    <div style={{ background: "#fff", borderRadius: 14, padding: "22px 24px", border: "1px solid #EDE8E0", boxShadow: "0 1px 3px rgba(0,0,0,.03)" }}>
-                      <div style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "#1A1815", fontWeight: 700, marginBottom: 4 }}>Room Photo</div>
-                      <div style={{ fontSize: 11, color: "#9B8B7B", marginBottom: 12, lineHeight: 1.4 }}>AI designs within your actual room</div>
-                      <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "20px", background: "#FDFCFA", border: "1.5px dashed #D8D0C8", borderRadius: 10, fontSize: 12, color: "#7A6B5B", cursor: "pointer", transition: "all .15s" }}>
-                        <span style={{ fontSize: 18, opacity: 0.5 }}>{"\uD83D\uDCF7"}</span>
-                        <span style={{ fontWeight: 500 }}>{roomPhotoLoading ? "Analyzing..." : "Upload photo"}</span>
-                        <input type="file" accept=".png,.jpg,.jpeg,.webp" onChange={handleRoomPhoto} style={{ display: "none" }} disabled={roomPhotoLoading} />
-                      </label>
-                      {roomPhoto && <div style={{ fontSize: 11, color: "#5B8B6B", fontWeight: 600, marginTop: 8 }}>{roomPhoto.name}</div>}
-                      {roomPhotoLoading && <div style={{ width: 14, height: 14, border: "2px solid #E8E0D8", borderTopColor: "#1A1815", borderRadius: "50%", animation: "spin .8s linear infinite", display: "inline-block", marginTop: 8 }} />}
-                      {roomPhoto && !roomPhotoLoading && (
-                        <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "flex-start" }}>
-                          <img src={roomPhoto.data} alt="Your room" style={{ width: 56, height: 42, objectFit: "cover", borderRadius: 6, border: "1px solid #E8E0D8" }} />
-                          {roomPhotoAnalysis && <div style={{ flex: 1, fontSize: 10, color: "#7A6B5B", lineHeight: 1.4, maxHeight: 50, overflowY: "auto" }}>{roomPhotoAnalysis.slice(0, 120)}...</div>}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  )}
 
-                  {/* Continue button — full width, prominent */}
-                  <button onClick={() => setDesignStep(1)} disabled={!room || !vibe} style={{ width: "100%", background: room && vibe ? "#1A1815" : "#E8E0D8", color: room && vibe ? "#fff" : "#B8A898", padding: "18px 48px", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: room && vibe ? "pointer" : "default", fontFamily: "inherit", transition: "all .2s", letterSpacing: ".02em" }}>
-                    {room && vibe ? "Continue to Design →" : "Select a room and style to continue"}
-                  </button>
+                  {/* Sub-step 2: Budget */}
+                  {setupSubStep === 2 && (
+                    <div style={{ animation: "fadeUp .4s ease" }}>
+                      <h2 style={{ fontFamily: "Georgia,serif", fontSize: 28, fontWeight: 400, marginBottom: 8, color: "#1A1815" }}>What's your budget?</h2>
+                      <p style={{ fontSize: 14, color: "#9B8B7B", lineHeight: 1.5, marginBottom: 28 }}>We'll find pieces that match your price range.</p>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
+                        {budgets.map(([id, lb]) => (
+                          <button key={id} onClick={() => { setBud(id); setTimeout(() => setSetupSubStep(3), 200); }} style={{ padding: "18px 20px", borderRadius: 12, border: bud === id ? "2px solid #1A1815" : "1px solid #E8E0D8", background: bud === id ? "#1A1815" : "#fff", fontSize: 15, fontWeight: bud === id ? 600 : 400, color: bud === id ? "#fff" : "#5A5045", cursor: "pointer", fontFamily: "inherit", transition: "all .15s", textAlign: "left" }}>{lb}</button>
+                        ))}
+                      </div>
+                      <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
+                        <button onClick={() => setSetupSubStep(1)} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 10, padding: "12px 20px", fontSize: 13, color: "#9B8B7B", cursor: "pointer", fontFamily: "inherit" }}>Back</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sub-step 3: Dimensions + Uploads (optional details) */}
+                  {setupSubStep === 3 && (
+                    <div style={{ animation: "fadeUp .4s ease" }}>
+                      <h2 style={{ fontFamily: "Georgia,serif", fontSize: 28, fontWeight: 400, marginBottom: 8, color: "#1A1815" }}>Room details <span style={{ fontSize: 14, color: "#B8A898", fontWeight: 400 }}>(optional)</span></h2>
+                      <p style={{ fontSize: 14, color: "#9B8B7B", lineHeight: 1.5, marginBottom: 28 }}>Add dimensions or photos for better results. You can skip this and add later.</p>
+
+                      {/* Summary of selections */}
+                      <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+                        {room && <span style={{ fontSize: 12, fontWeight: 600, color: "#1A1815", background: "#F5F0EB", padding: "6px 14px", borderRadius: 8 }}>{room}</span>}
+                        {vibe && <span style={{ fontSize: 12, color: "#5A5045", background: "#F5F0EB", padding: "6px 14px", borderRadius: 8 }}>{vibe}</span>}
+                        {bud && <span style={{ fontSize: 12, color: "#5A5045", background: "#F5F0EB", padding: "6px 14px", borderRadius: 8 }}>{budgets.find(b => b[0] === bud)?.[1]}</span>}
+                      </div>
+
+                      {/* Dimensions */}
+                      <div style={{ background: "#fff", borderRadius: 14, padding: "22px 24px", border: "1px solid #EDE8E0", marginBottom: 16 }}>
+                        <div style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "#1A1815", fontWeight: 700, marginBottom: 14 }}>Dimensions</div>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+                          <input value={roomW} onChange={(e) => { const v = e.target.value.replace(/[^\d.]/g, ""); setRoomW(v); if (v && roomL) setSqft(String(Math.round(parseFloat(v) * parseFloat(roomL)))); }} placeholder="Width (ft)" style={{ flex: 1, padding: "12px 14px", border: "1px solid #E8E0D8", borderRadius: 10, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", minWidth: 0, background: "#FDFCFA" }} />
+                          <span style={{ color: "#C8BEB4", fontSize: 14 }}>{"×"}</span>
+                          <input value={roomL} onChange={(e) => { const v = e.target.value.replace(/[^\d.]/g, ""); setRoomL(v); if (roomW && v) setSqft(String(Math.round(parseFloat(roomW) * parseFloat(v)))); }} placeholder="Length (ft)" style={{ flex: 1, padding: "12px 14px", border: "1px solid #E8E0D8", borderRadius: 10, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", minWidth: 0, background: "#FDFCFA" }} />
+                        </div>
+                        <input value={sqft} onChange={(e) => setSqft(e.target.value.replace(/\D/g, ""))} placeholder="or total sqft" style={{ width: "100%", padding: "12px 14px", border: "1px solid #E8E0D8", borderRadius: 10, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: "#FDFCFA" }} />
+                        {sqft && <div style={{ marginTop: 6, fontSize: 12, color: "#8A7B6B" }}>{roomW && roomL ? roomW + "' × " + roomL + "' = " + sqft + " sqft" : sqft + " sqft"}</div>}
+                      </div>
+
+                      {/* Uploads */}
+                      <div className="aura-upload-row" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 28 }}>
+                        <div style={{ background: "#fff", borderRadius: 14, padding: "18px 20px", border: "1px solid #EDE8E0" }}>
+                          <div style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "#1A1815", fontWeight: 700, marginBottom: 4 }}>Floor Plan / CAD</div>
+                          <div style={{ fontSize: 11, color: "#9B8B7B", marginBottom: 10, lineHeight: 1.4 }}>For precise placement</div>
+                          <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "16px", background: "#FDFCFA", border: "1.5px dashed #D8D0C8", borderRadius: 10, fontSize: 12, color: "#7A6B5B", cursor: "pointer" }}>
+                            <span style={{ fontSize: 18, opacity: 0.5 }}>{"\uD83D\uDCC0"}</span>
+                            <span style={{ fontWeight: 500 }}>{cadLoading ? "Analyzing..." : "Upload"}</span>
+                            <input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={handleCad} style={{ display: "none" }} disabled={cadLoading} />
+                          </label>
+                          {cadFile && <div style={{ fontSize: 11, color: "#5B8B6B", fontWeight: 600, marginTop: 6 }}>{cadFile.name}</div>}
+                          {cadLoading && <div style={{ width: 14, height: 14, border: "2px solid #E8E0D8", borderTopColor: "#1A1815", borderRadius: "50%", animation: "spin .8s linear infinite", display: "inline-block", marginTop: 6 }} />}
+                          {cadAnalysis && <div style={{ marginTop: 8, padding: "8px 10px", background: "#F8F5F0", borderRadius: 8, fontSize: 10, color: "#5A5045", lineHeight: 1.4, maxHeight: 60, overflowY: "auto" }}>{cadAnalysis.slice(0, 120)}{cadAnalysis.length > 120 ? "..." : ""}</div>}
+                        </div>
+                        <div style={{ background: "#fff", borderRadius: 14, padding: "18px 20px", border: "1px solid #EDE8E0" }}>
+                          <div style={{ fontSize: 10, letterSpacing: ".14em", textTransform: "uppercase", color: "#1A1815", fontWeight: 700, marginBottom: 4 }}>Room Photo</div>
+                          <div style={{ fontSize: 11, color: "#9B8B7B", marginBottom: 10, lineHeight: 1.4 }}>AI designs in your room</div>
+                          <label style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "16px", background: "#FDFCFA", border: "1.5px dashed #D8D0C8", borderRadius: 10, fontSize: 12, color: "#7A6B5B", cursor: "pointer" }}>
+                            <span style={{ fontSize: 18, opacity: 0.5 }}>{"\uD83D\uDCF7"}</span>
+                            <span style={{ fontWeight: 500 }}>{roomPhotoLoading ? "Analyzing..." : "Upload"}</span>
+                            <input type="file" accept=".png,.jpg,.jpeg,.webp" onChange={handleRoomPhoto} style={{ display: "none" }} disabled={roomPhotoLoading} />
+                          </label>
+                          {roomPhoto && <div style={{ fontSize: 11, color: "#5B8B6B", fontWeight: 600, marginTop: 6 }}>{roomPhoto.name}</div>}
+                          {roomPhotoLoading && <div style={{ width: 14, height: 14, border: "2px solid #E8E0D8", borderTopColor: "#1A1815", borderRadius: "50%", animation: "spin .8s linear infinite", display: "inline-block", marginTop: 6 }} />}
+                          {roomPhoto && !roomPhotoLoading && (
+                            <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "flex-start" }}>
+                              <img src={roomPhoto.data} alt="Your room" style={{ width: 48, height: 36, objectFit: "cover", borderRadius: 6, border: "1px solid #E8E0D8" }} />
+                              {roomPhotoAnalysis && <div style={{ flex: 1, fontSize: 10, color: "#7A6B5B", lineHeight: 1.3, maxHeight: 40, overflowY: "auto" }}>{roomPhotoAnalysis.slice(0, 100)}...</div>}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Navigation */}
+                      <div style={{ display: "flex", gap: 10 }}>
+                        <button onClick={() => setSetupSubStep(2)} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 10, padding: "14px 24px", fontSize: 14, color: "#9B8B7B", cursor: "pointer", fontFamily: "inherit" }}>Back</button>
+                        <button onClick={() => setDesignStep(1)} style={{ flex: 1, background: "#1A1815", color: "#fff", padding: "14px 24px", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>
+                          Continue to Design {"→"}
+                        </button>
+                      </div>
+                      <button onClick={() => setDesignStep(1)} style={{ width: "100%", marginTop: 10, background: "none", border: "none", padding: "10px", fontSize: 13, color: "#B8A898", cursor: "pointer", fontFamily: "inherit" }}>Skip details, start designing</button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -2511,7 +3042,7 @@ export default function App() {
                       {roomPhoto && <span style={{ fontSize: 10, color: "#5B8B6B", background: "#EDF5EE", padding: "3px 8px", borderRadius: 4 }}>Photo uploaded</span>}
                       {sel.size > 0 && <span style={{ fontSize: 12, fontWeight: 700, color: "#1A1815", background: "#F5F0EB", padding: "4px 12px", borderRadius: 6 }}>{selCount} items · {fmt(selTotal)}</span>}
                     </div>
-                    <button onClick={() => setDesignStep(0)} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 6, padding: "4px 12px", fontSize: 11, color: "#9B8B7B", cursor: "pointer", fontFamily: "inherit" }}>Edit</button>
+                    <button onClick={() => { setDesignStep(0); setSetupSubStep(3); }} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 6, padding: "4px 12px", fontSize: 11, color: "#9B8B7B", cursor: "pointer", fontFamily: "inherit" }}>Edit</button>
                   </div>
 
                   {/* AI Chat — above mood boards */}
@@ -2524,7 +3055,7 @@ export default function App() {
                         </div>
                         <span style={{ fontSize: 10, color: "#B8A898" }}>Ask about products, colors, layouts</span>
                       </div>
-                      <div ref={chatBoxRef} style={{ maxHeight: 400, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 10, WebkitOverflowScrolling: "touch" }}>
+                      <div ref={chatBoxRef} className="aura-chat-msgs" style={{ maxHeight: 400, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 10, WebkitOverflowScrolling: "touch" }}>
                         {msgs.map((m, i) => (
                           <div key={i}>
                             <div style={{ padding: m.role === "user" ? "10px 14px" : "12px 16px", borderRadius: m.role === "user" ? "14px 14px 4px 14px" : "14px 14px 14px 4px", fontSize: 14, lineHeight: 1.65, maxWidth: m.role === "user" ? "80%" : "100%", background: m.role === "user" ? "#1A1815" : "#F8F5F0", color: m.role === "user" ? "#fff" : "#3A3530", marginLeft: m.role === "user" ? "auto" : 0, wordBreak: "break-word" }} dangerouslySetInnerHTML={{ __html: formatChatMessage(m.text) }} />
@@ -2658,7 +3189,7 @@ export default function App() {
                     </div>
                   )}
                   </div>
-                  {vizUrls.length > 0 && (
+                  {vizUrls.length > 0 && (<>
                     <div className="aura-viz-grid" style={{ display: "grid", gridTemplateColumns: vizUrls.length === 1 ? "1fr" : "repeat(auto-fit,minmax(280px,1fr))", gap: 16, marginBottom: 24 }}>
                       {vizUrls.map((v, i) => (
                         <div key={i} style={{ borderRadius: 16, overflow: "hidden", border: "1px solid #F0EBE4" }}>
@@ -2681,12 +3212,23 @@ export default function App() {
                         </div>
                       ))}
                     </div>
-                  )}
+                    <p style={{ fontSize: 10, color: "#B8A898", margin: "4px 0 0", textAlign: "center", fontStyle: "italic", lineHeight: 1.4 }}>AI-generated visualization — colors, patterns, and item placement may not be 100% accurate. Refer to individual product images for exact appearance.</p>
+                  </>)}
 
-                  {/* Pro CAD Layout — below viz */}
+                  {/* Pro Interactive Floor Plan Editor — below viz */}
                   {cadLayout && userPlan === "pro" && (
                     <div style={{ marginBottom: 24 }}>
-                      <CADFloorPlan layout={cadLayout} roomType={room || "Living Room"} style={vibe || "Modern"} />
+                      <FloorPlanEditor
+                        initialLayout={cadLayout}
+                        items={selItems}
+                        roomType={room || "Living Room"}
+                        style={vibe || "Modern"}
+                        roomWidthFt={roomW ? parseFloat(roomW) : undefined}
+                        roomHeightFt={roomL ? parseFloat(roomL) : undefined}
+                        isFullScreen={false}
+                        onSave={(state) => { setFloorPlanState(state); setEditorFullScreen(true); }}
+                        savedState={floorPlanState}
+                      />
                       <div style={{ marginTop: 12, padding: "14px 18px", background: "#F8F5F0", borderRadius: 12, border: "1px solid #E8E0D8" }}>
                         <p style={{ fontSize: 11, letterSpacing: ".08em", textTransform: "uppercase", color: "#C17550", fontWeight: 700, marginBottom: 8 }}>Placement Notes</p>
                         <p style={{ fontSize: 12, color: "#5A5045", lineHeight: 1.7, margin: 0 }}>{((ROOM_NEEDS as Record<string, RoomNeed>)[room as string] || ROOM_NEEDS["Living Room"]).layout}</p>
@@ -2761,7 +3303,7 @@ export default function App() {
                         </div>
                       </div>
                       {/* Table header */}
-                      <div className="aura-purchase-header" style={{ display: "grid", gridTemplateColumns: "52px 1fr 110px 90px 80px 80px 72px", gap: 0, padding: "10px 20px", borderBottom: "1px solid #F0EBE4", background: "#FAFAF8" }}>
+                      <div className="aura-purchase-header" style={{ display: "grid", gridTemplateColumns: "52px 1fr 100px 100px 80px 80px 72px", gap: 8, padding: "10px 20px", borderBottom: "1px solid #F0EBE4", background: "#FAFAF8" }}>
                         {["", "Product", "Retailer", "Qty", "Price", "Total", ""].map((h, i) => (
                           <span key={i} style={{ fontSize: 10, fontWeight: 600, color: "#9B8B7B", letterSpacing: ".08em", textTransform: "uppercase" }}>{h}</span>
                         ))}
@@ -2771,7 +3313,7 @@ export default function App() {
                         const qty = sel.get(p.id) || 1;
                         const lineTotal = p.p * qty;
                         return (
-                          <div key={p.id} className="aura-purchase-row" style={{ display: "grid", gridTemplateColumns: "52px 1fr 110px 90px 80px 80px 72px", gap: 0, padding: "12px 20px", borderBottom: idx < selItems.length - 1 ? "1px solid #F5F2ED" : "none", alignItems: "center", transition: "background .15s" }}
+                          <div key={p.id} className="aura-purchase-row" style={{ display: "grid", gridTemplateColumns: "52px 1fr 100px 100px 80px 80px 72px", gap: 8, padding: "12px 20px", borderBottom: idx < selItems.length - 1 ? "1px solid #F5F2ED" : "none", alignItems: "center", transition: "background .15s" }}
                             onMouseEnter={e => e.currentTarget.style.background = "#FAFAF8"}
                             onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                             {/* Thumbnail */}
@@ -2786,7 +3328,7 @@ export default function App() {
                             {/* Retailer */}
                             <span className="aura-purchase-retailer" style={{ fontSize: 11, color: "#7A6B5B" }}>{p.r}</span>
                             {/* Quantity — clean inline stepper */}
-                            <div style={{ display: "inline-flex", alignItems: "center", border: "1px solid #E8E0D8", borderRadius: 6, overflow: "hidden", height: 26 }}>
+                            <div className="aura-purchase-qty" style={{ display: "inline-flex", alignItems: "center", border: "1px solid #E8E0D8", borderRadius: 6, overflow: "hidden", height: 26, width: "fit-content" }}>
                               <button onClick={() => setQty(p.id, qty - 1)} style={{ width: 26, height: 26, border: "none", borderRight: "1px solid #E8E0D8", background: "#FAFAF8", fontSize: 13, cursor: "pointer", fontFamily: "inherit", color: "#5A5045", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>−</button>
                               <span style={{ width: 24, textAlign: "center", fontSize: 12, fontWeight: 600, color: "#1A1815" }}>{qty}</span>
                               <button onClick={() => setQty(p.id, qty + 1)} style={{ width: 26, height: 26, border: "none", borderLeft: "1px solid #E8E0D8", background: "#FAFAF8", fontSize: 13, cursor: "pointer", fontFamily: "inherit", color: "#5A5045", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}>+</button>
@@ -2796,12 +3338,12 @@ export default function App() {
                             {/* Line total */}
                             <span style={{ fontSize: 13, fontWeight: 700, color: "#1A1815" }}>{fmt(lineTotal)}</span>
                             {/* Buy button */}
-                            <a href={p.u} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", background: "#C17550", color: "#fff", fontSize: 11, fontWeight: 600, padding: "6px 14px", borderRadius: 6, textDecoration: "none", whiteSpace: "nowrap" }}>Buy →</a>
+                            <a href={p.u} target="_blank" rel="noopener noreferrer" onClick={() => trackEvent("buy_click", { product: p.n, retailer: p.r, price: p.p })} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", background: "#C17550", color: "#fff", fontSize: 11, fontWeight: 600, padding: "6px 14px", borderRadius: 6, textDecoration: "none", whiteSpace: "nowrap" }}>Buy →</a>
                           </div>
                         );
                       })}
                       {/* Total footer */}
-                      <div className="aura-purchase-footer" style={{ display: "grid", gridTemplateColumns: "52px 1fr 110px 90px 80px 80px 72px", gap: 0, padding: "16px 20px", borderTop: "2px solid #E8E0D8", background: "#FAFAF8" }}>
+                      <div className="aura-purchase-footer" style={{ display: "grid", gridTemplateColumns: "52px 1fr 100px 100px 80px 80px 72px", gap: 8, padding: "16px 20px", borderTop: "2px solid #E8E0D8", background: "#FAFAF8" }}>
                         <span />
                         <span style={{ fontSize: 14, fontWeight: 700, color: "#1A1815", padding: "0 10px" }}>Total ({selCount} items)</span>
                         <span className="aura-purchase-retailer" style={{ fontSize: 11, color: "#9B8B7B" }}>{[...new Set(selItems.map(p => p.r))].length} retailers</span>
@@ -2827,13 +3369,13 @@ export default function App() {
           {/* FEATURED CATALOG TAB */}
           {tab === "catalog" && (
             <div style={{ padding: "28px 5%" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 20, flexWrap: "wrap", gap: 14 }}>
+              <div className="aura-catalog-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 20, flexWrap: "wrap", gap: 14 }}>
                 <div>
                   <p style={{ fontSize: 12, letterSpacing: ".15em", textTransform: "uppercase", color: "#C17550", fontWeight: 600, marginBottom: 6 }}>Featured Catalog</p>
                   <h2 style={{ fontFamily: "Georgia,serif", fontSize: 26, fontWeight: 400 }}>{filteredDB.length} products</h2>
                   <p style={{ fontSize: 13, color: "#9B8B7B", marginTop: 6, lineHeight: 1.5 }}>Out of 100,000+ products available, here are some of our featured picks — hand-selected by designers for quality and style.</p>
                 </div>
-                <input value={searchQ} onChange={(e) => { setSearchQ(e.target.value); setPage(0); }} placeholder="Search products or brands..." style={{ background: "#fff", border: "1px solid #E8E0D8", borderRadius: 12, padding: "12px 18px", fontFamily: "inherit", fontSize: 13, outline: "none", width: 280 }} />
+                <input className="aura-catalog-search" value={searchQ} onChange={(e) => { setSearchQ(e.target.value); setPage(0); }} placeholder="Search products or brands..." style={{ background: "#fff", border: "1px solid #E8E0D8", borderRadius: 12, padding: "12px 18px", fontFamily: "inherit", fontSize: 13, outline: "none", width: 280, maxWidth: "100%", boxSizing: "border-box" }} />
               </div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 24 }}>
                 {cats.map((ct) => <Pill key={ct.id} active={catFilter === ct.id} onClick={() => { setCatFilter(ct.id); setPage(0); }}>{ct.n}</Pill>)}
@@ -2859,8 +3401,8 @@ export default function App() {
                     {featuredLoading && featuredProducts.length === 0 ? "Searching..." : "100,000+ products from top brands"}
                   </h2>
                 </div>
-                <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); doFeaturedSearch(featuredQuery, featuredCat, 1); }} style={{ display: "flex", gap: 8 }}>
-                  <input value={featuredQuery} onChange={(e) => setFeaturedQuery(e.target.value)} placeholder="Search furniture from all retailers..." style={{ background: "#fff", border: "1px solid #E8E0D8", borderRadius: 12, padding: "12px 18px", fontFamily: "inherit", fontSize: 13, outline: "none", width: 260 }} />
+                <form className="aura-ext-search" onSubmit={(e: React.FormEvent<HTMLFormElement>) => { e.preventDefault(); doFeaturedSearch(featuredQuery, featuredCat, 1); }} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <input value={featuredQuery} onChange={(e) => setFeaturedQuery(e.target.value)} placeholder="Search furniture from all retailers..." style={{ background: "#fff", border: "1px solid #E8E0D8", borderRadius: 12, padding: "12px 18px", fontFamily: "inherit", fontSize: 13, outline: "none", width: 260, maxWidth: "100%", boxSizing: "border-box", flex: "1 1 200px" }} />
                   <button type="submit" style={{ background: "#C17550", color: "#fff", border: "none", borderRadius: 12, padding: "12px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>Search</button>
                 </form>
               </div>
@@ -2938,7 +3480,7 @@ export default function App() {
                     <div key={pr.id} style={{ background: "#fff", borderRadius: 16, border: activeProjectId === pr.id ? "2px solid #C17550" : "1px solid #F0EBE4", overflow: "hidden", transition: "border .2s, box-shadow .2s", boxShadow: activeProjectId === pr.id ? "0 4px 20px rgba(193,117,80,.12)" : "none" }}>
                       <div style={{ padding: "20px 22px 16px" }}>
                         {editingProjectName === pr.id ? (
-                          <input autoFocus defaultValue={pr.name} onBlur={(e) => renameProject(pr.id, e.target.value || pr.name)} onKeyDown={(e) => { if (e.key === "Enter") renameProject(pr.id, (e.target as HTMLInputElement).value || pr.name); if (e.key === "Escape") setEditingProjectName(null); }} style={{ fontFamily: "Georgia,serif", fontSize: 17, border: "1px solid #C17550", borderRadius: 8, padding: "4px 10px", width: "100%", outline: "none", boxSizing: "border-box" }} />
+                          <input autoFocus defaultValue={pr.name} onBlur={(e) => renameProject(pr.id, e.currentTarget.value || pr.name)} onKeyDown={(e) => { if (e.key === "Enter") renameProject(pr.id, e.currentTarget.value || pr.name); if (e.key === "Escape") setEditingProjectName(null); }} style={{ fontFamily: "Georgia,serif", fontSize: 17, border: "1px solid #C17550", borderRadius: 8, padding: "4px 10px", width: "100%", outline: "none", boxSizing: "border-box" }} />
                         ) : (
                           <div onClick={() => setEditingProjectName(pr.id)} style={{ fontFamily: "Georgia,serif", fontSize: 17, cursor: "text" }} title="Click to rename">{pr.name}</div>
                         )}
@@ -2963,13 +3505,30 @@ export default function App() {
         </div>
       )}
 
+      {/* FULLSCREEN FLOOR PLAN EDITOR — component manages its own fixed positioning */}
+      {editorFullScreen && cadLayout && (
+        <FloorPlanEditor
+          initialLayout={cadLayout}
+          items={selItems}
+          roomType={room || "Living Room"}
+          style={vibe || "Modern"}
+          roomWidthFt={roomW ? parseFloat(roomW) : undefined}
+          roomHeightFt={roomL ? parseFloat(roomL) : undefined}
+          isFullScreen={true}
+          onClose={() => setEditorFullScreen(false)}
+          onSave={(state) => { setFloorPlanState(state); }}
+          savedState={floorPlanState}
+        />
+      )}
+
       {/* FOOTER */}
       <footer style={{ background: "#fff", borderTop: "1px solid #F0EBE4", padding: "28px 5%", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}><AuraLogo size={22} /><span style={{ fontFamily: "Georgia,serif", fontSize: 18 }}>AURA</span></div>
         <div style={{ display: "flex", gap: 24 }}>
-          {([["Design", () => { go("design"); setTab("studio"); }], ["Featured Catalog", () => { go("design"); setTab("catalog"); }], ["Pricing", () => go("pricing")], ["Admin", () => go("admin")]] as [string, () => void][]).map(([l, fn]) => (
+          {([["Design", () => { go("design"); setTab("studio"); }], ["Featured Catalog", () => { go("design"); setTab("catalog"); }], ["Pricing", () => go("pricing")]] as [string, () => void][]).map(([l, fn]) => (
             <span key={l} onClick={fn} style={{ fontSize: 12, cursor: "pointer", color: "#B8A898" }}>{l}</span>
           ))}
+          {adminAuthed && <span onClick={() => go("admin")} style={{ fontSize: 12, cursor: "pointer", color: "#B8A898" }}>Admin</span>}
         </div>
       </footer>
     </div>

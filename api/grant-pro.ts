@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 
-const ADMIN_PASS: string = process.env.ADMIN_PASSWORD || "aura2025admin";
+const ADMIN_PASS: string | undefined = process.env.ADMIN_PASSWORD;
 
 const supabaseAdmin =
   process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -18,7 +18,7 @@ const ALLOWED_ORIGINS: string[] = [
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   const origin = (req.headers.origin || "") as string;
-  const allowedOrigin = ALLOWED_ORIGINS.find(o => origin.startsWith(o)) || ALLOWED_ORIGINS[0];
+  const allowedOrigin = ALLOWED_ORIGINS.find(o => origin === o) || ALLOWED_ORIGINS[0];
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -30,8 +30,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const { email, adminPass } = (req.body || {}) as { email?: string; adminPass?: string };
 
   // Verify admin password
-  if (adminPass !== ADMIN_PASS) {
-    res.status(403).json({ error: "Invalid admin password" });
+  if (!ADMIN_PASS || adminPass !== ADMIN_PASS) {
+    res.status(403).json({ error: "Unauthorized" });
     return;
   }
 
@@ -61,7 +61,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         .ilike("email", email.trim());
 
       if (searchErr || !profiles || profiles.length === 0) {
-        res.status(404).json({ error: "No user found with email: " + email });
+        res.status(404).json({ error: "No user found with that email" });
         return;
       }
 
@@ -78,16 +78,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         .eq("id", target.id);
 
       if (updateErr) {
-        res.status(500).json({ error: "Failed to update: " + updateErr.message });
+        res.status(500).json({ error: "Failed to update user" });
         return;
       }
 
-      res.status(200).json({ message: target.email + " upgraded to Pro!" });
+      res.status(200).json({ message: "User upgraded to Pro!" });
       return;
     }
 
     if (profile.plan === "pro") {
-      res.status(200).json({ message: profile.email + " is already on Pro plan" });
+      res.status(200).json({ message: "User is already on Pro plan" });
       return;
     }
 
@@ -97,12 +97,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       .eq("id", profile.id);
 
     if (updateErr) {
-      res.status(500).json({ error: "Failed to update: " + updateErr.message });
+      res.status(500).json({ error: "Failed to update user" });
       return;
     }
 
-    res.status(200).json({ message: profile.email + " upgraded to Pro!" });
+    res.status(200).json({ message: "User upgraded to Pro!" });
   } catch (err: unknown) {
-    res.status(500).json({ error: "Server error: " + (err as Error).message });
+    res.status(500).json({ error: "Internal server error" });
   }
 }

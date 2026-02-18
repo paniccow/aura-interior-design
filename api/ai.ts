@@ -90,7 +90,7 @@ export const maxDuration = 300;
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   // --- ORIGIN VALIDATION ---
   const origin = (req.headers.origin || req.headers.referer || "") as string;
-  const isAllowedOrigin = ALLOWED_ORIGINS.some(o => origin.startsWith(o));
+  const isAllowedOrigin = ALLOWED_ORIGINS.some(o => origin === o);
 
   // Set CORS headers — only for allowed origins
   if (isAllowedOrigin) {
@@ -175,8 +175,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           res.status(403).json({
             error: "viz_limit_reached",
             message: profile.plan === "pro"
-              ? "You have used all 100 visualizations this month."
-              : "Free plan allows 1 visualization per month. Upgrade to Pro for 100/month."
+              ? "You've reached the visualization limit for this billing period. Resets next month."
+              : "Free plan allows 1 visualization per month. Upgrade to Pro for unlimited visualizations."
           });
           return;
         }

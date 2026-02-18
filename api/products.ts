@@ -155,20 +155,37 @@ function mapProduct(raw: RapidAPIProduct): MappedProduct | null {
 }
 
 // ─── Main handler ───
+const ALLOWED_ORIGINS: string[] = [
+  "https://aurainteriordesign.org",
+  "https://www.aurainteriordesign.org",
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://localhost:4173"
+];
+
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
-  // CORS
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  // CORS — restrict to known origins
+  const origin = (req.headers.origin || "") as string;
+  const allowedOrigin = ALLOWED_ORIGINS.find(o => origin === o) || ALLOWED_ORIGINS[0];
+  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("X-Content-Type-Options", "nosniff");
   if (req.method === "OPTIONS") { res.status(200).end(); return; }
   if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
 
   if (!RAPIDAPI_KEY) {
-    res.status(500).json({ error: "RAPIDAPI_KEY not configured" });
+    res.status(500).json({ error: "Product search not configured" });
     return;
   }
 
   const { query, page = 1, category } = req.body || {};
+
+  // Validate query length to prevent abuse
+  if (query && typeof query === "string" && query.length > 200) {
+    res.status(400).json({ error: "Query too long", products: [], total: 0 });
+    return;
+  }
 
   // Build search query
   let searchQuery: string;
@@ -209,12 +226,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const data = await response.json();
     const rawProducts: RapidAPIProduct[] = data?.data?.products || data?.data || [];
 
-    // Use timestamp-based offset to generate unique IDs across different searches
-    // This prevents ID collisions when client caches products from different queries
-    // Each search gets a unique range: -(offset+1) to -(offset+40)
-    const timeOffset = (Date.now() % 1_000_000) * 100; // unique per-millisecond, wraps every ~16 min
-    const pageOffset = (page - 1) * 40;
-    idCounter = -(timeOffset + pageOffset + 1);
+    // Use high-entropy offset for unique IDs across searches and server instances
+    // Range: -(1) to -(2^31 - 1), avoiding collisions by combining time + random
+    const timeOffset = (Date.now() % 100_000_000) * 100; // unique per-ms, wraps every ~27 hrs
+    const randomOffset = Math.floor(Math.random() * 99); // extra entropy per request
+    const pageOffset = (page - 1) * 50;
+    idCounter = -(timeOffset + randomOffset + pageOffset + 1);
 
     const products: MappedProduct[] = [];
     for (const raw of rawProducts) {

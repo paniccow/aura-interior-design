@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 
-const ADMIN_PASS: string = process.env.ADMIN_PASSWORD || "aura2025admin";
+const ADMIN_PASS: string | undefined = process.env.ADMIN_PASSWORD;
 
 const supabaseAdmin =
   process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -29,7 +29,7 @@ const ALLOWED_ORIGINS: string[] = [
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   const origin = (req.headers.origin || "") as string;
-  const allowedOrigin = ALLOWED_ORIGINS.find(o => origin.startsWith(o)) || ALLOWED_ORIGINS[0];
+  const allowedOrigin = ALLOWED_ORIGINS.find(o => origin === o) || ALLOWED_ORIGINS[0];
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -39,7 +39,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
 
   const { adminPass } = (req.body || {}) as { adminPass?: string };
-  if (adminPass !== ADMIN_PASS) { res.status(403).json({ error: "Unauthorized" }); return; }
+  if (!ADMIN_PASS || adminPass !== ADMIN_PASS) { res.status(403).json({ error: "Unauthorized" }); return; }
 
   if (!supabaseAdmin) {
     res.status(200).json({
@@ -56,7 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       .select("id, email, name, plan, viz_count, viz_month, created_at, updated_at")
       .order("created_at", { ascending: false });
 
-    if (error) { res.status(500).json({ error: error.message }); return; }
+    if (error) { res.status(500).json({ error: "Database query failed" }); return; }
 
     const allUsers: ProfileRow[] = (profiles || []) as ProfileRow[];
     const totalUsers: number = allUsers.length;
@@ -89,6 +89,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       totalVizCount, recentUsers, userList
     });
   } catch (err: unknown) {
-    res.status(500).json({ error: (err as Error).message });
+    res.status(500).json({ error: "Internal server error" });
   }
 }
