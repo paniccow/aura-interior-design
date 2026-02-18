@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #1a1a1a;
+    display: flex;
+    gap: 40px;
+    padding: 40px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .pin {
+    width: 1000px;
+    height: 1500px;
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  /* ==================== PIN 1: Full bleed with bottom overlay ==================== */
+  .pin1 {
+    background: #000;
+  }
+  .pin1 .bg {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    filter: brightness(0.85);
+  }
+  .pin1 .overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 55%;
+    background: linear-gradient(to top, rgba(15,13,10,0.92) 0%, rgba(15,13,10,0.75) 50%, transparent 100%);
+  }
+  .pin1 .content {
+    position: absolute;
+    bottom: 80px;
+    left: 72px;
+    right: 72px;
+    color: #fff;
+  }
+  .pin1 .logo {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 36px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+  }
+  .pin1 .accent {
+    width: 48px;
+    height: 3px;
+    background: #C17550;
+    margin-bottom: 40px;
+    border-radius: 2px;
+  }
+  .pin1 .headline {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 64px;
+    font-weight: 500;
+    line-height: 1.15;
+    margin-bottom: 24px;
+    letter-spacing: -0.01em;
+  }
+  .pin1 .sub {
+    font-family: 'Inter', -apple-system, sans-serif;
+    font-size: 22px;
+    color: rgba(255,255,255,0.7);
+    line-height: 1.6;
+    margin-bottom: 44px;
+    max-width: 600px;
+  }
+  .pin1 .cta {
+    display: inline-block;
+    background: #C17550;
+    color: #fff;
+    font-family: 'Inter', sans-serif;
+    font-size: 20px;
+    font-weight: 600;
+    padding: 18px 44px;
+    border-radius: 50px;
+    letter-spacing: 0.02em;
+  }
+
+  /* ==================== PIN 2: Room photo top + white card bottom ==================== */
+  .pin2 {
+    background: #FDFCFA;
+  }
+  .pin2 .photo-area {
+    width: 100%;
+    height: 880px;
+    overflow: hidden;
+    position: relative;
+  }
+  .pin2 .photo-area img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .pin2 .photo-area::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 80px;
+    background: linear-gradient(to top, #FDFCFA, transparent);
+  }
+  .pin2 .card {
+    padding: 48px 72px 60px;
+  }
+  .pin2 .top-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 36px;
+  }
+  .pin2 .logo2 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 30px;
+    font-weight: 600;
+    color: #1A1815;
+    letter-spacing: 0.06em;
+  }
+  .pin2 .badge {
+    background: #C17550;
+    color: #fff;
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 5px 14px;
+    border-radius: 20px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .pin2 .headline2 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 52px;
+    font-weight: 500;
+    color: #1A1815;
+    line-height: 1.18;
+    margin-bottom: 20px;
+  }
+  .pin2 .sub2 {
+    font-family: 'Inter', sans-serif;
+    font-size: 20px;
+    color: #9B8B7B;
+    line-height: 1.6;
+    margin-bottom: 40px;
+  }
+  .pin2 .features {
+    display: flex;
+    gap: 32px;
+    margin-bottom: 44px;
+  }
+  .pin2 .feat {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'Inter', sans-serif;
+    font-size: 16px;
+    color: #7A6B5B;
+    font-weight: 500;
+  }
+  .pin2 .feat .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #C17550;
+    flex-shrink: 0;
+  }
+  .pin2 .cta2 {
+    display: inline-block;
+    background: #C17550;
+    color: #fff;
+    font-family: 'Inter', sans-serif;
+    font-size: 19px;
+    font-weight: 600;
+    padding: 18px 44px;
+    border-radius: 50px;
+    letter-spacing: 0.02em;
+  }
+
+  /* ==================== PIN 3: Minimal text-forward with room peek ==================== */
+  .pin3 {
+    background: #F8F5F0;
+    display: flex;
+    flex-direction: column;
+  }
+  .pin3 .top-section {
+    padding: 80px 72px 50px;
+    flex-shrink: 0;
+  }
+  .pin3 .logo3 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 34px;
+    font-weight: 600;
+    color: #1A1815;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+  }
+  .pin3 .accent3 {
+    width: 44px;
+    height: 3px;
+    background: #C17550;
+    border-radius: 2px;
+    margin-bottom: 48px;
+  }
+  .pin3 .headline3 {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-size: 56px;
+    font-weight: 500;
+    color: #1A1815;
+    line-height: 1.15;
+    margin-bottom: 24px;
+  }
+  .pin3 .sub3 {
+    font-family: 'Inter', sans-serif;
+    font-size: 20px;
+    color: #9B8B7B;
+    line-height: 1.6;
+    margin-bottom: 40px;
+    max-width: 680px;
+  }
+  .pin3 .steps {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 48px;
+  }
+  .pin3 .step {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .pin3 .step-num {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #C17550;
+    color: #fff;
+    font-family: 'Inter', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .pin3 .step-text {
+    font-family: 'Inter', sans-serif;
+    font-size: 19px;
+    color: #5A5045;
+    font-weight: 500;
+  }
+  .pin3 .cta3 {
+    display: inline-block;
+    background: #C17550;
+    color: #fff;
+    font-family: 'Inter', sans-serif;
+    font-size: 19px;
+    font-weight: 600;
+    padding: 18px 44px;
+    border-radius: 50px;
+    letter-spacing: 0.02em;
+  }
+  .pin3 .photo-peek {
+    flex: 1;
+    overflow: hidden;
+    border-radius: 24px 24px 0 0;
+    margin: 0 32px;
+    position: relative;
+  }
+  .pin3 .photo-peek img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 30%;
+  }
+  .pin3 .photo-peek::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: linear-gradient(to bottom, #F8F5F0, transparent);
+    z-index: 1;
+  }
+  .pin3 .photo-badge {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(10px);
+    color: #fff;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 18px;
+    border-radius: 20px;
+    z-index: 2;
+    letter-spacing: 0.04em;
+  }
+</style>
+</head>
+<body>
+
+<!-- PIN 1: Full bleed lifestyle -->
+<div class="pin pin1" id="pin1">
+  <img class="bg" src="hero-room.jpg" alt="">
+  <div class="overlay"></div>
+  <div class="content">
+    <div class="logo">AURA</div>
+    <div class="accent"></div>
+    <div class="headline">Your dream room,<br>designed by AI</div>
+    <div class="sub">Upload a photo of your space and watch AI transform it with shoppable furniture from premium brands.</div>
+    <div class="cta">Start designing free &rarr;</div>
+  </div>
+</div>
+
+<!-- PIN 2: Photo top, card bottom -->
+<div class="pin pin2" id="pin2">
+  <div class="photo-area">
+    <img src="hero-room.jpg" alt="">
+  </div>
+  <div class="card">
+    <div class="top-row">
+      <div class="logo2">AURA</div>
+      <div class="badge">AI Design</div>
+    </div>
+    <div class="headline2">Design any room<br>in minutes</div>
+    <div class="sub2">AI-powered interior design with 1,000+ shoppable products from premium brands.</div>
+    <div class="features">
+      <div class="feat"><div class="dot"></div>AI visualization</div>
+      <div class="feat"><div class="dot"></div>1000+ products</div>
+      <div class="feat"><div class="dot"></div>Free to start</div>
+    </div>
+    <div class="cta2">Try it free &rarr;</div>
+  </div>
+</div>
+
+<!-- PIN 3: Text-forward with room peek -->
+<div class="pin pin3" id="pin3">
+  <div class="top-section">
+    <div class="logo3">AURA</div>
+    <div class="accent3"></div>
+    <div class="headline3">Redesign your<br>room with AI</div>
+    <div class="sub3">No design skills needed. Just upload a photo and let AI do the rest.</div>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-text">Upload your room photo</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Pick your style &amp; budget</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Get a photorealistic redesign</div></div>
+    </div>
+    <div class="cta3">Start for free &rarr;</div>
+  </div>
+  <div class="photo-peek">
+    <img src="viz-room.jpg" alt="">
+    <div class="photo-badge">&#10024; AI-generated design</div>
+  </div>
+</div>
+
+</body>
+</html>
