@@ -2374,6 +2374,7 @@ export default function App() {
           .aura-ext-search{flex-direction:column!important}
           .aura-ext-search input{width:100%!important}
           .aura-ext-search button{width:100%!important}
+          .aura-style-grid{grid-template-columns:1fr 1fr!important}
           .aura-section-pad{padding-left:4%!important;padding-right:4%!important}
           .aura-section-gap60{gap:24px!important}
           .aura-step-nav{overflow-x:auto!important;-webkit-overflow-scrolling:touch}
@@ -2929,7 +2930,7 @@ export default function App() {
                     <div style={{ animation: "fadeUp .4s ease" }}>
                       <h2 style={{ fontFamily: "Georgia,serif", fontSize: 28, fontWeight: 400, marginBottom: 8, color: "#1A1815" }}>What's your style?</h2>
                       <p style={{ fontSize: 14, color: "#9B8B7B", lineHeight: 1.5, marginBottom: 28 }}>Pick the aesthetic that speaks to you. This guides your AI designer.</p>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                      <div className="aura-style-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
                         {VIBES.map((v) => (
                           <button key={v} onClick={() => setVibe(v)} style={{ padding: "16px 16px", borderRadius: 12, border: vibe === v ? "2px solid #1A1815" : "1px solid #E8E0D8", background: vibe === v ? "#1A1815" : "#fff", fontSize: 14, fontWeight: vibe === v ? 600 : 400, color: vibe === v ? "#fff" : "#5A5045", cursor: "pointer", fontFamily: "inherit", transition: "all .15s", textAlign: "left" }}>{v}</button>
                         ))}
