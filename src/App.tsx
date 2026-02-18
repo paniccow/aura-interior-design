@@ -2331,6 +2331,7 @@ export default function App() {
           .aura-timeline-left>div,.aura-timeline-right>div{max-width:100%!important}
           .aura-timeline-line{display:none!important}
           .aura-grid-2col{grid-template-columns:1fr!important;gap:16px!important}
+          .aura-grid-2col.aura-grid-reverse{display:flex!important;flex-direction:column-reverse!important;gap:16px!important}
           .aura-pricing-grid{grid-template-columns:1fr!important}
           .aura-nav-links{gap:4px!important;flex-wrap:nowrap!important}
           .aura-nav-links>button,.aura-nav-links>span{font-size:10px!important;padding:4px 8px!important}
@@ -2363,8 +2364,8 @@ export default function App() {
           .aura-purchase-footer{grid-template-columns:36px 1fr 70px 60px!important}
           .aura-purchase-retailer,.aura-purchase-unit,.aura-purchase-qty{display:none!important}
           .aura-admin-grid{grid-template-columns:1fr!important}
-          .aura-compare-header,.aura-compare-row{grid-template-columns:1fr repeat(3,48px)!important;gap:2px!important;padding:12px 14px!important}
-          .aura-compare-header>div:nth-child(n+5),.aura-compare-row>div:nth-child(n+5){display:none!important}
+          .aura-compare-header,.aura-compare-row{grid-template-columns:1fr 56px!important;gap:4px!important;padding:12px 14px!important}
+          .aura-compare-header>div:nth-child(n+3),.aura-compare-row>div:nth-child(n+3){display:none!important}
           .aura-setup-grid{grid-template-columns:1fr!important}
           .aura-budget-dims{grid-template-columns:1fr!important}
           .aura-brands-grid{grid-template-columns:repeat(2,1fr)!important;gap:10px!important}
@@ -2481,7 +2482,7 @@ export default function App() {
           {/* Feature 2: Discover Your Style — with style palette mockup */}
           <section className="aura-home-section" style={{ padding: "100px 6%", background: "#F8F5F0" }}>
             <RevealSection>
-              <div className="aura-grid-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 60, alignItems: "center", maxWidth: 1200, margin: "0 auto" }}>
+              <div className="aura-grid-2col aura-grid-reverse" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 60, alignItems: "center", maxWidth: 1200, margin: "0 auto" }}>
                 {/* Mockup: Style palette selector */}
                 <div style={{ background: "#fff", borderRadius: 20, border: "1px solid #E8E0D8", boxShadow: "0 20px 60px rgba(0,0,0,.06)", overflow: "hidden" }}>
                   <div style={{ padding: "14px 20px", borderBottom: "1px solid #F0EBE4", display: "flex", alignItems: "center", gap: 8 }}>
@@ -2912,8 +2913,13 @@ export default function App() {
                       <p style={{ fontSize: 14, color: "#9B8B7B", lineHeight: 1.5, marginBottom: 28 }}>Choose the room type so we can tailor recommendations.</p>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                         {ROOMS.map((rm) => (
-                          <button key={rm} onClick={() => { setRoom(rm); setTimeout(() => setSetupSubStep(1), 200); }} style={{ padding: "18px 16px", borderRadius: 12, border: room === rm ? "2px solid #1A1815" : "1px solid #E8E0D8", background: room === rm ? "#1A1815" : "#fff", fontSize: 14, fontWeight: room === rm ? 600 : 400, color: room === rm ? "#fff" : "#5A5045", cursor: "pointer", fontFamily: "inherit", transition: "all .15s", textAlign: "left" }}>{rm}</button>
+                          <button key={rm} onClick={() => setRoom(rm)} style={{ padding: "18px 16px", borderRadius: 12, border: room === rm ? "2px solid #1A1815" : "1px solid #E8E0D8", background: room === rm ? "#1A1815" : "#fff", fontSize: 14, fontWeight: room === rm ? 600 : 400, color: room === rm ? "#fff" : "#5A5045", cursor: "pointer", fontFamily: "inherit", transition: "all .15s", textAlign: "left" }}>{rm}</button>
                         ))}
+                      </div>
+                      <div style={{ marginTop: 24 }}>
+                        <button onClick={() => setSetupSubStep(1)} disabled={!room} style={{ width: "100%", background: room ? "#1A1815" : "#E8E0D8", color: room ? "#fff" : "#B8A898", padding: "16px 24px", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: room ? "pointer" : "default", fontFamily: "inherit", transition: "all .2s" }}>
+                          {room ? "Next →" : "Select a room to continue"}
+                        </button>
                       </div>
                     </div>
                   )}
@@ -2925,7 +2931,7 @@ export default function App() {
                       <p style={{ fontSize: 14, color: "#9B8B7B", lineHeight: 1.5, marginBottom: 28 }}>Pick the aesthetic that speaks to you. This guides your AI designer.</p>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                         {VIBES.map((v) => (
-                          <button key={v} onClick={() => { setVibe(v); setTimeout(() => setSetupSubStep(2), 200); }} style={{ padding: "16px 16px", borderRadius: 12, border: vibe === v ? "2px solid #1A1815" : "1px solid #E8E0D8", background: vibe === v ? "#1A1815" : "#fff", fontSize: 14, fontWeight: vibe === v ? 600 : 400, color: vibe === v ? "#fff" : "#5A5045", cursor: "pointer", fontFamily: "inherit", transition: "all .15s", textAlign: "left" }}>{v}</button>
+                          <button key={v} onClick={() => setVibe(v)} style={{ padding: "16px 16px", borderRadius: 12, border: vibe === v ? "2px solid #1A1815" : "1px solid #E8E0D8", background: vibe === v ? "#1A1815" : "#fff", fontSize: 14, fontWeight: vibe === v ? 600 : 400, color: vibe === v ? "#fff" : "#5A5045", cursor: "pointer", fontFamily: "inherit", transition: "all .15s", textAlign: "left" }}>{v}</button>
                         ))}
                       </div>
                       {currentPalette && (
@@ -2938,7 +2944,10 @@ export default function App() {
                         </div>
                       )}
                       <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
-                        <button onClick={() => setSetupSubStep(0)} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 10, padding: "12px 20px", fontSize: 13, color: "#9B8B7B", cursor: "pointer", fontFamily: "inherit" }}>Back</button>
+                        <button onClick={() => setSetupSubStep(0)} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 10, padding: "14px 20px", fontSize: 14, color: "#9B8B7B", cursor: "pointer", fontFamily: "inherit" }}>Back</button>
+                        <button onClick={() => setSetupSubStep(2)} disabled={!vibe} style={{ flex: 1, background: vibe ? "#1A1815" : "#E8E0D8", color: vibe ? "#fff" : "#B8A898", padding: "14px 24px", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: vibe ? "pointer" : "default", fontFamily: "inherit", transition: "all .2s" }}>
+                          {vibe ? "Next →" : "Select a style to continue"}
+                        </button>
                       </div>
                     </div>
                   )}
@@ -2950,11 +2959,14 @@ export default function App() {
                       <p style={{ fontSize: 14, color: "#9B8B7B", lineHeight: 1.5, marginBottom: 28 }}>We'll find pieces that match your price range.</p>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
                         {budgets.map(([id, lb]) => (
-                          <button key={id} onClick={() => { setBud(id); setTimeout(() => setSetupSubStep(3), 200); }} style={{ padding: "18px 20px", borderRadius: 12, border: bud === id ? "2px solid #1A1815" : "1px solid #E8E0D8", background: bud === id ? "#1A1815" : "#fff", fontSize: 15, fontWeight: bud === id ? 600 : 400, color: bud === id ? "#fff" : "#5A5045", cursor: "pointer", fontFamily: "inherit", transition: "all .15s", textAlign: "left" }}>{lb}</button>
+                          <button key={id} onClick={() => setBud(id)} style={{ padding: "18px 20px", borderRadius: 12, border: bud === id ? "2px solid #1A1815" : "1px solid #E8E0D8", background: bud === id ? "#1A1815" : "#fff", fontSize: 15, fontWeight: bud === id ? 600 : 400, color: bud === id ? "#fff" : "#5A5045", cursor: "pointer", fontFamily: "inherit", transition: "all .15s", textAlign: "left" }}>{lb}</button>
                         ))}
                       </div>
                       <div style={{ display: "flex", gap: 10, marginTop: 24 }}>
-                        <button onClick={() => setSetupSubStep(1)} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 10, padding: "12px 20px", fontSize: 13, color: "#9B8B7B", cursor: "pointer", fontFamily: "inherit" }}>Back</button>
+                        <button onClick={() => setSetupSubStep(1)} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 10, padding: "14px 20px", fontSize: 14, color: "#9B8B7B", cursor: "pointer", fontFamily: "inherit" }}>Back</button>
+                        <button onClick={() => setSetupSubStep(3)} style={{ flex: 1, background: "#1A1815", color: "#fff", padding: "14px 24px", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>
+                          Next {"→"}
+                        </button>
                       </div>
                     </div>
                   )}
