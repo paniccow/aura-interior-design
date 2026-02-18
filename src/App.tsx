@@ -2304,7 +2304,7 @@ export default function App() {
         @keyframes bentoScrollRight{0%{transform:translateX(-50%)}100%{transform:translateX(0)}}
         .aura-bento-scroll-left{animation:bentoScrollLeft 40s linear infinite}
         .aura-bento-scroll-right{animation:bentoScrollRight 40s linear infinite}
-        .aura-bento-scroll-left:hover,.aura-bento-scroll-right:hover{animation-play-state:paused}
+        .aura-bento-scroll-left,.aura-bento-scroll-right{pointer-events:none}
         *{-webkit-tap-highlight-color:transparent}
         input,button,select,textarea{font-size:16px!important}
         /* ─── TABLET: 768px–1024px ─── */
