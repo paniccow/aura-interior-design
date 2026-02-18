@@ -2749,7 +2749,7 @@ export default function App() {
           </section>
 
           {/* Mobile-only: Simple feature highlights (replaces comparison table) */}
-          <section className="aura-home-section aura-mobile-features" style={{ padding: "60px 6%", background: "#F8F5F0", display: "none" }}>
+          <section className="aura-home-section aura-mobile-features" style={{ padding: "60px 6%", display: "none" }}>
             <RevealSection>
               <div style={{ maxWidth: 600, margin: "0 auto" }}>
                 <div style={{ textAlign: "center", marginBottom: 32 }}>
@@ -2757,18 +2757,21 @@ export default function App() {
                   <h2 style={{ fontFamily: "Georgia,serif", fontSize: 28, fontWeight: 400, marginBottom: 10, lineHeight: 1.15 }}>Everything in one platform</h2>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  {[
-                    ["AI room visualization", "Photorealistic renders of your space"],
-                    ["Chat with an AI designer", "Personalized suggestions in plain language"],
-                    ["CAD floor plans", "Professional layouts with real dimensions"],
-                    [DB.length + " curated products", "Hand-picked from premium brands"],
-                    ["Smart fit scoring", "AI checks style & room compatibility"],
-                    ["Free tier available", "Start designing at no cost"],
-                  ].map(([title, desc]) => (
+                  {([
+                    ["AI room visualization", "Photorealistic renders of your space", true],
+                    ["Chat with an AI designer", "Personalized suggestions in plain language", false],
+                    ["CAD floor plans", "Professional layouts with real dimensions", true],
+                    [DB.length + " curated products", "Hand-picked from premium brands", false],
+                    ["Smart fit scoring", "AI checks style & room compatibility", false],
+                    ["Free tier available", "Start designing at no cost", false],
+                  ] as [string, string, boolean][]).map(([title, desc, isPro]) => (
                     <div key={title} style={{ display: "flex", gap: 14, alignItems: "flex-start", padding: "16px 18px", background: "#fff", borderRadius: 12, border: "1px solid #EDE8E0" }}>
                       <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#C17550", marginTop: 7, flexShrink: 0 }} />
-                      <div>
-                        <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1815", margin: "0 0 2px" }}>{title}</p>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <p style={{ fontSize: 14, fontWeight: 600, color: "#1A1815", margin: "0 0 2px" }}>{title}</p>
+                          {isPro && <span style={{ display: "inline-flex", alignItems: "center", gap: 3, background: "#C17550", color: "#fff", padding: "2px 8px", borderRadius: 8, fontSize: 9, fontWeight: 700, letterSpacing: ".06em", flexShrink: 0 }}><AuraLogo size={10} />PRO</span>}
+                        </div>
                         <p style={{ fontSize: 12, color: "#9B8B7B", margin: 0, lineHeight: 1.4 }}>{desc}</p>
                       </div>
                     </div>
