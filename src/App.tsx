@@ -378,7 +378,7 @@ export default function App() {
       const el = chatBoxRef.current;
       requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
     }
-  }, [msgs, busy]);
+  }, [msgs, busy, searchProgress]);
 
   // Mood boards are now generated after AI chat prompt — not auto-generated
   // This function is called from the send() function after AI responds
@@ -991,19 +991,12 @@ export default function App() {
         console.log("[AURA] API returned:", apiProducts.length, "products");
         // Retry once if first attempt returned empty (handles cold-start / transient failures)
         if (apiProducts.length === 0) {
-          console.log("[AURA] API empty on first try — retrying with delay...");
-          await new Promise(r => setTimeout(r, 2000));
-          const retry = await searchFeaturedProducts(searchQuery.trim(), 1);
+          const fallbackQuery = (vibe ? vibe.toLowerCase() + " " : "") + (room ? room.toLowerCase() + " " : "") + "furniture";
+          console.log("[AURA] API empty — retrying with broader query:", fallbackQuery);
+          await new Promise(r => setTimeout(r, 1500));
+          const retry = await searchFeaturedProducts(fallbackQuery, 1);
           apiProducts = retry.products;
           console.log("[AURA] API retry returned:", apiProducts.length, "products");
-          // If still empty, try a broader fallback query
-          if (apiProducts.length === 0) {
-            const fallbackQuery = (vibe ? vibe.toLowerCase() + " " : "") + (room ? room.toLowerCase() + " " : "") + "furniture";
-            console.log("[AURA] API still empty — trying fallback query:", fallbackQuery);
-            const retry2 = await searchFeaturedProducts(fallbackQuery, 1);
-            apiProducts = retry2.products;
-            console.log("[AURA] API fallback returned:", apiProducts.length, "products");
-          }
         }
         if (apiProducts.length > 0) {
           setFeaturedCache(prev => {
@@ -1015,7 +1008,24 @@ export default function App() {
       }
     } catch (e) { console.log("[AURA] API search failed:", (e as Error)?.message || e); }
 
-    setSearchProgress({ stage: "Analyzing your preferences...", count: 24 });
+    setSearchProgress({ stage: "Analyzing your preferences...", count: 0 });
+
+    // Rotate through AI processing stages so the user knows it's still working
+    const aiStages = [
+      "Analyzing your preferences...",
+      "Matching styles to your taste...",
+      "Curating from premium brands...",
+      "Comparing prices across retailers...",
+      "Scoring design compatibility...",
+      "Building your personalized picks...",
+      "Applying color palette harmony...",
+      "Finalizing recommendations..."
+    ];
+    let aiStageIdx = 0;
+    const aiStageInterval = setInterval(() => {
+      aiStageIdx = (aiStageIdx + 1) % aiStages.length;
+      setSearchProgress({ stage: aiStages[aiStageIdx], count: 0 });
+    }, 3000);
 
     // Combine curated DB + fresh API products + previously cached API products
     const cachedApiProducts = Array.from(featuredCache.values());
@@ -1510,6 +1520,7 @@ export default function App() {
       }
     }
     clearInterval(countdownInterval);
+    clearInterval(aiStageInterval);
     setSearchProgress(null);
     setBusy(false);
   };
@@ -2446,6 +2457,8 @@ export default function App() {
     <div style={{ fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',Helvetica,Arial,sans-serif", background: "#fff", minHeight: "100vh", color: "#1d1d1f" }}>
       <style>{`
         @keyframes spin{to{transform:rotate(360deg)}}
+        @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+        @keyframes fadeInText{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
         @keyframes fadeUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
         @keyframes drawLine{from{stroke-dashoffset:1000}to{stroke-dashoffset:0}}
@@ -3126,19 +3139,26 @@ export default function App() {
                           </div>
                         ))}
                         {busy && (
-                          <div style={{ color: "#1A1815", fontSize: 13, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8, background: "#F8F5F0", borderRadius: 12, margin: "4px 0" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                              <div style={{ width: 16, height: 16, border: "2px solid #E8E0D8", borderTopColor: "#1A1815", borderRadius: "50%", animation: "spin .8s linear infinite", flexShrink: 0 }} />
-                              <span style={{ fontWeight: 600 }}>{searchProgress?.stage || "Designing your space..."}</span>
+                          <div style={{ color: "#1A1815", fontSize: 13, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 8, background: "#F8F5F0", borderRadius: 12, margin: "4px 0" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <div style={{ width: 18, height: 18, border: "2px solid #E8E0D8", borderTopColor: "#1A1815", borderRadius: "50%", animation: "spin .8s linear infinite", flexShrink: 0 }} />
+                              <span style={{ fontWeight: 600, transition: "opacity .3s", animation: "fadeInText .5s ease" }} key={searchProgress?.stage || "default"}>{searchProgress?.stage || "Designing your space..."}</span>
                             </div>
-                            {searchProgress && searchProgress.count > 0 && (
+                            {searchProgress && searchProgress.count > 0 ? (
                               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                 <div style={{ flex: 1, height: 4, borderRadius: 2, background: "#E8E0D8", overflow: "hidden" }}>
                                   <div style={{ height: "100%", borderRadius: 2, background: "#1A1815", transition: "width .4s ease", width: Math.min(100, Math.max(5, 100 - (searchProgress.count / DB.length) * 100)) + "%" }} />
                                 </div>
                                 <span style={{ fontSize: 11, color: "#9B8B7B", fontWeight: 600, whiteSpace: "nowrap" }}>{searchProgress.count > 50 ? searchProgress.count.toLocaleString() + " left" : "Almost done"}</span>
                               </div>
+                            ) : (
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <div style={{ flex: 1, height: 4, borderRadius: 2, background: "#E8E0D8", overflow: "hidden" }}>
+                                  <div style={{ height: "100%", borderRadius: 2, background: "linear-gradient(90deg, #1A1815, #9B8B7B, #1A1815)", backgroundSize: "200% 100%", animation: "shimmer 1.5s ease infinite" }} />
+                                </div>
+                              </div>
                             )}
+                            <span style={{ fontSize: 10, color: "#B8A898", marginTop: -2 }}>This can take up to a minute</span>
                           </div>
                         )}
                         <div ref={chatEnd} />
@@ -3279,6 +3299,7 @@ export default function App() {
                               <div>
                                 <p style={{ fontSize: 15, color: "#1A1815", margin: 0, fontWeight: 600 }}>Generating visualization</p>
                                 <p style={{ fontSize: 12, color: "#9B8B7B", margin: "2px 0 0" }}>{selItems.length} products · {vibe || "Modern"} style</p>
+                                <p style={{ fontSize: 10, color: "#B8A898", margin: "2px 0 0" }}>This can take up to a minute</p>
                               </div>
                             </div>
                             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

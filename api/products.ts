@@ -12,7 +12,7 @@ interface CacheEntry {
   expires: number;
 }
 const cache = new Map<string, CacheEntry>();
-const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
 function getCached(key: string): unknown | null {
   const entry = cache.get(key);
@@ -23,7 +23,7 @@ function getCached(key: string): unknown | null {
 
 function setCache(key: string, data: unknown): void {
   // Keep cache small — evict old entries
-  if (cache.size > 100) {
+  if (cache.size > 500) {
     const now = Date.now();
     for (const [k, v] of cache) {
       if (now >= v.expires) cache.delete(k);
@@ -207,7 +207,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   try {
-    const apiUrl = `https://${RAPIDAPI_HOST}/search-v2?q=${encodeURIComponent(searchQuery)}&country=us&language=en&page=${page}&limit=40&sort_by=BEST_MATCH`;
+    const apiUrl = `https://${RAPIDAPI_HOST}/search-v2?q=${encodeURIComponent(searchQuery)}&country=us&language=en&page=${page}&limit=80&sort_by=BEST_MATCH`;
 
     const response = await fetch(apiUrl, {
       method: "GET",
@@ -245,7 +245,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     const result = {
       products,
-      total: products.length >= 30 ? page * 40 + 100 : products.length + ((page - 1) * 40),
+      total: products.length >= 30 ? page * 80 + 100 : products.length + ((page - 1) * 80),
       retailers,
       query: searchQuery,
       page,
