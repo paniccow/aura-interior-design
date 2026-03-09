@@ -2736,47 +2736,47 @@ export default function App() {
           </section>
 
           {/* Section 5: Product Catalog — scrolling marquee */}
-          <section className="aura-home-section" style={{ padding: "120px 0", background: "#f5f5f7", overflow: "hidden" }}>
+          <section className="aura-home-section" style={{ padding: "64px 0", background: "#f5f5f7", overflow: "hidden" }}>
             <RevealSection style={{ width: "100%" }}>
-              <div style={{ textAlign: "center", padding: "0 6%", marginBottom: 48, maxWidth: 800, margin: "0 auto 48px" }}>
-                <h2 style={{ fontSize: "clamp(32px,4vw,52px)", fontWeight: 700, lineHeight: 1.08, letterSpacing: "-0.02em", marginBottom: 16 }}>{DB.length}+ products.<br />All real. All shoppable.</h2>
-                <p style={{ fontSize: 18, color: "#6e6e73", lineHeight: 1.6 }}>Hand-picked from Lulu & Georgia, McGee & Co, West Elm, and more. Every item links directly to the product page so you can buy what you love.</p>
+              <div style={{ textAlign: "center", padding: "0 6%", marginBottom: 32, maxWidth: 800, margin: "0 auto 32px" }}>
+                <h2 style={{ fontSize: "clamp(24px,3vw,36px)", fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.02em", marginBottom: 10 }}>{DB.length}+ products. All real. All shoppable.</h2>
+                <p style={{ fontSize: 16, color: "#6e6e73", lineHeight: 1.5 }}>Hand-picked from Lulu & Georgia, McGee & Co, West Elm, and more.</p>
               </div>
               {(() => {
                 const bentoProducts = DB.filter(p => p.img && p.img.includes("shopify")).filter((_, i) => i % 23 === 0).slice(0, 16);
                 const row1 = bentoProducts.slice(0, 8);
                 const row2 = bentoProducts.slice(8, 16);
                 const MarqueeCard = ({ p }: { p: typeof DB[0] }) => (
-                  <div style={{ flex: "0 0 auto", width: 240, background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 4px 20px rgba(0,0,0,.06)" }}>
-                    <div style={{ height: 200, overflow: "hidden" }}>
+                  <div style={{ flex: "0 0 auto", width: 160, background: "#fff", borderRadius: 14, overflow: "hidden", boxShadow: "0 2px 12px rgba(0,0,0,.05)" }}>
+                    <div style={{ height: 120, overflow: "hidden" }}>
                       <img src={p.img} alt={p.n} loading="lazy" referrerPolicy="no-referrer" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                     </div>
-                    <div style={{ padding: "14px 16px" }}>
-                      <p style={{ fontSize: 14, fontWeight: 600, margin: 0, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#1d1d1f" }}>{p.n}</p>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
-                        <span style={{ fontSize: 12, color: "#86868b" }}>{p.r}</span>
-                        <span style={{ fontWeight: 700, fontSize: 15, color: "#1d1d1f" }}>{fmt(p.p)}</span>
+                    <div style={{ padding: "10px 12px" }}>
+                      <p style={{ fontSize: 12, fontWeight: 600, margin: 0, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#1d1d1f" }}>{p.n}</p>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 4 }}>
+                        <span style={{ fontSize: 10, color: "#86868b" }}>{p.r}</span>
+                        <span style={{ fontWeight: 700, fontSize: 12, color: "#1d1d1f" }}>{fmt(p.p)}</span>
                       </div>
                     </div>
                   </div>
                 );
                 return (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                     <div style={{ overflow: "hidden", width: "100%", maskImage: "linear-gradient(90deg, transparent, black 5%, black 95%, transparent)", WebkitMaskImage: "linear-gradient(90deg, transparent, black 5%, black 95%, transparent)" }}>
-                      <div className="aura-bento-scroll-left" style={{ display: "flex", gap: 16, width: "max-content" }}>
+                      <div className="aura-bento-scroll-left" style={{ display: "flex", gap: 12, width: "max-content" }}>
                         {[...row1, ...row1].map((p, i) => <MarqueeCard key={`r1-${i}`} p={p} />)}
                       </div>
                     </div>
                     <div style={{ overflow: "hidden", width: "100%", maskImage: "linear-gradient(90deg, transparent, black 5%, black 95%, transparent)", WebkitMaskImage: "linear-gradient(90deg, transparent, black 5%, black 95%, transparent)" }}>
-                      <div className="aura-bento-scroll-right" style={{ display: "flex", gap: 16, width: "max-content" }}>
+                      <div className="aura-bento-scroll-right" style={{ display: "flex", gap: 12, width: "max-content" }}>
                         {[...row2, ...row2].map((p, i) => <MarqueeCard key={`r2-${i}`} p={p} />)}
                       </div>
                     </div>
                   </div>
                 );
               })()}
-              <div style={{ textAlign: "center", marginTop: 40, padding: "0 6%" }}>
-                <button onClick={() => { go("design"); setTab("catalog"); }} style={{ background: "#1d1d1f", color: "#fff", padding: "16px 40px", border: "none", borderRadius: 980, fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Browse full catalog</button>
+              <div style={{ textAlign: "center", marginTop: 28, padding: "0 6%" }}>
+                <button onClick={() => { go("design"); setTab("catalog"); }} style={{ background: "#1d1d1f", color: "#fff", padding: "14px 32px", border: "none", borderRadius: 980, fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Browse full catalog</button>
               </div>
             </RevealSection>
           </section>
