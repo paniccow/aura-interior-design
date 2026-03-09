@@ -109,6 +109,7 @@ function getAnalyticsSummary(): { total: number; byEvent: Record<string, number>
 /* ─── MAIN APP ─── */
 export default function App() {
   const [pg, setPg] = useState<string>("home");
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "yearly">("monthly");
   const [user, setUser] = useState<AppUser | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null); // Supabase profile: { plan, stripe_customer_id, viz_count, viz_month, ... }
   const [authLoading, setAuthLoading] = useState<boolean>(true); // true until Supabase session check completes
@@ -154,6 +155,7 @@ export default function App() {
   const [authMode, setAuthMode] = useState<string>("signin");
   const [ae, setAe] = useState<string>("");
   const [ap, setAp] = useState<string>("");
+  const [ap2, setAp2] = useState<string>("");
   const [an, setAn] = useState<string>("");
   const [aErr, setAErr] = useState<string>("");
   const [aLd, setALd] = useState<boolean>(false);
@@ -192,6 +194,7 @@ export default function App() {
   const [featuredCache, setFeaturedCache] = useState<Map<number, Product>>(new Map());
   const [floorPlanState, setFloorPlanState] = useState<FloorPlanEditorState | null>(null);
   const [editorFullScreen, setEditorFullScreen] = useState(false);
+  const [onboardStep, setOnboardStep] = useState<number>(0); // 0=welcome, 1=pick room, 2=pick style
 
   const [designStep, _setDesignStep] = useState<number>(0); // 0=setup, 1=chat, 2=review
   const setDesignStep = (step: number) => { _setDesignStep(step); window.scrollTo({ top: 0, behavior: "smooth" }); };
@@ -2125,10 +2128,10 @@ export default function App() {
   /* ─── EMAIL CONFIRMATION PAGE ─── */
   /* ─── ONBOARDING (new users) — multi-step flow into room creation ─── */
   if (showOnboarding && user) {
-    const [onboardStep, setOnboardStep] = React.useState(0); // 0=welcome, 1=pick room, 2=pick style
     const finishOnboarding = () => {
       localStorage.setItem("aura_onboarded", "true");
       setShowOnboarding(false);
+      setOnboardStep(0);
       trackEvent("onboarding_complete", { room: room || "none", vibe: vibe || "none" });
       setTab("studio");
       setDesignStep(0);
@@ -2141,6 +2144,7 @@ export default function App() {
     const skipOnboarding = () => {
       localStorage.setItem("aura_onboarded", "true");
       setShowOnboarding(false);
+      setOnboardStep(0);
       trackEvent("onboarding_skip", {});
       go("home");
     };
@@ -2248,6 +2252,7 @@ export default function App() {
       if (!ae || !ap) { setAErr("Fill in all fields"); return; }
       if (authMode === "signup" && !an) { setAErr("Name required"); return; }
       if (authMode === "signup" && ap.length < 8) { setAErr("Password must be at least 8 characters"); return; }
+      if (authMode === "signup" && ap !== ap2) { setAErr("Passwords do not match"); return; }
       setALd(true); setAErr("");
       try {
         const e = await doAuth(authMode, ae, ap, an);
@@ -2262,7 +2267,8 @@ export default function App() {
           <p style={{ textAlign: "center", fontSize: 14, color: "#9B8B7B", marginBottom: 32 }}>{authMode === "signup" ? "Create account" : authMode === "forgot" ? "Reset password" : "Welcome back"}</p>
           {authMode === "signup" && <input value={an} onChange={(e) => setAn(e.target.value)} placeholder="Your name" style={{ width: "100%", padding: "14px 16px", border: "1px solid #E8E0D8", borderRadius: 12, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 12 }} />}
           <input value={ae} onChange={(e) => setAe(e.target.value)} type="email" placeholder="Email" style={{ width: "100%", padding: "14px 16px", border: "1px solid #E8E0D8", borderRadius: 12, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 12 }} />
-          {authMode !== "forgot" && <input value={ap} onChange={(e) => setAp(e.target.value)} type="password" placeholder="Password" onKeyDown={(e) => { if (e.key === "Enter") submit(); }} style={{ width: "100%", padding: "14px 16px", border: "1px solid #E8E0D8", borderRadius: 12, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 16 }} />}
+          {authMode !== "forgot" && <input value={ap} onChange={(e) => setAp(e.target.value)} type="password" placeholder="Password" onKeyDown={(e) => { if (e.key === "Enter" && authMode !== "signup") submit(); }} style={{ width: "100%", padding: "14px 16px", border: "1px solid #E8E0D8", borderRadius: 12, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 12 }} />}
+          {authMode === "signup" && <input value={ap2} onChange={(e) => setAp2(e.target.value)} type="password" placeholder="Confirm password" onKeyDown={(e) => { if (e.key === "Enter") submit(); }} style={{ width: "100%", padding: "14px 16px", border: "1px solid #E8E0D8", borderRadius: 12, fontSize: 14, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 16 }} />}
           {aErr && <p style={{ color: "#C17550", fontSize: 13, textAlign: "center", marginBottom: 12 }}>{aErr}</p>}
           {resetEmailSent && authMode === "forgot" && <p style={{ color: "#5A8C5A", fontSize: 13, textAlign: "center", marginBottom: 12 }}>Reset link sent! Check your email.</p>}
           <button onClick={submit} disabled={aLd} style={{ width: "100%", padding: "14px", background: "#C17550", color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: aLd ? 0.5 : 1 }}>{aLd ? "..." : authMode === "signup" ? "Create Account" : authMode === "forgot" ? "Send Reset Link" : "Sign In"}</button>
@@ -2277,8 +2283,8 @@ export default function App() {
               Sign in with Google
             </button>
           </>)}
-          {authMode === "signin" && <p style={{ textAlign: "center", fontSize: 12, color: "#B8A898", marginTop: 12 }}><span onClick={() => { setAuthMode("forgot"); setAErr(""); setResetEmailSent(false); }} style={{ cursor: "pointer", textDecoration: "underline" }}>Forgot password?</span></p>}
-          <p style={{ textAlign: "center", fontSize: 13, color: "#9B8B7B", marginTop: 20 }}>{authMode === "signup" ? "Have an account? " : authMode === "forgot" ? "Remember it? " : "Need one? "}<span onClick={() => { setAuthMode(authMode === "signup" ? "signin" : authMode === "forgot" ? "signin" : "signup"); setAErr(""); setResetEmailSent(false); }} style={{ color: "#C17550", cursor: "pointer", fontWeight: 600 }}>{authMode === "signup" ? "Sign In" : authMode === "forgot" ? "Sign In" : "Sign Up"}</span></p>
+          {authMode === "signin" && <p style={{ textAlign: "center", fontSize: 12, color: "#B8A898", marginTop: 12 }}><span onClick={() => { setAuthMode("forgot"); setAErr(""); setAp2(""); setResetEmailSent(false); }} style={{ cursor: "pointer", textDecoration: "underline" }}>Forgot password?</span></p>}
+          <p style={{ textAlign: "center", fontSize: 13, color: "#9B8B7B", marginTop: 20 }}>{authMode === "signup" ? "Have an account? " : authMode === "forgot" ? "Remember it? " : "Need one? "}<span onClick={() => { setAuthMode(authMode === "signup" ? "signin" : authMode === "forgot" ? "signin" : "signup"); setAErr(""); setAp2(""); setResetEmailSent(false); }} style={{ color: "#C17550", cursor: "pointer", fontWeight: 600 }}>{authMode === "signup" ? "Sign In" : authMode === "forgot" ? "Sign In" : "Sign Up"}</span></p>
           <p style={{ textAlign: "center", marginTop: 16 }}><span onClick={() => go("home")} style={{ fontSize: 12, color: "#B8A898", cursor: "pointer" }}>Back</span></p>
         </div>
       </div>
@@ -2291,7 +2297,12 @@ export default function App() {
       <div style={{ minHeight: "100vh", padding: "120px 5% 60px", background: "linear-gradient(160deg,#FDFCFA,#F0EBE4)" }}>
         <div style={{ textAlign: "center", maxWidth: 720, margin: "0 auto" }}>
           <p style={{ fontSize: 12, letterSpacing: ".2em", textTransform: "uppercase", color: "#C17550", fontWeight: 600, marginBottom: 12 }}>Pricing</p>
-          <h1 className="aura-pricing-h" style={{ fontFamily: "Georgia,serif", fontSize: 42, fontWeight: 400, marginBottom: 48 }}>Design without limits</h1>
+          <h1 className="aura-pricing-h" style={{ fontFamily: "Georgia,serif", fontSize: 42, fontWeight: 400, marginBottom: 24 }}>Design without limits</h1>
+          {/* Billing toggle */}
+          <div style={{ display: "inline-flex", background: "#F0EBE4", borderRadius: 12, padding: 4, marginBottom: 40 }}>
+            <button onClick={() => setBillingCycle("monthly")} style={{ padding: "10px 24px", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", background: billingCycle === "monthly" ? "#fff" : "transparent", color: billingCycle === "monthly" ? "#5A4A3B" : "#9B8B7B", boxShadow: billingCycle === "monthly" ? "0 1px 4px rgba(0,0,0,.08)" : "none", transition: "all .2s" }}>Monthly</button>
+            <button onClick={() => setBillingCycle("yearly")} style={{ padding: "10px 24px", borderRadius: 10, border: "none", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", background: billingCycle === "yearly" ? "#fff" : "transparent", color: billingCycle === "yearly" ? "#5A4A3B" : "#9B8B7B", boxShadow: billingCycle === "yearly" ? "0 1px 4px rgba(0,0,0,.08)" : "none", transition: "all .2s" }}>Yearly <span style={{ fontSize: 11, color: "#C17550", fontWeight: 700 }}>Save 50%</span></button>
+          </div>
           <div className="aura-pricing-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 24 }}>
             <div style={{ background: "#fff", borderRadius: 20, padding: "40px 32px", textAlign: "left" }}>
               <p style={{ fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", color: "#A89B8B", marginBottom: 8 }}>Free</p>
@@ -2299,12 +2310,14 @@ export default function App() {
               {["3 mood boards/month", "Core catalog", "AI design chat", "1 room visualization/month", "1 saved project"].map((f) => <p key={f} style={{ fontSize: 14, color: "#7A6B5B", padding: "10px 0", borderBottom: "1px solid #F5F0EB", margin: 0 }}>&#10003; {f}</p>)}
             </div>
             <div style={{ background: "#fff", borderRadius: 20, padding: "40px 32px", textAlign: "left", border: "2px solid #C17550", position: "relative" }}>
-              <div style={{ position: "absolute", top: 0, right: 20, background: "#C17550", color: "#fff", fontSize: 10, fontWeight: 700, padding: "6px 16px", borderRadius: "0 0 12px 12px", letterSpacing: ".1em" }}>POPULAR</div>
+              <div style={{ position: "absolute", top: 0, right: 20, background: "#C17550", color: "#fff", fontSize: 10, fontWeight: 700, padding: "6px 16px", borderRadius: "0 0 12px 12px", letterSpacing: ".1em" }}>{billingCycle === "yearly" ? "BEST VALUE" : "POPULAR"}</div>
               <p style={{ fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", color: "#C17550", marginBottom: 8 }}>Pro</p>
-              <div style={{ fontFamily: "Georgia,serif", fontSize: 48, fontWeight: 400, marginBottom: 24 }}>$20<span style={{ fontSize: 16, color: "#B8A898" }}>/mo</span></div>
+              <div style={{ fontFamily: "Georgia,serif", fontSize: 48, fontWeight: 400, marginBottom: 4 }}>{billingCycle === "yearly" ? "$10" : "$20"}<span style={{ fontSize: 16, color: "#B8A898" }}>/mo</span></div>
+              {billingCycle === "yearly" && <p style={{ fontSize: 13, color: "#9B8B7B", marginBottom: 20 }}>$120 billed annually <span style={{ textDecoration: "line-through", color: "#C4B5A5" }}>$240</span></p>}
+              {billingCycle === "monthly" && <div style={{ marginBottom: 20 }} />}
               {["Unlimited mood boards", "Full " + DB.length + " product catalog", "Unlimited AI room visualizations", "CAD/PDF floor plan analysis", "AI-powered furniture layout plans", "Exact placement with dimensions", "Spatial fit verification", "Unlimited projects", "All 14 design styles"].map((f) => <p key={f} style={{ fontSize: 14, color: "#7A6B5B", padding: "10px 0", borderBottom: "1px solid #F5F0EB", margin: 0 }}>&#10003; {f}</p>)}
               <button onClick={async () => {
-                trackEvent("checkout_click", { plan: "pro", loggedIn: user ? "yes" : "no" });
+                trackEvent("checkout_click", { plan: "pro", billing: billingCycle, loggedIn: user ? "yes" : "no" });
                 if (!user) { go("auth"); return; }
                 if (userPlan === "pro") return;
                 try {
@@ -2312,13 +2325,14 @@ export default function App() {
                   if (!session) { go("auth"); return; }
                   const resp = await fetch("/api/create-checkout", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token }
+                    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token },
+                    body: JSON.stringify({ plan: billingCycle })
                   });
                   const result = await resp.json();
                   if (result.url) window.location.href = result.url;
                   else setAErr(result.error || "Failed to start checkout");
                 } catch (err) { console.error("Checkout error:", err); }
-              }} style={{ width: "100%", marginTop: 24, padding: "14px", background: userPlan === "pro" ? "#A89B8B" : "#C17550", color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: userPlan === "pro" ? "default" : "pointer", fontFamily: "inherit" }}>{userPlan === "pro" ? "Current Plan" : user ? "Subscribe - $20/mo" : "Sign In to Subscribe"}</button>
+              }} style={{ width: "100%", marginTop: 24, padding: "14px", background: userPlan === "pro" ? "#A89B8B" : "#C17550", color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: userPlan === "pro" ? "default" : "pointer", fontFamily: "inherit" }}>{userPlan === "pro" ? "Current Plan" : user ? (billingCycle === "yearly" ? "Subscribe - $120/yr" : "Subscribe - $20/mo") : "Sign In to Subscribe"}</button>
             </div>
           </div>
           <button onClick={() => go("home")} style={{ marginTop: 36, background: "none", border: "1px solid #E8E0D8", borderRadius: 12, padding: "12px 28px", fontSize: 13, color: "#9B8B7B", cursor: "pointer", fontFamily: "inherit" }}>Back</button>
