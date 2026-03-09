@@ -92,12 +92,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const origin = (req.headers.origin || req.headers.referer || "") as string;
   const isAllowedOrigin = ALLOWED_ORIGINS.some(o => origin === o);
 
-  // Set CORS headers — only for allowed origins
-  if (isAllowedOrigin) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-  } else {
-    res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGINS[0]);
-  }
+  // Reject unknown origins
+  if (!isAllowedOrigin) { res.status(403).json({ error: "Origin not allowed" }); return; }
+  res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.setHeader("Access-Control-Max-Age", "86400");

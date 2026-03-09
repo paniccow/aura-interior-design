@@ -19,6 +19,18 @@ interface ProfileRow {
   updated_at: string | null;
 }
 
+// Simple rate limiter — 5 attempts per minute per IP for admin endpoints
+const rateLimitMap = new Map<string, { windowStart: number; count: number }>();
+function checkAdminRateLimit(req: VercelRequest): boolean {
+  const forwarded = req.headers["x-forwarded-for"];
+  const key = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(",")[0]?.trim() || "unknown";
+  const now = Date.now();
+  const entry = rateLimitMap.get(key);
+  if (!entry || now - entry.windowStart > 60000) { rateLimitMap.set(key, { windowStart: now, count: 1 }); return true; }
+  entry.count++;
+  return entry.count <= 5;
+}
+
 const ALLOWED_ORIGINS: string[] = [
   "https://aurainteriordesign.org",
   "https://www.aurainteriordesign.org",
@@ -29,7 +41,8 @@ const ALLOWED_ORIGINS: string[] = [
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   const origin = (req.headers.origin || "") as string;
-  const allowedOrigin = ALLOWED_ORIGINS.find(o => origin === o) || ALLOWED_ORIGINS[0];
+  const allowedOrigin = ALLOWED_ORIGINS.find(o => origin === o);
+  if (!allowedOrigin) { res.status(403).json({ error: "Origin not allowed" }); return; }
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -37,6 +50,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   res.setHeader("Cache-Control", "no-store");
   if (req.method === "OPTIONS") { res.status(200).end(); return; }
   if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
+
+  if (!checkAdminRateLimit(req)) { res.status(429).json({ error: "Too many requests" }); return; }
 
   const { adminPass } = (req.body || {}) as { adminPass?: string };
   if (!ADMIN_PASS || adminPass !== ADMIN_PASS) { res.status(403).json({ error: "Unauthorized" }); return; }

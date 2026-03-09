@@ -166,7 +166,8 @@ const ALLOWED_ORIGINS: string[] = [
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   // CORS — restrict to known origins
   const origin = (req.headers.origin || "") as string;
-  const allowedOrigin = ALLOWED_ORIGINS.find(o => origin === o) || ALLOWED_ORIGINS[0];
+  const allowedOrigin = ALLOWED_ORIGINS.find(o => origin === o);
+  if (!allowedOrigin) { res.status(403).json({ error: "Origin not allowed" }); return; }
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
