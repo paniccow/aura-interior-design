@@ -9,6 +9,7 @@ if (POSTHOG_KEY) {
     capture_pageview: true,
     capture_pageleave: true,
     autocapture: true,
+    disable_session_recording: false,
   });
 }
 
