@@ -35,6 +35,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return;
   }
 
+  // Reject replayed events older than 5 minutes
+  const eventAge = Math.abs(Date.now() / 1000 - event.created);
+  if (eventAge > 300) {
+    console.warn("Rejecting stale webhook event:", event.id, "age:", eventAge, "seconds");
+    res.status(200).json({ received: true, skipped: "stale" });
+    return;
+  }
+
   try {
     switch (event.type) {
       case "checkout.session.completed": {
