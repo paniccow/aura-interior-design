@@ -16,6 +16,7 @@ import Pill from "./components/Pill";
 import RevealSection, { useScrollReveal } from "./components/RevealSection";
 import FloorPlanEditor from "./components/FloorPlanEditor";
 import { serializeEditorState, deserializeEditorState } from "./engine/floorPlanState";
+import posthog, { posthogEnabled } from "./posthog";
 import type { Product, ChatMessage, MoodBoard, CADLayout as CADLayoutType, Project, AppUser, UserProfile, AdminStats, StylePalette, RoomNeed, BudgetKey, FurnitureCategory, FloorPlanEditorState } from "./types";
 
 /* ─── Local Types ─── */
@@ -78,6 +79,10 @@ function trackEvent(event: string, meta?: Record<string, string | number>) {
     const w = window as unknown as { gtag?: (...args: unknown[]) => void };
     if (w.gtag) w.gtag("event", event, { ...meta, session_id: SESSION_ID });
   } catch (_e) { /* GA not loaded */ }
+  // Forward to PostHog
+  try {
+    if (posthogEnabled) posthog.capture(event, { ...meta, session_id: SESSION_ID });
+  } catch (_e) { /* PostHog not loaded */ }
 }
 
 function getAnalyticsSummary(): { total: number; byEvent: Record<string, number>; last7Days: Record<string, number>; uniqueSessions: number; buyPageVisits: number; checkoutClicks: number; recentEvents: AnalyticsEvent[] } {
@@ -180,6 +185,7 @@ export default function App() {
   const [featuredQuery, setFeaturedQuery] = useState<string>("");
   const [featuredCat, setFeaturedCat] = useState<string>("all");
   const [featuredLoading, setFeaturedLoading] = useState<boolean>(false);
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
   const [featuredTotal, setFeaturedTotal] = useState<number>(0);
   const [featuredPage, setFeaturedPage] = useState<number>(1);
   const [featuredRetailers, setFeaturedRetailers] = useState<string[]>([]);
@@ -225,6 +231,14 @@ export default function App() {
         .single();
       if (data && !error) {
         setProfile(data);
+        // Check if new user for onboarding
+        const onboarded = localStorage.getItem("aura_onboarded");
+        if (!onboarded && data.created_at) {
+          const createdAt = new Date(data.created_at).getTime();
+          if (Date.now() - createdAt < 60000) {
+            setShowOnboarding(true);
+          }
+        }
       } else if (error) {
         console.warn("Profile fetch failed:", error.message);
         // Profile may not exist yet (new signup before DB trigger fires) — retry after short delay
@@ -236,7 +250,16 @@ export default function App() {
               .select("*")
               .eq("id", userId)
               .single();
-            if (retryData && !retryError) setProfile(retryData);
+            if (retryData && !retryError) {
+              setProfile(retryData);
+              const onboarded = localStorage.getItem("aura_onboarded");
+              if (!onboarded && retryData.created_at) {
+                const createdAt = new Date(retryData.created_at).getTime();
+                if (Date.now() - createdAt < 60000) {
+                  setShowOnboarding(true);
+                }
+              }
+            }
             else console.warn("Profile retry failed:", retryError?.message);
           }, 2000);
         }
@@ -266,13 +289,16 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (event === "SIGNED_IN" && session?.user) {
+          const userName = session.user.user_metadata?.name || (session.user.email || "").split("@")[0];
           setUser({
             id: session.user.id,
             email: session.user.email || "",
-            name: session.user.user_metadata?.name || (session.user.email || "").split("@")[0]
+            name: userName
           });
           fetchProfile(session.user.id);
           setConfirmationPending(false);
+          // Identify user in PostHog
+          if (posthogEnabled) posthog.identify(session.user.id, { email: session.user.email, name: userName });
         } else if (event === "SIGNED_OUT") {
           setUser(null);
           setProfile(null);
@@ -2097,6 +2123,63 @@ export default function App() {
   }
 
   /* ─── EMAIL CONFIRMATION PAGE ─── */
+  /* ─── ONBOARDING (new users) ─── */
+  if (showOnboarding && user) {
+    const onboardChoose = (target: string) => {
+      localStorage.setItem("aura_onboarded", "true");
+      setShowOnboarding(false);
+      trackEvent("onboarding_choice", { choice: target });
+      if (target === "studio" || target === "catalog") {
+        setTab(target);
+        go("home");
+      } else if (target === "visualize") {
+        setTab("studio");
+        go("home");
+      } else {
+        go("home");
+      }
+    };
+    const onboardCards: { title: string; desc: string; target: string; icon: React.ReactNode }[] = [
+      {
+        title: "Design a Room",
+        desc: "Chat with AI to design your perfect space",
+        target: "studio",
+        icon: <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#C17550" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+      },
+      {
+        title: "Browse Products",
+        desc: "Explore 100,000+ products from top brands",
+        target: "catalog",
+        icon: <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#C17550" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>,
+      },
+      {
+        title: "Visualize Your Space",
+        desc: "Upload a photo and see AI-generated designs",
+        target: "visualize",
+        icon: <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#C17550" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>,
+      },
+    ];
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, background: "linear-gradient(160deg,#FDFCFA,#F0EBE4)" }}>
+        <div style={{ maxWidth: 640, width: "100%", textAlign: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 8 }}><AuraLogo size={36} /><h1 style={{ fontFamily: "Georgia,serif", fontSize: 32, fontWeight: 400, margin: 0 }}>AURA</h1></div>
+          <h2 style={{ fontFamily: "Georgia,serif", fontSize: 28, fontWeight: 400, marginBottom: 8, color: "#3A2E28" }}>Welcome, {user.name}!</h2>
+          <p style={{ fontSize: 15, color: "#9B8B7B", marginBottom: 36 }}>What would you like to do?</p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 20, marginBottom: 36 }}>
+            {onboardCards.map((c) => (
+              <div key={c.target} onClick={() => onboardChoose(c.target)} style={{ background: "#fff", borderRadius: 16, padding: "32px 20px", cursor: "pointer", boxShadow: "0 4px 24px rgba(0,0,0,.04)", border: "1px solid #F0EBE4", transition: "border-color .2s, transform .2s" }} onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#C17550"; e.currentTarget.style.transform = "translateY(-4px)"; }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#F0EBE4"; e.currentTarget.style.transform = "translateY(0)"; }}>
+                <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#C1755010", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>{c.icon}</div>
+                <h3 style={{ fontFamily: "Georgia,serif", fontSize: 17, fontWeight: 400, marginBottom: 8, color: "#3A2E28" }}>{c.title}</h3>
+                <p style={{ fontSize: 13, color: "#9B8B7B", lineHeight: 1.5, margin: 0 }}>{c.desc}</p>
+              </div>
+            ))}
+          </div>
+          <p style={{ fontSize: 12, color: "#B8A898", lineHeight: 1.6 }}>Your data stays private. We never share your designs or personal information.</p>
+        </div>
+      </div>
+    );
+  }
+
   if (pg === "confirm") {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, background: "linear-gradient(160deg,#FDFCFA,#F0EBE4)" }}>
@@ -2160,6 +2243,17 @@ export default function App() {
           {aErr && <p style={{ color: "#C17550", fontSize: 13, textAlign: "center", marginBottom: 12 }}>{aErr}</p>}
           {resetEmailSent && authMode === "forgot" && <p style={{ color: "#5A8C5A", fontSize: 13, textAlign: "center", marginBottom: 12 }}>Reset link sent! Check your email.</p>}
           <button onClick={submit} disabled={aLd} style={{ width: "100%", padding: "14px", background: "#C17550", color: "#fff", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", opacity: aLd ? 0.5 : 1 }}>{aLd ? "..." : authMode === "signup" ? "Create Account" : authMode === "forgot" ? "Send Reset Link" : "Sign In"}</button>
+          {authMode !== "forgot" && (<>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "20px 0" }}>
+              <div style={{ flex: 1, height: 1, background: "#E8E0D8" }} />
+              <span style={{ fontSize: 12, color: "#B8A898", flexShrink: 0 }}>or</span>
+              <div style={{ flex: 1, height: 1, background: "#E8E0D8" }} />
+            </div>
+            <button onClick={() => { supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } }); }} style={{ width: "100%", padding: "14px", background: "#fff", color: "#5A4A3B", border: "1px solid #E8E0D8", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, transition: "border-color .2s" }} onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#C17550")} onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#E8E0D8")}>
+              <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59a14.5 14.5 0 0 1 0-9.18l-7.98-6.19a24.01 24.01 0 0 0 0 21.56l7.98-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+              Sign in with Google
+            </button>
+          </>)}
           {authMode === "signin" && <p style={{ textAlign: "center", fontSize: 12, color: "#B8A898", marginTop: 12 }}><span onClick={() => { setAuthMode("forgot"); setAErr(""); setResetEmailSent(false); }} style={{ cursor: "pointer", textDecoration: "underline" }}>Forgot password?</span></p>}
           <p style={{ textAlign: "center", fontSize: 13, color: "#9B8B7B", marginTop: 20 }}>{authMode === "signup" ? "Have an account? " : authMode === "forgot" ? "Remember it? " : "Need one? "}<span onClick={() => { setAuthMode(authMode === "signup" ? "signin" : authMode === "forgot" ? "signin" : "signup"); setAErr(""); setResetEmailSent(false); }} style={{ color: "#C17550", cursor: "pointer", fontWeight: 600 }}>{authMode === "signup" ? "Sign In" : authMode === "forgot" ? "Sign In" : "Sign Up"}</span></p>
           <p style={{ textAlign: "center", marginTop: 16 }}><span onClick={() => go("home")} style={{ fontSize: 12, color: "#B8A898", cursor: "pointer" }}>Back</span></p>
