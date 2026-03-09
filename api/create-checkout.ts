@@ -54,11 +54,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         .eq("id", user.id);
     }
 
-    // 4. Create Checkout session
+    // 4. Determine price ID based on plan parameter
+    const { plan } = req.body || {};
+    const priceId = plan === "yearly"
+      ? process.env.STRIPE_PRO_YEARLY_PRICE_ID!
+      : process.env.STRIPE_PRO_PRICE_ID!;
+
+    // 5. Create Checkout session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: "subscription",
-      line_items: [{ price: process.env.STRIPE_PRO_PRICE_ID!, quantity: 1 }],
+      line_items: [{ price: priceId, quantity: 1 }],
       success_url: SITE_URL + "?checkout=success",
       cancel_url: SITE_URL + "?checkout=cancel",
       metadata: { supabase_user_id: user.id }
@@ -66,7 +72,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     res.status(200).json({ url: session.url });
   } catch (err: unknown) {
-    console.error("Checkout error:", (err as Error).message);
-    res.status(500).json({ error: "Failed to create checkout session" });
+    const errMsg = (err as Error).message;
+    console.error("Checkout error:", errMsg);
+    res.status(500).json({ error: errMsg || "Failed to create checkout session" });
   }
 }
