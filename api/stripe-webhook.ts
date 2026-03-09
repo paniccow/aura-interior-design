@@ -41,11 +41,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         const session = event.data.object as Stripe.Checkout.Session;
         const userId = session.metadata?.supabase_user_id;
         if (userId && session.subscription) {
+          // Fetch subscription from Stripe to get billing period dates
+          const sub = await stripe.subscriptions.retrieve(session.subscription as string);
+          const billingCycle = sub.items.data[0]?.price?.recurring?.interval === "year" ? "yearly" : "monthly";
+          const periodStart = new Date(sub.current_period_start * 1000).toISOString();
+          const periodEnd = new Date(sub.current_period_end * 1000).toISOString();
+
           await supabaseAdmin.from("profiles").update({
             plan: "pro",
-            stripe_subscription_id: session.subscription as string
+            stripe_subscription_id: sub.id,
+            billing_cycle: billingCycle,
+            plan_started_at: periodStart,
+            plan_expires_at: periodEnd
           }).eq("id", userId);
-          console.log("Upgraded user to pro:", userId);
+          console.log("Upgraded user to pro:", userId, "cycle:", billingCycle, "expires:", periodEnd);
         }
         break;
       }
@@ -60,11 +69,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           .single();
         if (profile) {
           const isActive = ["active", "trialing"].includes(subscription.status);
+          const billingCycle = subscription.items.data[0]?.price?.recurring?.interval === "year" ? "yearly" : "monthly";
+          const periodStart = new Date(subscription.current_period_start * 1000).toISOString();
+          const periodEnd = new Date(subscription.current_period_end * 1000).toISOString();
           await supabaseAdmin.from("profiles").update({
             plan: isActive ? "pro" : "free",
-            stripe_subscription_id: subscription.id
+            stripe_subscription_id: subscription.id,
+            billing_cycle: billingCycle,
+            plan_started_at: periodStart,
+            plan_expires_at: periodEnd
           }).eq("id", profile.id);
-          console.log("Subscription updated for:", profile.id, "->", isActive ? "pro" : "free");
+          console.log("Subscription updated for:", profile.id, "->", isActive ? "pro" : "free", "expires:", periodEnd);
         }
         break;
       }
@@ -80,7 +95,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         if (profile) {
           await supabaseAdmin.from("profiles").update({
             plan: "free",
-            stripe_subscription_id: null
+            stripe_subscription_id: null,
+            billing_cycle: null,
+            plan_started_at: null,
+            plan_expires_at: null
           }).eq("id", profile.id);
           console.log("Subscription cancelled for:", profile.id);
         }

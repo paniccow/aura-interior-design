@@ -281,6 +281,9 @@ export interface UserProfile {
   plan: string;
   stripe_customer_id: string | null;
   stripe_subscription_id: string | null;
+  billing_cycle: string | null;
+  plan_started_at: string | null;
+  plan_expires_at: string | null;
   viz_count: number;
   viz_month: string | null;
   created_at: string;

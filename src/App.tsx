@@ -2387,7 +2387,8 @@ export default function App() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
               <div>
                 <p style={{ fontSize: 16, fontWeight: 600, color: "#1A1815" }}>{userPlan === "pro" ? "Pro Plan" : "Free Plan"}</p>
-                <p style={{ fontSize: 13, color: "#9B8B7B", marginTop: 4 }}>{userPlan === "pro" ? "$20/month" : "$0/month"}</p>
+                <p style={{ fontSize: 13, color: "#9B8B7B", marginTop: 4 }}>{userPlan === "pro" ? (profile?.billing_cycle === "yearly" ? "$120/year ($10/mo)" : "$20/month") : "$0/month"}</p>
+                {userPlan === "pro" && profile?.plan_expires_at && <p style={{ fontSize: 12, color: "#86868b", marginTop: 4 }}>Renews {new Date(profile.plan_expires_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</p>}
               </div>
               <span style={{ background: userPlan === "pro" ? "#C17550" : "#F0EBE4", color: userPlan === "pro" ? "#fff" : "#9B8B7B", padding: "5px 14px", borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase" }}>{userPlan === "pro" ? "Active" : "Free"}</span>
             </div>
@@ -2546,19 +2547,19 @@ export default function App() {
         const previewProducts = DB.filter(p => p.img && p.img.includes("shopify")).filter((_, i) => i % 47 === 0).slice(0, 8);
         return (
         <div>
-          {/* Hero — Apple-style centered */}
-          <section className="aura-hero" style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", position: "relative", background: "#fff", paddingTop: 60, paddingBottom: 40 }}>
-            <div style={{ textAlign: "center", maxWidth: 900, padding: "0 6%", animation: "fadeUp .8s ease" }}>
-              <h1 style={{ fontSize: "clamp(40px,6vw,80px)", fontWeight: 700, lineHeight: 1.05, marginBottom: 16, letterSpacing: "-0.025em", color: "#1d1d1f" }}>Design your<br />dream room.</h1>
-              <p style={{ fontSize: "clamp(16px,1.8vw,21px)", color: "#6e6e73", lineHeight: 1.5, maxWidth: 500, margin: "0 auto 32px", fontWeight: 400 }}>AI picks the furniture. You pick the style.</p>
-              <div className="aura-hero-btns" style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
-                <button onClick={() => { go("design"); setTab("studio"); trackEvent("cta_click", { button: "hero_start_designing" }); }} style={{ background: "#1d1d1f", color: "#fff", padding: "16px 36px", border: "none", borderRadius: 980, fontSize: 17, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Get started free</button>
-                <button onClick={() => go("pricing")} style={{ background: "transparent", border: "none", padding: "16px 24px", borderRadius: 980, fontSize: 17, color: "#06c", cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>See pricing {">"}</button>
-              </div>
-            </div>
-            <div style={{ width: "100%", maxWidth: 1100, padding: "0 5%", marginTop: 48, animation: "fadeUp 1s ease .15s both" }}>
-              <div style={{ borderRadius: 20, overflow: "hidden", boxShadow: "0 20px 80px rgba(0,0,0,.08)" }}>
-                <img src={homeHeroImg} alt="Modern living room interior design" style={{ width: "100%", display: "block", height: "auto", maxHeight: 520, objectFit: "cover" }} />
+          {/* Hero — Tesla-style full-screen immersive */}
+          <section className="aura-hero" style={{ height: "100vh", minHeight: 600, position: "relative", overflow: "hidden" }}>
+            {/* Full-screen background image */}
+            <img src={homeHeroImg} alt="Modern living room interior design" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 40%" }} />
+            {/* Dark gradient overlay for text readability */}
+            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,.15) 0%, rgba(0,0,0,0) 40%, rgba(0,0,0,0) 50%, rgba(0,0,0,.55) 100%)" }} />
+            {/* Text positioned at bottom like Tesla */}
+            <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, textAlign: "center", padding: "0 6% 64px", animation: "fadeUp .8s ease" }}>
+              <h1 style={{ fontSize: "clamp(40px,6vw,72px)", fontWeight: 700, lineHeight: 1.05, marginBottom: 12, letterSpacing: "-0.025em", color: "#fff" }}>Design your dream room.</h1>
+              <p style={{ fontSize: "clamp(14px,1.5vw,18px)", color: "rgba(255,255,255,.8)", lineHeight: 1.5, maxWidth: 500, margin: "0 auto 28px", fontWeight: 400 }}>AI picks the furniture. You pick the style.</p>
+              <div className="aura-hero-btns" style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+                <button onClick={() => { go("design"); setTab("studio"); trackEvent("cta_click", { button: "hero_start_designing" }); }} style={{ background: "rgba(255,255,255,.95)", color: "#1d1d1f", padding: "14px 40px", border: "none", borderRadius: 4, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "background .2s", letterSpacing: ".02em", textTransform: "uppercase" }} onMouseEnter={e => e.currentTarget.style.background = "#fff"} onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.95)"}>Get Started</button>
+                <button onClick={() => go("pricing")} style={{ background: "rgba(255,255,255,.15)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", color: "#fff", padding: "14px 40px", border: "1px solid rgba(255,255,255,.3)", borderRadius: 4, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "background .2s", letterSpacing: ".02em", textTransform: "uppercase" }} onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.25)"} onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.15)"}>See Pricing</button>
               </div>
             </div>
           </section>
