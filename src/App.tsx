@@ -2818,65 +2818,51 @@ export default function App() {
             </RevealSection>
           </section>
 
-          {/* Section 7: Pricing teaser — dark section */}
-          <section className="aura-home-section" style={{ padding: "120px 6%", background: "#1d1d1f" }}>
+          {/* Section 7: Pricing teaser — light section */}
+          <section className="aura-home-section" style={{ padding: "100px 6%", background: "#f5f5f7" }}>
             <RevealSection>
-              <div style={{ maxWidth: 1000, margin: "0 auto", textAlign: "center" }}>
-                <h2 style={{ fontSize: "clamp(32px,4vw,52px)", fontWeight: 700, lineHeight: 1.08, letterSpacing: "-0.02em", marginBottom: 20, color: "#fff" }}>Start free. Upgrade when you're ready.</h2>
-                <p style={{ fontSize: 18, color: "rgba(255,255,255,.5)", lineHeight: 1.6, maxWidth: 560, margin: "0 auto 48px" }}>Design mood boards and browse products at no cost. Upgrade to Pro for AI room renders, CAD floor plans, and unlimited projects.</p>
-                <div className="aura-grid-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, maxWidth: 700, margin: "0 auto" }}>
+              <div style={{ maxWidth: 800, margin: "0 auto", textAlign: "center" }}>
+                <h2 style={{ fontSize: "clamp(28px,3.5vw,44px)", fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.02em", marginBottom: 12 }}>Start free. Upgrade when you're ready.</h2>
+                <p style={{ fontSize: 17, color: "#6e6e73", lineHeight: 1.5, maxWidth: 520, margin: "0 auto 40px" }}>Design mood boards and browse products at no cost. Upgrade to Pro for AI room renders and CAD floor plans.</p>
+                <div className="aura-grid-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, maxWidth: 640, margin: "0 auto" }}>
                   {/* Free tier */}
-                  <div style={{ background: "rgba(255,255,255,.06)", borderRadius: 24, padding: "36px 28px", border: "1px solid rgba(255,255,255,.1)", textAlign: "left" }}>
-                    <p style={{ fontSize: 13, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,.4)", fontWeight: 600, marginBottom: 8 }}>Free</p>
-                    <p style={{ fontSize: 32, fontWeight: 700, color: "#fff", marginBottom: 20 }}>$0<span style={{ fontSize: 15, fontWeight: 400, color: "rgba(255,255,255,.4)" }}>/month</span></p>
-                    {["AI mood boards", "Style matching", DB.length + "+ product catalog", "Save projects"].map(f => (
-                      <div key={f} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="rgba(255,255,255,.5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                        <span style={{ fontSize: 14, color: "rgba(255,255,255,.7)" }}>{f}</span>
+                  <div style={{ background: "#fff", borderRadius: 20, padding: "32px 24px", border: "1px solid #e5e5e5", textAlign: "left" }}>
+                    <p style={{ fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", color: "#86868b", fontWeight: 600, marginBottom: 6 }}>Free</p>
+                    <p style={{ fontSize: 28, fontWeight: 700, color: "#1d1d1f", marginBottom: 20 }}>$0<span style={{ fontSize: 14, fontWeight: 400, color: "#86868b" }}>/month</span></p>
+                    {["AI mood boards", "Style matching", DB.length + "+ products", "Save projects"].map(f => (
+                      <div key={f} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#86868b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        <span style={{ fontSize: 14, color: "#6e6e73" }}>{f}</span>
                       </div>
                     ))}
-                    <button onClick={() => { go("design"); setTab("studio"); }} style={{ width: "100%", marginTop: 20, background: "rgba(255,255,255,.1)", color: "#fff", padding: "14px", border: "1px solid rgba(255,255,255,.2)", borderRadius: 14, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Get started</button>
+                    <button onClick={() => { go("design"); setTab("studio"); }} style={{ width: "100%", marginTop: 16, background: "#fff", color: "#1d1d1f", padding: "12px", border: "1px solid #d1d1d1", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Get started</button>
                   </div>
                   {/* Pro tier */}
-                  <div style={{ background: "#fff", borderRadius: 24, padding: "36px 28px", textAlign: "left", position: "relative" }}>
-                    <div style={{ position: "absolute", top: 16, right: 16, background: "#1d1d1f", color: "#fff", padding: "4px 12px", borderRadius: 980, fontSize: 11, fontWeight: 700, letterSpacing: ".06em" }}>POPULAR</div>
-                    <p style={{ fontSize: 13, letterSpacing: ".1em", textTransform: "uppercase", color: "#86868b", fontWeight: 600, marginBottom: 8 }}>Pro</p>
-                    <p style={{ fontSize: 32, fontWeight: 700, color: "#1d1d1f", marginBottom: 20 }}>$20<span style={{ fontSize: 15, fontWeight: 400, color: "#86868b" }}>/month</span></p>
-                    {["Everything in Free", "AI room visualization", "CAD floor plans", "Clearance analysis", "Unlimited projects"].map(f => (
-                      <div key={f} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#1d1d1f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                        <span style={{ fontSize: 14, color: "#1d1d1f" }}>{f}</span>
+                  <div style={{ background: "#1d1d1f", borderRadius: 20, padding: "32px 24px", textAlign: "left", position: "relative" }}>
+                    <p style={{ fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,.4)", fontWeight: 600, marginBottom: 6 }}>Pro</p>
+                    <p style={{ fontSize: 28, fontWeight: 700, color: "#fff", marginBottom: 20 }}>$20<span style={{ fontSize: 14, fontWeight: 400, color: "rgba(255,255,255,.4)" }}>/month</span></p>
+                    {["Everything in Free", "AI visualization", "CAD floor plans", "Clearance analysis", "Unlimited projects"].map(f => (
+                      <div key={f} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="rgba(255,255,255,.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        <span style={{ fontSize: 14, color: "rgba(255,255,255,.8)" }}>{f}</span>
                       </div>
                     ))}
-                    <button onClick={() => go("pricing")} style={{ width: "100%", marginTop: 20, background: "#1d1d1f", color: "#fff", padding: "14px", border: "none", borderRadius: 14, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Upgrade to Pro</button>
+                    <button onClick={() => go("pricing")} style={{ width: "100%", marginTop: 16, background: "#fff", color: "#1d1d1f", padding: "12px", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Upgrade to Pro</button>
                   </div>
                 </div>
               </div>
             </RevealSection>
           </section>
 
-          {/* Brands */}
-          <section className="aura-brands-section" style={{ padding: "80px 6%", background: "#f5f5f7" }}>
-            <RevealSection style={{ maxWidth: 1100, margin: "0 auto", textAlign: "center" }}>
-              <p style={{ fontSize: 13, color: "#86868b", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 32, fontWeight: 600 }}>Curated from premium brands</p>
-              <div className="aura-brands-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20, maxWidth: 700, margin: "0 auto", alignItems: "center" }}>
-                {["Lulu & Georgia", "McGee & Co", "Shoppe Amber Interiors", "West Elm"].map(b => (
-                  <div key={b} style={{ height: 56, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <span style={{ fontSize: 17, color: "#1d1d1f", fontWeight: 600, textAlign: "center", lineHeight: 1.3 }}>{b}</span>
-                  </div>
-                ))}
-              </div>
-            </RevealSection>
-          </section>
-
           {/* Final CTA */}
-          <section className="aura-cta-section" style={{ padding: "120px 6%", textAlign: "center", background: "#fff" }}>
+          <section className="aura-cta-section" style={{ padding: "100px 6%", textAlign: "center", background: "#fff" }}>
             <RevealSection>
-              <h2 style={{ fontSize: "clamp(36px,5vw,60px)", fontWeight: 700, marginBottom: 16, letterSpacing: "-0.025em", lineHeight: 1.05, color: "#1d1d1f" }}>Your dream room<br />is one click away.</h2>
-              <p style={{ fontSize: 18, color: "#86868b", marginBottom: 40, lineHeight: 1.5 }}>Join thousands of homeowners designing smarter with AI.</p>
-              <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
-                <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#1d1d1f", color: "#fff", padding: "18px 44px", border: "none", borderRadius: 980, fontSize: 17, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Get started free</button>
-                <button onClick={() => go("pricing")} style={{ background: "#f5f5f7", border: "none", padding: "18px 36px", borderRadius: 980, fontSize: 17, color: "#1d1d1f", cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>See pricing</button>
+              <p style={{ fontSize: 13, color: "#86868b", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 24, fontWeight: 500 }}>Products from Lulu & Georgia, McGee & Co, West Elm, and more</p>
+              <h2 style={{ fontSize: "clamp(32px,4.5vw,52px)", fontWeight: 700, marginBottom: 16, letterSpacing: "-0.025em", lineHeight: 1.08, color: "#1d1d1f" }}>Your dream room<br />is one click away.</h2>
+              <p style={{ fontSize: 17, color: "#86868b", marginBottom: 36, lineHeight: 1.5 }}>Join thousands of homeowners designing smarter with AI.</p>
+              <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+                <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#1d1d1f", color: "#fff", padding: "16px 40px", border: "none", borderRadius: 980, fontSize: 16, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Get started free</button>
+                <button onClick={() => go("pricing")} style={{ background: "#f5f5f7", border: "none", padding: "16px 32px", borderRadius: 980, fontSize: 16, color: "#1d1d1f", cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>See pricing</button>
               </div>
             </RevealSection>
           </section>
