@@ -130,15 +130,15 @@ export default function App() {
   const [inp, setInp] = useState<string>("");
   const [busy, setBusy] = useState<boolean>(false);
   const [room, setRoom] = useState<string | null>(() => {
-    try { return localStorage.getItem("aura_room") || null; } catch (_e) { return null; }
+    try { return sessionStorage.getItem("aura_room") || null; } catch (_e) { return null; }
   });
   const [vibe, setVibe] = useState<string | null>(() => {
-    try { return localStorage.getItem("aura_vibe") || null; } catch (_e) { return null; }
+    try { return sessionStorage.getItem("aura_vibe") || null; } catch (_e) { return null; }
   });
   const [bud, setBud] = useState<string>("all");
   const [sel, setSel] = useState<Map<number, number>>(() => {
     try {
-      const s = localStorage.getItem("aura_sel");
+      const s = sessionStorage.getItem("aura_sel");
       if (!s) return new Map();
       const parsed = JSON.parse(s);
       if (Array.isArray(parsed) && parsed.length > 0 && !Array.isArray(parsed[0])) {
@@ -177,7 +177,7 @@ export default function App() {
   const [boardsGenHint, setBoardsGenHint] = useState<string | null>(null);
   // Multi-project
   const [activeProjectId, setActiveProjectId] = useState<number | null>(() => {
-    try { const a = localStorage.getItem("aura_activeProject"); return a ? JSON.parse(a) : null; } catch (_e) { return null; }
+    try { const a = sessionStorage.getItem("aura_activeProject"); return a ? JSON.parse(a) : null; } catch (_e) { return null; }
   });
   const [editingProjectName, setEditingProjectName] = useState<number | null>(null);
   // Featured catalog (external products from RapidAPI)
@@ -209,16 +209,16 @@ export default function App() {
     try { localStorage.setItem("aura_projects", JSON.stringify(projects)); } catch (_e) {}
   }, [projects]);
   useEffect(() => {
-    try { localStorage.setItem("aura_sel", JSON.stringify(Array.from(sel.entries()))); } catch (_e) {}
+    try { sessionStorage.setItem("aura_sel", JSON.stringify(Array.from(sel.entries()))); } catch (_e) {}
   }, [sel]);
   useEffect(() => {
-    try { if (room) localStorage.setItem("aura_room", room); else localStorage.removeItem("aura_room"); } catch (_e) {}
+    try { if (room) sessionStorage.setItem("aura_room", room); else sessionStorage.removeItem("aura_room"); } catch (_e) {}
   }, [room]);
   useEffect(() => {
-    try { if (vibe) localStorage.setItem("aura_vibe", vibe); else localStorage.removeItem("aura_vibe"); } catch (_e) {}
+    try { if (vibe) sessionStorage.setItem("aura_vibe", vibe); else sessionStorage.removeItem("aura_vibe"); } catch (_e) {}
   }, [vibe]);
   useEffect(() => {
-    try { localStorage.setItem("aura_activeProject", JSON.stringify(activeProjectId)); } catch (_e) {}
+    try { sessionStorage.setItem("aura_activeProject", JSON.stringify(activeProjectId)); } catch (_e) {}
   }, [activeProjectId]);
 
   // ─── SUPABASE AUTH ───
@@ -2123,58 +2123,81 @@ export default function App() {
   }
 
   /* ─── EMAIL CONFIRMATION PAGE ─── */
-  /* ─── ONBOARDING (new users) ─── */
+  /* ─── ONBOARDING (new users) — multi-step flow into room creation ─── */
   if (showOnboarding && user) {
-    const onboardChoose = (target: string) => {
+    const [onboardStep, setOnboardStep] = React.useState(0); // 0=welcome, 1=pick room, 2=pick style
+    const finishOnboarding = () => {
       localStorage.setItem("aura_onboarded", "true");
       setShowOnboarding(false);
-      trackEvent("onboarding_choice", { choice: target });
-      if (target === "studio" || target === "catalog") {
-        setTab(target);
-        go("home");
-      } else if (target === "visualize") {
-        setTab("studio");
-        go("home");
-      } else {
-        go("home");
-      }
+      trackEvent("onboarding_complete", { room: room || "none", vibe: vibe || "none" });
+      setTab("studio");
+      setDesignStep(0);
+      // Skip to budget step if room+vibe selected, otherwise start from beginning
+      if (room && vibe) setSetupSubStep(2);
+      else if (room) setSetupSubStep(1);
+      else setSetupSubStep(0);
+      go("home");
     };
-    const onboardCards: { title: string; desc: string; target: string; icon: React.ReactNode }[] = [
-      {
-        title: "Design a Room",
-        desc: "Chat with AI to design your perfect space",
-        target: "studio",
-        icon: <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#C17550" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
-      },
-      {
-        title: "Browse Products",
-        desc: "Explore 100,000+ products from top brands",
-        target: "catalog",
-        icon: <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#C17550" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>,
-      },
-      {
-        title: "Visualize Your Space",
-        desc: "Upload a photo and see AI-generated designs",
-        target: "visualize",
-        icon: <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#C17550" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>,
-      },
-    ];
+    const skipOnboarding = () => {
+      localStorage.setItem("aura_onboarded", "true");
+      setShowOnboarding(false);
+      trackEvent("onboarding_skip", {});
+      go("home");
+    };
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, background: "linear-gradient(160deg,#FDFCFA,#F0EBE4)" }}>
-        <div style={{ maxWidth: 640, width: "100%", textAlign: "center" }}>
+        <div style={{ maxWidth: 560, width: "100%", textAlign: "center" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 8 }}><AuraLogo size={36} /><h1 style={{ fontFamily: "Georgia,serif", fontSize: 32, fontWeight: 400, margin: 0 }}>AURA</h1></div>
-          <h2 style={{ fontFamily: "Georgia,serif", fontSize: 28, fontWeight: 400, marginBottom: 8, color: "#3A2E28" }}>Welcome, {user.name}!</h2>
-          <p style={{ fontSize: 15, color: "#9B8B7B", marginBottom: 36 }}>What would you like to do?</p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 20, marginBottom: 36 }}>
-            {onboardCards.map((c) => (
-              <div key={c.target} onClick={() => onboardChoose(c.target)} style={{ background: "#fff", borderRadius: 16, padding: "32px 20px", cursor: "pointer", boxShadow: "0 4px 24px rgba(0,0,0,.04)", border: "1px solid #F0EBE4", transition: "border-color .2s, transform .2s" }} onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#C17550"; e.currentTarget.style.transform = "translateY(-4px)"; }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#F0EBE4"; e.currentTarget.style.transform = "translateY(0)"; }}>
-                <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#C1755010", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>{c.icon}</div>
-                <h3 style={{ fontFamily: "Georgia,serif", fontSize: 17, fontWeight: 400, marginBottom: 8, color: "#3A2E28" }}>{c.title}</h3>
-                <p style={{ fontSize: 13, color: "#9B8B7B", lineHeight: 1.5, margin: 0 }}>{c.desc}</p>
-              </div>
+          {/* Progress dots */}
+          <div style={{ display: "flex", justifyContent: "center", gap: 8, margin: "16px 0 28px" }}>
+            {[0, 1, 2].map(i => (
+              <div key={i} style={{ width: i === onboardStep ? 24 : 8, height: 8, borderRadius: 4, background: i <= onboardStep ? "#C17550" : "#E8E0D8", transition: "all .3s" }} />
             ))}
           </div>
-          <p style={{ fontSize: 12, color: "#B8A898", lineHeight: 1.6 }}>Your data stays private. We never share your designs or personal information.</p>
+
+          {/* Step 0: Welcome */}
+          {onboardStep === 0 && (<>
+            <h2 style={{ fontFamily: "Georgia,serif", fontSize: 28, fontWeight: 400, marginBottom: 8, color: "#3A2E28" }}>Welcome, {user.name}!</h2>
+            <p style={{ fontSize: 15, color: "#9B8B7B", marginBottom: 32, lineHeight: 1.6 }}>Let's design your perfect space. We'll help you pick a room, choose a style, and connect you with our AI designer in under a minute.</p>
+            <button onClick={() => { setOnboardStep(1); trackEvent("onboarding_start", {}); }} style={{ width: "100%", background: "#1A1815", color: "#fff", padding: "16px 24px", border: "none", borderRadius: 12, fontSize: 16, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", marginBottom: 12 }}>Let's get started</button>
+            <button onClick={skipOnboarding} style={{ background: "none", border: "none", fontSize: 13, color: "#B8A898", cursor: "pointer", fontFamily: "inherit", padding: 8 }}>Skip for now</button>
+          </>)}
+
+          {/* Step 1: Pick a room */}
+          {onboardStep === 1 && (<>
+            <h2 style={{ fontFamily: "Georgia,serif", fontSize: 26, fontWeight: 400, marginBottom: 8, color: "#3A2E28" }}>What room are you designing?</h2>
+            <p style={{ fontSize: 14, color: "#9B8B7B", marginBottom: 24 }}>Pick the space you want to transform.</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, textAlign: "left", marginBottom: 24 }}>
+              {ROOMS.map((rm) => (
+                <button key={rm} onClick={() => setRoom(rm)} style={{ padding: "18px 16px", borderRadius: 12, border: room === rm ? "2px solid #1A1815" : "1px solid #E8E0D8", background: room === rm ? "#1A1815" : "#fff", fontSize: 14, fontWeight: room === rm ? 600 : 400, color: room === rm ? "#fff" : "#5A5045", cursor: "pointer", fontFamily: "inherit", transition: "all .15s" }}>{rm}</button>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setOnboardStep(0)} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 10, padding: "14px 20px", fontSize: 14, color: "#9B8B7B", cursor: "pointer", fontFamily: "inherit" }}>Back</button>
+              <button onClick={() => { setOnboardStep(2); trackEvent("onboarding_room", { room: room || "none" }); }} disabled={!room} style={{ flex: 1, background: room ? "#1A1815" : "#E8E0D8", color: room ? "#fff" : "#B8A898", padding: "14px 24px", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: room ? "pointer" : "default", fontFamily: "inherit", transition: "all .2s" }}>
+                {room ? "Next — pick your style" : "Select a room to continue"}
+              </button>
+            </div>
+          </>)}
+
+          {/* Step 2: Pick a style */}
+          {onboardStep === 2 && (<>
+            <h2 style={{ fontFamily: "Georgia,serif", fontSize: 26, fontWeight: 400, marginBottom: 8, color: "#3A2E28" }}>What's your style?</h2>
+            <p style={{ fontSize: 14, color: "#9B8B7B", marginBottom: 24 }}>This guides your AI designer's recommendations.</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, textAlign: "left", marginBottom: 24 }}>
+              {VIBES.map((v) => (
+                <button key={v} onClick={() => setVibe(v)} style={{ padding: "14px 14px", borderRadius: 12, border: vibe === v ? "2px solid #1A1815" : "1px solid #E8E0D8", background: vibe === v ? "#1A1815" : "#fff", fontSize: 13, fontWeight: vibe === v ? 600 : 400, color: vibe === v ? "#fff" : "#5A5045", cursor: "pointer", fontFamily: "inherit", transition: "all .15s" }}>{v}</button>
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setOnboardStep(1)} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 10, padding: "14px 20px", fontSize: 14, color: "#9B8B7B", cursor: "pointer", fontFamily: "inherit" }}>Back</button>
+              <button onClick={finishOnboarding} disabled={!vibe} style={{ flex: 1, background: vibe ? "#C17550" : "#E8E0D8", color: vibe ? "#fff" : "#B8A898", padding: "14px 24px", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: vibe ? "pointer" : "default", fontFamily: "inherit", transition: "all .2s" }}>
+                {vibe ? "Start designing →" : "Select a style to continue"}
+              </button>
+            </div>
+          </>)}
+
+          <p style={{ fontSize: 12, color: "#B8A898", lineHeight: 1.6, marginTop: 24 }}>Your data stays private. We never share your designs or personal information.</p>
         </div>
       </div>
     );
