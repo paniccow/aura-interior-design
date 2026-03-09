@@ -2562,76 +2562,200 @@ export default function App() {
             </div>
           </section>
 
-          {/* Section 2: How it works — Tesla-style full-viewport panels */}
-          <section className="aura-home-section" style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#fff", padding: "80px 6%" }}>
-            <RevealSection style={{ maxWidth: 900, textAlign: "center", width: "100%" }}>
-              <p style={{ fontSize: 13, letterSpacing: ".2em", textTransform: "uppercase", color: "#86868b", marginBottom: 16, fontWeight: 600 }}>Step 1</p>
-              <h2 style={{ fontSize: "clamp(36px,5vw,64px)", fontWeight: 700, lineHeight: 1.05, letterSpacing: "-0.025em", marginBottom: 16 }}>Tell us about your room.</h2>
-              <p style={{ fontSize: "clamp(16px,1.6vw,21px)", color: "#6e6e73", lineHeight: 1.5, maxWidth: 560, margin: "0 auto 48px" }}>Pick a room type, enter dimensions, upload a photo. That's it.</p>
-              <div style={{ display: "flex", justifyContent: "center", gap: 16, flexWrap: "wrap", marginBottom: 48 }}>
-                {["Living Room", "Bedroom", "Dining Room", "Office", "Kitchen"].map((r, i) => (
-                  <div key={r} style={{ padding: "16px 28px", borderRadius: 16, background: i === 0 ? "#1d1d1f" : "#f5f5f7", color: i === 0 ? "#fff" : "#1d1d1f", fontSize: 15, fontWeight: 600, transition: "all .2s" }}>{r}</div>
-                ))}
-              </div>
-              <div style={{ display: "flex", justifyContent: "center", gap: 40, flexWrap: "wrap" }}>
-                {[["18 ft", "Width"], ["22 ft", "Length"], ["396 sqft", "Area"]].map(([val, label]) => (
-                  <div key={label} style={{ textAlign: "center" }}>
-                    <p style={{ fontSize: "clamp(28px,3vw,40px)", fontWeight: 700, margin: "0 0 4px", color: "#1d1d1f" }}>{val}</p>
-                    <p style={{ fontSize: 13, color: "#86868b", margin: 0, textTransform: "uppercase", letterSpacing: ".1em" }}>{label}</p>
+          {/* Section 2: Define Your Room — text left, product UI demo right */}
+          <section className="aura-home-section" style={{ padding: "120px 6%", background: "#fff" }}>
+            <RevealSection>
+              <div className="aura-grid-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 80, alignItems: "center", maxWidth: 1200, margin: "0 auto" }}>
+                <div>
+                  <p style={{ fontSize: 13, letterSpacing: ".2em", textTransform: "uppercase", color: "#86868b", marginBottom: 12, fontWeight: 600 }}>Step 1</p>
+                  <h2 style={{ fontSize: "clamp(32px,4vw,52px)", fontWeight: 700, lineHeight: 1.08, letterSpacing: "-0.02em", marginBottom: 20 }}>Tell us about<br />your room.</h2>
+                  <p style={{ fontSize: 18, color: "#6e6e73", lineHeight: 1.6, marginBottom: 32 }}>Select your room type, enter the dimensions, and optionally upload a photo. Our AI uses this to understand your space and recommend furniture that actually fits.</p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    {[["8 room types", "Living room, bedroom, dining, kitchen, office, and more"], ["Custom dimensions", "Enter exact width and length for precise furniture sizing"], ["Photo upload", "Upload your actual room photo for AI-powered analysis"]].map(([title, desc]) => (
+                      <div key={title} style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+                        <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#1d1d1f", marginTop: 8, flexShrink: 0 }} />
+                        <div>
+                          <p style={{ fontSize: 15, fontWeight: 600, color: "#1d1d1f", margin: "0 0 2px" }}>{title}</p>
+                          <p style={{ fontSize: 14, color: "#86868b", margin: 0, lineHeight: 1.4 }}>{desc}</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </RevealSection>
-          </section>
-
-          {/* Section 3: Style — full-viewport dark panel */}
-          <section className="aura-home-section" style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#1d1d1f", padding: "80px 6%" }}>
-            <RevealSection style={{ maxWidth: 900, textAlign: "center", width: "100%" }}>
-              <p style={{ fontSize: 13, letterSpacing: ".2em", textTransform: "uppercase", color: "rgba(255,255,255,.4)", marginBottom: 16, fontWeight: 600 }}>Step 2</p>
-              <h2 style={{ fontSize: "clamp(36px,5vw,64px)", fontWeight: 700, lineHeight: 1.05, letterSpacing: "-0.025em", marginBottom: 16, color: "#fff" }}>Pick a style.</h2>
-              <p style={{ fontSize: "clamp(16px,1.6vw,21px)", color: "rgba(255,255,255,.6)", lineHeight: 1.5, maxWidth: 500, margin: "0 auto 56px" }}>14 curated palettes. Every product scored for harmony.</p>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 16, maxWidth: 800, margin: "0 auto" }}>
-                {[
-                  { name: "Warm Modern", colors: ["#D4B896", "#8B6040", "#E8DDD0", "#5A4535"] },
-                  { name: "Japandi", colors: ["#D4CEC4", "#6B6560", "#E8E4DC", "#2A2825"] },
-                  { name: "Scandinavian", colors: ["#E8E4E0", "#A09890", "#F5F0EB", "#5A5550"] },
-                  { name: "Mid-Century", colors: ["#C8702A", "#2B5B4E", "#E8D4B4", "#3A3A3A"] },
-                ].map((s, i) => (
-                  <div key={s.name} style={{ padding: "24px 20px", borderRadius: 20, background: i === 0 ? "rgba(255,255,255,.1)" : "rgba(255,255,255,.04)", border: i === 0 ? "1px solid rgba(255,255,255,.2)" : "1px solid rgba(255,255,255,.06)", transition: "all .3s" }}>
-                    <div style={{ display: "flex", gap: 6, marginBottom: 14, justifyContent: "center" }}>
-                      {s.colors.map((c, ci) => <div key={ci} style={{ width: 24, height: 24, borderRadius: "50%", background: c, border: "2px solid rgba(255,255,255,.1)" }} />)}
+                </div>
+                {/* Live product UI mockup */}
+                <div style={{ background: "#fafafa", borderRadius: 24, border: "1px solid #e5e5e5", boxShadow: "0 20px 60px rgba(0,0,0,.08)", overflow: "hidden" }}>
+                  <div style={{ padding: "16px 24px", borderBottom: "1px solid #e5e5e5", display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#FF5F57" }} />
+                    <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#FEBC2E" }} />
+                    <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#28C840" }} />
+                    <span style={{ marginLeft: "auto", fontSize: 12, color: "#86868b", fontWeight: 500 }}>AURA Studio</span>
+                  </div>
+                  <div style={{ padding: 28 }}>
+                    <p style={{ fontSize: 11, letterSpacing: ".15em", textTransform: "uppercase", color: "#86868b", fontWeight: 700, marginBottom: 20 }}>What room are you designing?</p>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
+                      {["Living Room", "Bedroom", "Dining Room", "Office"].map((r, i) => (
+                        <div key={r} style={{ padding: "16px 14px", borderRadius: 12, border: i === 0 ? "2px solid #1d1d1f" : "1px solid #e5e5e5", background: i === 0 ? "#1d1d1f" : "#fff", color: i === 0 ? "#fff" : "#1d1d1f", fontSize: 14, fontWeight: i === 0 ? 600 : 400, textAlign: "center" }}>{r}</div>
+                      ))}
                     </div>
-                    <p style={{ fontSize: 14, fontWeight: 600, color: "#fff", margin: 0 }}>{s.name}</p>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+                      <div style={{ padding: "12px 16px", borderRadius: 12, border: "1px solid #e5e5e5", background: "#fff" }}>
+                        <span style={{ fontSize: 11, color: "#86868b", fontWeight: 500 }}>Width</span>
+                        <p style={{ fontSize: 20, fontWeight: 700, margin: "4px 0 0", color: "#1d1d1f" }}>18 ft</p>
+                      </div>
+                      <div style={{ padding: "12px 16px", borderRadius: 12, border: "1px solid #e5e5e5", background: "#fff" }}>
+                        <span style={{ fontSize: 11, color: "#86868b", fontWeight: 500 }}>Length</span>
+                        <p style={{ fontSize: 20, fontWeight: 700, margin: "4px 0 0", color: "#1d1d1f" }}>22 ft</p>
+                      </div>
+                    </div>
+                    <div style={{ padding: "20px 16px", borderRadius: 14, border: "2px dashed #d1d1d1", textAlign: "center", background: "#fff" }}>
+                      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" style={{ margin: "0 auto 8px", display: "block", opacity: 0.3 }}><path d="M12 16V8M12 8l-3 3M12 8l3 3M3 16v2a2 2 0 002 2h14a2 2 0 002-2v-2" stroke="#1d1d1f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      <p style={{ fontSize: 13, color: "#86868b", margin: 0 }}>Upload a room photo</p>
+                    </div>
                   </div>
-                ))}
+                </div>
               </div>
-              <p style={{ fontSize: 14, color: "rgba(255,255,255,.3)", marginTop: 24 }}>+ Bohemian, Art Deco, Coastal, Industrial, Luxury, and more</p>
             </RevealSection>
           </section>
 
-          {/* Section 4: AI designs — full-viewport with product marquee */}
-          <section className="aura-home-section" style={{ minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", background: "#f5f5f7", padding: "80px 0", overflow: "hidden" }}>
-            <RevealSection style={{ width: "100%" }}>
-              <div style={{ textAlign: "center", padding: "0 6%", marginBottom: 48 }}>
-                <p style={{ fontSize: 13, letterSpacing: ".2em", textTransform: "uppercase", color: "#86868b", marginBottom: 16, fontWeight: 600 }}>Step 3</p>
-                <h2 style={{ fontSize: "clamp(36px,5vw,64px)", fontWeight: 700, lineHeight: 1.05, letterSpacing: "-0.025em", marginBottom: 16 }}>AI designs it for you.</h2>
-                <p style={{ fontSize: "clamp(16px,1.6vw,21px)", color: "#6e6e73", lineHeight: 1.5, maxWidth: 520, margin: "0 auto" }}>Chat with your AI designer or let it curate a mood board from {DB.length}+ real products.</p>
+          {/* Section 3: Style — text right, palette UI demo left */}
+          <section className="aura-home-section" style={{ padding: "120px 6%", background: "#f5f5f7" }}>
+            <RevealSection>
+              <div className="aura-grid-2col aura-grid-reverse" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 80, alignItems: "center", maxWidth: 1200, margin: "0 auto" }}>
+                {/* Style selector UI mockup */}
+                <div style={{ background: "#fff", borderRadius: 24, border: "1px solid #e5e5e5", boxShadow: "0 20px 60px rgba(0,0,0,.08)", overflow: "hidden" }}>
+                  <div style={{ padding: "16px 24px", borderBottom: "1px solid #e5e5e5", display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#FF5F57" }} />
+                    <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#FEBC2E" }} />
+                    <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#28C840" }} />
+                    <span style={{ marginLeft: "auto", fontSize: 12, color: "#86868b", fontWeight: 500 }}>Style Selection</span>
+                  </div>
+                  <div style={{ padding: 28 }}>
+                    <p style={{ fontSize: 11, letterSpacing: ".15em", textTransform: "uppercase", color: "#86868b", fontWeight: 700, marginBottom: 20 }}>What's your style?</p>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                      {[
+                        { name: "Warm Modern", colors: ["#D4B896", "#8B6040", "#E8DDD0", "#5A4535", "#C4A882"], feel: "Earthy, inviting, textured" },
+                        { name: "Japandi", colors: ["#D4CEC4", "#6B6560", "#E8E4DC", "#2A2825", "#B8B0A4"], feel: "Minimal, natural, balanced" },
+                        { name: "Scandinavian", colors: ["#E8E4E0", "#A09890", "#F5F0EB", "#5A5550", "#D4CEC4"], feel: "Light, airy, functional" },
+                        { name: "Mid-Century", colors: ["#C8702A", "#2B5B4E", "#E8D4B4", "#3A3A3A", "#D4956A"], feel: "Retro, organic, bold" },
+                      ].map((s, i) => (
+                        <div key={s.name} style={{ padding: 16, borderRadius: 14, border: i === 0 ? "2px solid #1d1d1f" : "1px solid #e5e5e5", background: i === 0 ? "#fafafa" : "#fff", cursor: "pointer" }}>
+                          <div style={{ display: "flex", gap: 5, marginBottom: 10 }}>
+                            {s.colors.map((c, ci) => <div key={ci} style={{ width: 20, height: 20, borderRadius: "50%", background: c, border: "1px solid rgba(0,0,0,.06)" }} />)}
+                          </div>
+                          <p style={{ fontSize: 14, fontWeight: 600, color: "#1d1d1f", margin: "0 0 2px" }}>{s.name}</p>
+                          <p style={{ fontSize: 11, color: "#86868b", margin: 0 }}>{s.feel}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ marginTop: 16, padding: "14px 18px", background: "#f5f5f7", borderRadius: 12, display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#1d1d1f", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </div>
+                      <div>
+                        <p style={{ fontSize: 13, fontWeight: 600, color: "#1d1d1f", margin: 0 }}>Warm Modern selected</p>
+                        <p style={{ fontSize: 11, color: "#86868b", margin: 0 }}>Products will be scored for style harmony</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <p style={{ fontSize: 13, letterSpacing: ".2em", textTransform: "uppercase", color: "#86868b", marginBottom: 12, fontWeight: 600 }}>Step 2</p>
+                  <h2 style={{ fontSize: "clamp(32px,4vw,52px)", fontWeight: 700, lineHeight: 1.08, letterSpacing: "-0.02em", marginBottom: 20 }}>Pick a style.<br />We match the rest.</h2>
+                  <p style={{ fontSize: 18, color: "#6e6e73", lineHeight: 1.6, marginBottom: 32 }}>Choose from 14 curated design palettes — from Warm Modern to Japandi to Art Deco. Our AI scores every product for style harmony, so everything in your room looks like it belongs together.</p>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {["Warm Modern", "Japandi", "Scandinavian", "Bohemian", "Art Deco", "Coastal", "Mid-Century", "+7 more"].map(s => (
+                      <span key={s} style={{ fontSize: 13, padding: "8px 16px", borderRadius: 980, background: "#fff", color: "#1d1d1f", fontWeight: 500, border: "1px solid #e5e5e5" }}>{s}</span>
+                    ))}
+                  </div>
+                </div>
               </div>
-              {/* Scrolling product marquee */}
+            </RevealSection>
+          </section>
+
+          {/* Section 4: AI Chat — text left, chat UI demo right */}
+          <section className="aura-home-section" style={{ padding: "120px 6%", background: "#fff" }}>
+            <RevealSection>
+              <div className="aura-grid-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 80, alignItems: "center", maxWidth: 1200, margin: "0 auto" }}>
+                <div>
+                  <p style={{ fontSize: 13, letterSpacing: ".2em", textTransform: "uppercase", color: "#86868b", marginBottom: 12, fontWeight: 600 }}>Step 3</p>
+                  <h2 style={{ fontSize: "clamp(32px,4vw,52px)", fontWeight: 700, lineHeight: 1.08, letterSpacing: "-0.02em", marginBottom: 20 }}>Just describe<br />what you want.</h2>
+                  <p style={{ fontSize: 18, color: "#6e6e73", lineHeight: 1.6, marginBottom: 32 }}>Chat with your AI interior designer in plain English. Describe a vibe, ask for suggestions, or let it build a complete mood board. It searches {DB.length}+ real products and finds pieces that work together.</p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                    {[["AI mood boards", "Auto-generated collections of matching furniture"], ["Real product links", "Every recommendation links to the actual product page"], ["Smart scoring", "Each item is rated for style, size, and budget fit"]].map(([title, desc]) => (
+                      <div key={title} style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+                        <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#1d1d1f", marginTop: 8, flexShrink: 0 }} />
+                        <div>
+                          <p style={{ fontSize: 15, fontWeight: 600, color: "#1d1d1f", margin: "0 0 2px" }}>{title}</p>
+                          <p style={{ fontSize: 14, color: "#86868b", margin: 0, lineHeight: 1.4 }}>{desc}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* Chat UI mockup */}
+                <div style={{ background: "#fafafa", borderRadius: 24, border: "1px solid #e5e5e5", boxShadow: "0 20px 60px rgba(0,0,0,.08)", overflow: "hidden" }}>
+                  <div style={{ padding: "14px 24px", borderBottom: "1px solid #e5e5e5", display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#34C759" }} />
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "#1d1d1f" }}>AI Designer</span>
+                    <span style={{ fontSize: 11, color: "#86868b", marginLeft: "auto" }}>Online</span>
+                  </div>
+                  <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 12 }}>
+                    <div style={{ padding: "12px 16px", borderRadius: "18px 18px 4px 18px", background: "#1d1d1f", color: "#fff", fontSize: 14, lineHeight: 1.5, maxWidth: "80%", marginLeft: "auto" }}>I need a warm living room with earthy tones and a large sectional</div>
+                    <div style={{ padding: "14px 18px", borderRadius: "18px 18px 18px 4px", background: "#fff", fontSize: 14, lineHeight: 1.6, color: "#1d1d1f", border: "1px solid #e5e5e5" }}>
+                      <span style={{ fontWeight: 700 }}>Great choice!</span> I found 23 pieces that match your Warm Modern style. Here are my top picks — the Haven Sectional anchors the room beautifully.
+                    </div>
+                    {/* Product cards */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 4 }}>
+                      {previewProducts.slice(0, 2).map(p => (
+                        <div key={p.id} style={{ borderRadius: 14, border: "1px solid #e5e5e5", overflow: "hidden", background: "#fff" }}>
+                          <div style={{ height: 100, overflow: "hidden" }}>
+                            <img src={p.img} alt={p.n} loading="lazy" referrerPolicy="no-referrer" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                          </div>
+                          <div style={{ padding: "10px 12px" }}>
+                            <p style={{ fontSize: 12, fontWeight: 600, margin: 0, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.n}</p>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
+                              <span style={{ fontSize: 11, color: "#86868b" }}>{p.r}</span>
+                              <span style={{ fontSize: 13, fontWeight: 700 }}>{fmt(p.p)}</span>
+                            </div>
+                            <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}>
+                              <div style={{ height: 4, flex: 1, borderRadius: 2, background: "#e5e5e5" }}><div style={{ height: "100%", width: "92%", borderRadius: 2, background: "#34C759" }} /></div>
+                              <span style={{ fontSize: 10, color: "#34C759", fontWeight: 700 }}>92%</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display: "flex", border: "1px solid #e5e5e5", borderRadius: 14, overflow: "hidden", background: "#fff" }}>
+                      <div style={{ flex: 1, padding: "12px 16px", fontSize: 13, color: "#86868b" }}>Tell me what you're looking for...</div>
+                      <div style={{ background: "#1d1d1f", color: "#fff", padding: "12px 20px", fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center" }}>Send</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </RevealSection>
+          </section>
+
+          {/* Section 5: Product Catalog — scrolling marquee */}
+          <section className="aura-home-section" style={{ padding: "120px 0", background: "#f5f5f7", overflow: "hidden" }}>
+            <RevealSection style={{ width: "100%" }}>
+              <div style={{ textAlign: "center", padding: "0 6%", marginBottom: 48, maxWidth: 800, margin: "0 auto 48px" }}>
+                <h2 style={{ fontSize: "clamp(32px,4vw,52px)", fontWeight: 700, lineHeight: 1.08, letterSpacing: "-0.02em", marginBottom: 16 }}>{DB.length}+ products.<br />All real. All shoppable.</h2>
+                <p style={{ fontSize: 18, color: "#6e6e73", lineHeight: 1.6 }}>Hand-picked from Lulu & Georgia, McGee & Co, West Elm, and more. Every item links directly to the product page so you can buy what you love.</p>
+              </div>
               {(() => {
                 const bentoProducts = DB.filter(p => p.img && p.img.includes("shopify")).filter((_, i) => i % 23 === 0).slice(0, 16);
                 const row1 = bentoProducts.slice(0, 8);
                 const row2 = bentoProducts.slice(8, 16);
                 const MarqueeCard = ({ p }: { p: typeof DB[0] }) => (
-                  <div style={{ flex: "0 0 auto", width: 220, background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 4px 20px rgba(0,0,0,.06)" }}>
-                    <div style={{ height: 180, overflow: "hidden" }}>
+                  <div style={{ flex: "0 0 auto", width: 240, background: "#fff", borderRadius: 20, overflow: "hidden", boxShadow: "0 4px 20px rgba(0,0,0,.06)" }}>
+                    <div style={{ height: 200, overflow: "hidden" }}>
                       <img src={p.img} alt={p.n} loading="lazy" referrerPolicy="no-referrer" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                     </div>
                     <div style={{ padding: "14px 16px" }}>
-                      <p style={{ fontSize: 13, fontWeight: 600, margin: 0, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#1d1d1f" }}>{p.n}</p>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 6 }}>
-                        <span style={{ fontSize: 11, color: "#86868b" }}>{p.r}</span>
-                        <span style={{ fontWeight: 700, fontSize: 14, color: "#1d1d1f" }}>{fmt(p.p)}</span>
+                      <p style={{ fontSize: 14, fontWeight: 600, margin: 0, lineHeight: 1.3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#1d1d1f" }}>{p.n}</p>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+                        <span style={{ fontSize: 12, color: "#86868b" }}>{p.r}</span>
+                        <span style={{ fontWeight: 700, fontSize: 15, color: "#1d1d1f" }}>{fmt(p.p)}</span>
                       </div>
                     </div>
                   </div>
@@ -2652,30 +2776,81 @@ export default function App() {
                 );
               })()}
               <div style={{ textAlign: "center", marginTop: 40, padding: "0 6%" }}>
-                <button onClick={() => { go("design"); setTab("catalog"); }} style={{ background: "#1d1d1f", color: "#fff", padding: "16px 40px", border: "none", borderRadius: 980, fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Browse catalog</button>
+                <button onClick={() => { go("design"); setTab("catalog"); }} style={{ background: "#1d1d1f", color: "#fff", padding: "16px 40px", border: "none", borderRadius: 980, fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Browse full catalog</button>
               </div>
             </RevealSection>
           </section>
 
-          {/* Section 5: Visualize — full-viewport with large image */}
-          <section className="aura-home-section" style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#fff", padding: "80px 6%" }}>
-            <RevealSection style={{ maxWidth: 1000, textAlign: "center", width: "100%" }}>
-              <p style={{ fontSize: 13, letterSpacing: ".2em", textTransform: "uppercase", color: "#86868b", marginBottom: 16, fontWeight: 600 }}>Step 4</p>
-              <h2 style={{ fontSize: "clamp(36px,5vw,64px)", fontWeight: 700, lineHeight: 1.05, letterSpacing: "-0.025em", marginBottom: 16 }}>See it before you buy it.</h2>
-              <p style={{ fontSize: "clamp(16px,1.6vw,21px)", color: "#6e6e73", lineHeight: 1.5, maxWidth: 520, margin: "0 auto 48px" }}>AI renders your room with the exact products you picked. Plus CAD floor plans with real dimensions.</p>
-              <div style={{ borderRadius: 24, overflow: "hidden", boxShadow: "0 24px 80px rgba(0,0,0,.12)", position: "relative" }}>
-                <img src={homeVizImg} alt="AI room visualization" style={{ width: "100%", display: "block", maxHeight: 520, objectFit: "cover" }} />
-                <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "40px 32px 28px", background: "linear-gradient(to top, rgba(0,0,0,.6), transparent)" }}>
-                  <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
-                    {["AI Visualization", "CAD Floor Plan", "Clearance Check"].map(t => (
-                      <span key={t} style={{ fontSize: 12, background: "rgba(255,255,255,.15)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", padding: "8px 18px", borderRadius: 980, color: "#fff", fontWeight: 600, letterSpacing: ".02em" }}>{t}</span>
+          {/* Section 6: Visualization — text right, large viz image left */}
+          <section className="aura-home-section" style={{ padding: "120px 6%", background: "#fff" }}>
+            <RevealSection>
+              <div className="aura-grid-2col aura-grid-reverse" style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 80, alignItems: "center", maxWidth: 1200, margin: "0 auto" }}>
+                {/* Large visualization image */}
+                <div style={{ borderRadius: 24, overflow: "hidden", boxShadow: "0 24px 80px rgba(0,0,0,.1)", position: "relative" }}>
+                  <img src={homeVizImg} alt="AI room visualization" style={{ width: "100%", display: "block" }} />
+                  <div style={{ position: "absolute", top: 16, left: 16, display: "flex", gap: 6 }}>
+                    <span style={{ fontSize: 11, background: "rgba(0,0,0,.6)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", padding: "6px 14px", borderRadius: 980, color: "#fff", fontWeight: 600 }}>AI Generated</span>
+                  </div>
+                  <div style={{ position: "absolute", bottom: 16, left: 16, right: 16, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {["Warm Modern", "Living Room", "18' x 22'"].map(t => (
+                      <span key={t} style={{ fontSize: 11, background: "rgba(255,255,255,.9)", backdropFilter: "blur(8px)", padding: "6px 14px", borderRadius: 980, color: "#1d1d1f", fontWeight: 600 }}>{t}</span>
                     ))}
                   </div>
                 </div>
+                <div>
+                  <p style={{ fontSize: 13, letterSpacing: ".2em", textTransform: "uppercase", color: "#86868b", marginBottom: 12, fontWeight: 600 }}>Step 4</p>
+                  <h2 style={{ fontSize: "clamp(32px,4vw,52px)", fontWeight: 700, lineHeight: 1.08, letterSpacing: "-0.02em", marginBottom: 20 }}>See it before<br />you buy it.</h2>
+                  <p style={{ fontSize: 18, color: "#6e6e73", lineHeight: 1.6, marginBottom: 32 }}>AI renders a photorealistic visualization of your room with the exact products you selected. See how everything looks together before you spend a dollar.</p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 32 }}>
+                    {[["AI room renders", "Photorealistic scenes with your chosen furniture"], ["CAD floor plans", "Precise layouts with dimensions and clearance zones"], ["Traffic flow analysis", "Ensures walkways are clear and furniture is accessible"]].map(([title, desc]) => (
+                      <div key={title} style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+                        <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#1d1d1f", marginTop: 8, flexShrink: 0 }} />
+                        <div>
+                          <p style={{ fontSize: 15, fontWeight: 600, color: "#1d1d1f", margin: "0 0 2px" }}>{title}</p>
+                          <p style={{ fontSize: 14, color: "#86868b", margin: 0, lineHeight: 1.4 }}>{desc}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#1d1d1f", color: "#fff", padding: "14px 32px", border: "none", borderRadius: 980, fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Try it free</button>
+                </div>
               </div>
-              <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 36 }}>
-                <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#1d1d1f", color: "#fff", padding: "16px 36px", border: "none", borderRadius: 980, fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Try it free</button>
-                <button onClick={() => go("pricing")} style={{ background: "transparent", border: "none", padding: "16px 24px", borderRadius: 980, fontSize: 15, color: "#06c", cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>See Pro features {">"}</button>
+            </RevealSection>
+          </section>
+
+          {/* Section 7: Pricing teaser — dark section */}
+          <section className="aura-home-section" style={{ padding: "120px 6%", background: "#1d1d1f" }}>
+            <RevealSection>
+              <div style={{ maxWidth: 1000, margin: "0 auto", textAlign: "center" }}>
+                <h2 style={{ fontSize: "clamp(32px,4vw,52px)", fontWeight: 700, lineHeight: 1.08, letterSpacing: "-0.02em", marginBottom: 20, color: "#fff" }}>Start free. Upgrade when you're ready.</h2>
+                <p style={{ fontSize: 18, color: "rgba(255,255,255,.5)", lineHeight: 1.6, maxWidth: 560, margin: "0 auto 48px" }}>Design mood boards and browse products at no cost. Upgrade to Pro for AI room renders, CAD floor plans, and unlimited projects.</p>
+                <div className="aura-grid-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, maxWidth: 700, margin: "0 auto" }}>
+                  {/* Free tier */}
+                  <div style={{ background: "rgba(255,255,255,.06)", borderRadius: 24, padding: "36px 28px", border: "1px solid rgba(255,255,255,.1)", textAlign: "left" }}>
+                    <p style={{ fontSize: 13, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,.4)", fontWeight: 600, marginBottom: 8 }}>Free</p>
+                    <p style={{ fontSize: 32, fontWeight: 700, color: "#fff", marginBottom: 20 }}>$0<span style={{ fontSize: 15, fontWeight: 400, color: "rgba(255,255,255,.4)" }}>/month</span></p>
+                    {["AI mood boards", "Style matching", DB.length + "+ product catalog", "Save projects"].map(f => (
+                      <div key={f} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="rgba(255,255,255,.5)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        <span style={{ fontSize: 14, color: "rgba(255,255,255,.7)" }}>{f}</span>
+                      </div>
+                    ))}
+                    <button onClick={() => { go("design"); setTab("studio"); }} style={{ width: "100%", marginTop: 20, background: "rgba(255,255,255,.1)", color: "#fff", padding: "14px", border: "1px solid rgba(255,255,255,.2)", borderRadius: 14, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Get started</button>
+                  </div>
+                  {/* Pro tier */}
+                  <div style={{ background: "#fff", borderRadius: 24, padding: "36px 28px", textAlign: "left", position: "relative" }}>
+                    <div style={{ position: "absolute", top: 16, right: 16, background: "#1d1d1f", color: "#fff", padding: "4px 12px", borderRadius: 980, fontSize: 11, fontWeight: 700, letterSpacing: ".06em" }}>POPULAR</div>
+                    <p style={{ fontSize: 13, letterSpacing: ".1em", textTransform: "uppercase", color: "#86868b", fontWeight: 600, marginBottom: 8 }}>Pro</p>
+                    <p style={{ fontSize: 32, fontWeight: 700, color: "#1d1d1f", marginBottom: 20 }}>$20<span style={{ fontSize: 15, fontWeight: 400, color: "#86868b" }}>/month</span></p>
+                    {["Everything in Free", "AI room visualization", "CAD floor plans", "Clearance analysis", "Unlimited projects"].map(f => (
+                      <div key={f} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#1d1d1f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        <span style={{ fontSize: 14, color: "#1d1d1f" }}>{f}</span>
+                      </div>
+                    ))}
+                    <button onClick={() => go("pricing")} style={{ width: "100%", marginTop: 20, background: "#1d1d1f", color: "#fff", padding: "14px", border: "none", borderRadius: 14, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Upgrade to Pro</button>
+                  </div>
+                </div>
               </div>
             </RevealSection>
           </section>
@@ -2694,14 +2869,14 @@ export default function App() {
             </RevealSection>
           </section>
 
-          {/* Final CTA — full-viewport */}
-          <section className="aura-cta-section" style={{ minHeight: "80vh", display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center", background: "#1d1d1f", padding: "80px 6%" }}>
+          {/* Final CTA */}
+          <section className="aura-cta-section" style={{ padding: "120px 6%", textAlign: "center", background: "#fff" }}>
             <RevealSection>
-              <h2 style={{ fontSize: "clamp(40px,6vw,72px)", fontWeight: 700, marginBottom: 16, letterSpacing: "-0.03em", lineHeight: 1.05, color: "#fff" }}>Your dream room<br />is one click away.</h2>
-              <p style={{ fontSize: "clamp(16px,1.6vw,21px)", color: "rgba(255,255,255,.5)", marginBottom: 40 }}>Free to start. Upgrade anytime.</p>
+              <h2 style={{ fontSize: "clamp(36px,5vw,60px)", fontWeight: 700, marginBottom: 16, letterSpacing: "-0.025em", lineHeight: 1.05, color: "#1d1d1f" }}>Your dream room<br />is one click away.</h2>
+              <p style={{ fontSize: 18, color: "#86868b", marginBottom: 40, lineHeight: 1.5 }}>Join thousands of homeowners designing smarter with AI.</p>
               <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
-                <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#fff", color: "#1d1d1f", padding: "18px 44px", border: "none", borderRadius: 980, fontSize: 17, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s", letterSpacing: ".01em" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Get started free</button>
-                <button onClick={() => go("pricing")} style={{ background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.2)", padding: "18px 36px", borderRadius: 980, fontSize: 17, color: "#fff", cursor: "pointer", fontFamily: "inherit", fontWeight: 500, transition: "background .2s" }} onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.15)"} onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.1)"}>See pricing</button>
+                <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#1d1d1f", color: "#fff", padding: "18px 44px", border: "none", borderRadius: 980, fontSize: 17, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Get started free</button>
+                <button onClick={() => go("pricing")} style={{ background: "#f5f5f7", border: "none", padding: "18px 36px", borderRadius: 980, fontSize: 17, color: "#1d1d1f", cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>See pricing</button>
               </div>
             </RevealSection>
           </section>
