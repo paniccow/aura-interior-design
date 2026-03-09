@@ -130,6 +130,7 @@ export default function App() {
   const [msgs, setMsgs] = useState<ChatMessage[]>([{ role: "bot", text: "Welcome to AURA! I have **" + DB.length + " products** from premium brands including Restoration Hardware, West Elm, Article, Crate & Barrel, AllModern, Serena & Lily, Rejuvenation, McGee & Co, Shoppe Amber, and more.\n\n**Tell me about your space** — your room type, style preferences, and what you're looking for. I'll generate personalized mood boards based on our conversation.\n\n**Upload a room photo** above and I'll analyze your existing space to create layouts that actually work.\n\nOr ask me anything about design — I'll explain exactly why each piece works for your space!", recs: [] }]);
   const [inp, setInp] = useState<string>("");
   const [busy, setBusy] = useState<boolean>(false);
+  const [searchProgress, setSearchProgress] = useState<{ stage: string; count: number } | null>(null);
   const [room, setRoom] = useState<string | null>(() => {
     try { return sessionStorage.getItem("aura_room") || null; } catch (_e) { return null; }
   });
@@ -531,7 +532,7 @@ export default function App() {
     if (selItems.length === 0) return;
     // Check viz limit (client-side pre-check — server enforces too)
     if (!user) {
-      setVizErr("Please sign in to generate visualizations.");
+      setVizErr("sign_up_prompt");
       return;
     }
     if (vizRemaining <= 0) {
@@ -938,8 +939,21 @@ export default function App() {
     const msg = inp.trim();
     setInp("");
     setBusy(true);
+    setSearchProgress({ stage: "Searching " + DB.length.toLocaleString() + " products...", count: DB.length });
     setMsgs((prev) => [...prev, { role: "user", text: msg, recs: [] }]);
     trackEvent("ai_chat", { msgLength: msg.length, room: (room || "none") as string, style: (vibe || "none") as string });
+
+    // Animated countdown effect
+    const countdownInterval = setInterval(() => {
+      setSearchProgress(prev => {
+        if (!prev) return prev;
+        const next = Math.max(0, prev.count - Math.floor(Math.random() * 4000 + 1500));
+        if (next <= 50) return { stage: "Picking the best matches...", count: next };
+        if (next <= 500) return { stage: "Narrowing down to your style...", count: next };
+        if (next <= 5000) return { stage: "Filtering by room and budget...", count: next };
+        return { stage: "Searching " + next.toLocaleString() + " products...", count: next };
+      });
+    }, 400);
 
     // Search RapidAPI for real products — awaited so the AI can design with them
     let apiProducts: Product[] = [];
@@ -1000,6 +1014,8 @@ export default function App() {
         }
       }
     } catch (e) { console.log("[AURA] API search failed:", (e as Error)?.message || e); }
+
+    setSearchProgress({ stage: "Analyzing your preferences...", count: 24 });
 
     // Combine curated DB + fresh API products + previously cached API products
     const cachedApiProducts = Array.from(featuredCache.values());
@@ -1493,6 +1509,8 @@ export default function App() {
         setBoardsGenHint("Mood boards generated based on your request");
       }
     }
+    clearInterval(countdownInterval);
+    setSearchProgress(null);
     setBusy(false);
   };
 
@@ -3108,9 +3126,19 @@ export default function App() {
                           </div>
                         ))}
                         {busy && (
-                          <div style={{ color: "#9B8B7B", fontSize: 13, padding: 10, display: "flex", alignItems: "center", gap: 8 }}>
-                            <div style={{ width: 14, height: 14, border: "2px solid #E8E0D8", borderTopColor: "#1A1815", borderRadius: "50%", animation: "spin .8s linear infinite" }} />
-                            Designing your space...
+                          <div style={{ color: "#1A1815", fontSize: 13, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8, background: "#F8F5F0", borderRadius: 12, margin: "4px 0" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <div style={{ width: 16, height: 16, border: "2px solid #E8E0D8", borderTopColor: "#1A1815", borderRadius: "50%", animation: "spin .8s linear infinite", flexShrink: 0 }} />
+                              <span style={{ fontWeight: 600 }}>{searchProgress?.stage || "Designing your space..."}</span>
+                            </div>
+                            {searchProgress && searchProgress.count > 0 && (
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <div style={{ flex: 1, height: 4, borderRadius: 2, background: "#E8E0D8", overflow: "hidden" }}>
+                                  <div style={{ height: "100%", borderRadius: 2, background: "#1A1815", transition: "width .4s ease", width: Math.min(100, Math.max(5, 100 - (searchProgress.count / DB.length) * 100)) + "%" }} />
+                                </div>
+                                <span style={{ fontSize: 11, color: "#9B8B7B", fontWeight: 600, whiteSpace: "nowrap" }}>{searchProgress.count > 50 ? searchProgress.count.toLocaleString() + " left" : "Almost done"}</span>
+                              </div>
+                            )}
                           </div>
                         )}
                         <div ref={chatEnd} />
@@ -3213,19 +3241,66 @@ export default function App() {
                   </div>
 
                   {/* Viz images — ABOVE floor plan */}
-                  {vizErr && <div style={{ fontSize: 12, color: "#C17550", marginBottom: 16, background: "#FFF8F0", padding: "14px 18px", borderRadius: 10, border: "1px solid #F0D8C0", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-                    <span>{vizErr}</span>
-                    {vizRemaining <= 0 && userPlan !== "pro" && <button onClick={() => go("pricing")} style={{ background: "#C17550", color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>Upgrade to Pro</button>}
-                  </div>}
-                  <div ref={vizAreaRef}>
-                  {vizSt === "loading" && (
-                    <div style={{ marginBottom: 24, borderRadius: 14, border: "1px solid #EDE8E0", padding: "48px 32px", textAlign: "center", background: "#fff" }}>
-                      <div style={{ width: 36, height: 36, border: "2.5px solid #E8E0D8", borderTopColor: "#1A1815", borderRadius: "50%", animation: "spin .8s linear infinite", margin: "0 auto 16px" }} />
-                      <p style={{ fontSize: 15, color: "#1A1815", margin: 0, fontWeight: 500 }}>Generating visualization</p>
-                      <p style={{ fontSize: 13, color: "#9B8B7B", margin: "6px 0 0" }}>{selItems.length} products · {roomPhotoAnalysis ? "Matching your room photo" : "Creating scene"}</p>
-                      <p style={{ fontSize: 11, color: "#C8BEB4", margin: "4px 0 0" }}>This may take up to a minute</p>
+                  {vizErr && vizErr === "sign_up_prompt" ? (
+                    <div style={{ marginBottom: 20, borderRadius: 16, border: "1px solid #E8E0D8", padding: "32px 28px", background: "linear-gradient(135deg, #FDFCFA, #F8F5F0)", textAlign: "center" }}>
+                      <h3 style={{ fontSize: 20, fontWeight: 700, color: "#1A1815", margin: "0 0 8px" }}>You're almost there!</h3>
+                      <p style={{ fontSize: 14, color: "#7A6B5B", margin: "0 0 20px", lineHeight: 1.5 }}>Create a free account to visualize your room. It takes 10 seconds — your selections are saved.</p>
+                      <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+                        <button onClick={() => { setVizErr(""); go("auth"); }} style={{ background: "#1A1815", color: "#fff", border: "none", borderRadius: 10, padding: "14px 32px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Create free account</button>
+                        <button onClick={() => { setVizErr(""); go("auth"); }} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 10, padding: "14px 24px", fontSize: 14, color: "#7A6B5B", cursor: "pointer", fontFamily: "inherit" }}>Sign in</button>
+                      </div>
                     </div>
-                  )}
+                  ) : vizErr ? (
+                    <div style={{ fontSize: 12, color: "#C17550", marginBottom: 16, background: "#FFF8F0", padding: "14px 18px", borderRadius: 10, border: "1px solid #F0D8C0", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+                      <span>{vizErr}</span>
+                      {vizRemaining <= 0 && userPlan !== "pro" && <button onClick={() => go("pricing")} style={{ background: "#C17550", color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>Upgrade to Pro</button>}
+                    </div>
+                  ) : null}
+                  <div ref={vizAreaRef}>
+                  {vizSt === "loading" && (() => {
+                    const VizProgress = () => {
+                      const [step, setStep] = React.useState(0);
+                      const steps = [
+                        "Analyzing " + selItems.length + " selected products...",
+                        "Building room layout (" + (roomW || "18") + "' x " + (roomL || "22") + "')...",
+                        roomPhotoAnalysis ? "Matching your room photo..." : "Applying " + (vibe || "modern") + " style palette...",
+                        "Rendering photorealistic scene...",
+                        "Adding lighting and finishing touches..."
+                      ];
+                      React.useEffect(() => {
+                        const t = setInterval(() => setStep(s => s < steps.length - 1 ? s + 1 : s), 8000);
+                        return () => clearInterval(t);
+                      }, []);
+                      return (
+                        <div style={{ marginBottom: 24, borderRadius: 16, border: "1px solid #EDE8E0", padding: "40px 32px", background: "#fff" }}>
+                          <div style={{ maxWidth: 320, margin: "0 auto" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+                              <div style={{ width: 32, height: 32, border: "2.5px solid #E8E0D8", borderTopColor: "#1A1815", borderRadius: "50%", animation: "spin .8s linear infinite", flexShrink: 0 }} />
+                              <div>
+                                <p style={{ fontSize: 15, color: "#1A1815", margin: 0, fontWeight: 600 }}>Generating visualization</p>
+                                <p style={{ fontSize: 12, color: "#9B8B7B", margin: "2px 0 0" }}>{selItems.length} products · {vibe || "Modern"} style</p>
+                              </div>
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                              {steps.map((s, i) => (
+                                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, opacity: i <= step ? 1 : 0.3, transition: "opacity .5s" }}>
+                                  {i < step ? (
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#5B8B6B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                  ) : i === step ? (
+                                    <div style={{ width: 16, height: 16, border: "2px solid #E8E0D8", borderTopColor: "#1A1815", borderRadius: "50%", animation: "spin .8s linear infinite", flexShrink: 0 }} />
+                                  ) : (
+                                    <div style={{ width: 16, height: 16, borderRadius: "50%", border: "1.5px solid #E8E0D8", flexShrink: 0 }} />
+                                  )}
+                                  <span style={{ fontSize: 13, color: i < step ? "#5B8B6B" : i === step ? "#1A1815" : "#C8BEB4", fontWeight: i === step ? 600 : 400 }}>{s}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    };
+                    return <VizProgress />;
+                  })()}
                   </div>
                   {vizUrls.length > 0 && (<>
                     <div className="aura-viz-grid" style={{ display: "grid", gridTemplateColumns: vizUrls.length === 1 ? "1fr" : "repeat(auto-fit,minmax(280px,1fr))", gap: 16, marginBottom: 24 }}>
