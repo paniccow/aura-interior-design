@@ -42,10 +42,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         const userId = session.metadata?.supabase_user_id;
         if (userId && session.subscription) {
           // Fetch subscription from Stripe to get billing period dates
-          const sub = await stripe.subscriptions.retrieve(session.subscription as string);
-          const billingCycle = sub.items.data[0]?.price?.recurring?.interval === "year" ? "yearly" : "monthly";
-          const periodStart = new Date(sub.current_period_start * 1000).toISOString();
-          const periodEnd = new Date(sub.current_period_end * 1000).toISOString();
+          const sub = await stripe.subscriptions.retrieve(session.subscription as string) as any;
+          const billingCycle = sub.items?.data?.[0]?.price?.recurring?.interval === "year" ? "yearly" : "monthly";
+          const periodStart = sub.current_period_start ? new Date(sub.current_period_start * 1000).toISOString() : new Date().toISOString();
+          const periodEnd = sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null;
 
           await supabaseAdmin.from("profiles").update({
             plan: "pro",
@@ -69,9 +69,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           .single();
         if (profile) {
           const isActive = ["active", "trialing"].includes(subscription.status);
+          const subAny = subscription as any;
           const billingCycle = subscription.items.data[0]?.price?.recurring?.interval === "year" ? "yearly" : "monthly";
-          const periodStart = new Date(subscription.current_period_start * 1000).toISOString();
-          const periodEnd = new Date(subscription.current_period_end * 1000).toISOString();
+          const periodStart = subAny.current_period_start ? new Date(subAny.current_period_start * 1000).toISOString() : new Date().toISOString();
+          const periodEnd = subAny.current_period_end ? new Date(subAny.current_period_end * 1000).toISOString() : null;
           await supabaseAdmin.from("profiles").update({
             plan: isActive ? "pro" : "free",
             stripe_subscription_id: subscription.id,
