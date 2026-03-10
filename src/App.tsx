@@ -130,7 +130,7 @@ export default function App() {
   const [msgs, setMsgs] = useState<ChatMessage[]>([{ role: "bot", text: "Welcome to AURA! I have **" + DB.length + " products** from premium brands including Restoration Hardware, West Elm, Article, Crate & Barrel, AllModern, Serena & Lily, Rejuvenation, McGee & Co, Shoppe Amber, and more.\n\n**Tell me about your space** — your room type, style preferences, and what you're looking for. I'll generate personalized mood boards based on our conversation.\n\n**Upload a room photo** above and I'll analyze your existing space to create layouts that actually work.\n\nOr ask me anything about design — I'll explain exactly why each piece works for your space!", recs: [] }]);
   const [inp, setInp] = useState<string>("");
   const [busy, setBusy] = useState<boolean>(false);
-  const [searchProgress, setSearchProgress] = useState<{ stage: string; count: number } | null>(null);
+  const [searchProgress, setSearchProgress] = useState<{ stage: string; count: number; step: number; steps: string[] } | null>(null);
   const [room, setRoom] = useState<string | null>(() => {
     try { return sessionStorage.getItem("aura_room") || null; } catch (_e) { return null; }
   });
@@ -939,19 +939,39 @@ export default function App() {
     const msg = inp.trim();
     setInp("");
     setBusy(true);
-    setSearchProgress({ stage: "Searching " + DB.length.toLocaleString() + " products...", count: DB.length });
+    // Build context-aware loading steps that sell the value of the service
+    const styleLabel = vibe || "your style";
+    const roomLabel = room ? room.toLowerCase() : "your space";
+    const budgetLabel = bud === "u500" ? "under $500" : bud === "u1k" ? "under $1K" : bud === "1k5k" ? "$1K–$5K" : bud === "5k10k" ? "$5K–$10K" : bud === "10k25k" ? "$10K–$25K" : bud === "25k" ? "$25K+" : "";
+    const loadingSteps = [
+      "Scanning " + DB.length.toLocaleString() + " products across 200+ retailers",
+      "Filtering for " + styleLabel + " pieces" + (room ? " suited for " + roomLabel : ""),
+      budgetLabel ? "Matching " + budgetLabel + " price range across tiers" : "Comparing prices across retailer tiers",
+      "Scoring color palette & material harmony",
+      "Evaluating spatial fit" + (sqft ? " for " + sqft + " sqft" : "") + (roomW ? " (" + roomW + "' × " + roomL + "')" : ""),
+      "Running design cohesion analysis",
+      "Curating your personalized selection",
+      "Preparing designer recommendations"
+    ];
+    setSearchProgress({ stage: loadingSteps[0], count: DB.length, step: 0, steps: loadingSteps });
     setMsgs((prev) => [...prev, { role: "user", text: msg, recs: [] }]);
     trackEvent("ai_chat", { msgLength: msg.length, room: (room || "none") as string, style: (vibe || "none") as string });
 
-    // Animated countdown effect
+    // Animated countdown for step 0, then progressive steps with checkmarks
+    let currentLoadingStep = 0;
     const countdownInterval = setInterval(() => {
       setSearchProgress(prev => {
         if (!prev) return prev;
-        const next = Math.max(0, prev.count - Math.floor(Math.random() * 4000 + 1500));
-        if (next <= 50) return { stage: "Picking the best matches...", count: next };
-        if (next <= 500) return { stage: "Narrowing down to your style...", count: next };
-        if (next <= 5000) return { stage: "Filtering by room and budget...", count: next };
-        return { stage: "Searching " + next.toLocaleString() + " products...", count: next };
+        if (prev.step === 0) {
+          // Countdown phase
+          const next = Math.max(0, prev.count - Math.floor(Math.random() * 4000 + 1500));
+          if (next <= 0) {
+            currentLoadingStep = 1;
+            return { stage: loadingSteps[1], count: 0, step: 1, steps: loadingSteps };
+          }
+          return { ...prev, count: next };
+        }
+        return prev;
       });
     }, 400);
 
@@ -1008,24 +1028,11 @@ export default function App() {
       }
     } catch (e) { console.log("[AURA] API search failed:", (e as Error)?.message || e); }
 
-    setSearchProgress({ stage: "Analyzing your preferences...", count: 0 });
-
-    // Rotate through AI processing stages so the user knows it's still working
-    const aiStages = [
-      "Analyzing your preferences...",
-      "Matching styles to your taste...",
-      "Curating from premium brands...",
-      "Comparing prices across retailers...",
-      "Scoring design compatibility...",
-      "Building your personalized picks...",
-      "Applying color palette harmony...",
-      "Finalizing recommendations..."
-    ];
-    let aiStageIdx = 0;
+    // Progressive steps with checkmarks — advance one step every 3.5s
     const aiStageInterval = setInterval(() => {
-      aiStageIdx = (aiStageIdx + 1) % aiStages.length;
-      setSearchProgress({ stage: aiStages[aiStageIdx], count: 0 });
-    }, 3000);
+      currentLoadingStep = Math.min(currentLoadingStep + 1, loadingSteps.length - 1);
+      setSearchProgress({ stage: loadingSteps[currentLoadingStep], count: 0, step: currentLoadingStep, steps: loadingSteps });
+    }, 3500);
 
     // Combine curated DB + fresh API products + previously cached API products
     const cachedApiProducts = Array.from(featuredCache.values());
@@ -3138,27 +3145,43 @@ export default function App() {
                             )}
                           </div>
                         ))}
-                        {busy && (
-                          <div style={{ color: "#1A1815", fontSize: 13, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 8, background: "#F8F5F0", borderRadius: 12, margin: "4px 0" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                              <div style={{ width: 18, height: 18, border: "2px solid #E8E0D8", borderTopColor: "#1A1815", borderRadius: "50%", animation: "spin .8s linear infinite", flexShrink: 0 }} />
-                              <span style={{ fontWeight: 600, transition: "opacity .3s", animation: "fadeInText .5s ease" }} key={searchProgress?.stage || "default"}>{searchProgress?.stage || "Designing your space..."}</span>
+                        {busy && searchProgress && (
+                          <div style={{ color: "#1A1815", fontSize: 13, padding: "16px 18px", background: "#F8F5F0", borderRadius: 14, margin: "4px 0", border: "1px solid #EDE8E0" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                              <div style={{ width: 28, height: 28, borderRadius: 8, background: "linear-gradient(135deg, #1A1815, #3A3530)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                <div style={{ width: 12, height: 12, border: "2px solid rgba(255,255,255,.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin .8s linear infinite" }} />
+                              </div>
+                              <div>
+                                <p style={{ fontSize: 13, fontWeight: 700, color: "#1A1815", margin: 0 }}>AI Designer working</p>
+                                <p style={{ fontSize: 10, color: "#B8A898", margin: "1px 0 0" }}>Typically 20–40 seconds</p>
+                              </div>
                             </div>
-                            {searchProgress && searchProgress.count > 0 ? (
-                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <div style={{ flex: 1, height: 4, borderRadius: 2, background: "#E8E0D8", overflow: "hidden" }}>
-                                  <div style={{ height: "100%", borderRadius: 2, background: "#1A1815", transition: "width .4s ease", width: Math.min(100, Math.max(5, 100 - (searchProgress.count / DB.length) * 100)) + "%" }} />
-                                </div>
-                                <span style={{ fontSize: 11, color: "#9B8B7B", fontWeight: 600, whiteSpace: "nowrap" }}>{searchProgress.count > 50 ? searchProgress.count.toLocaleString() + " left" : "Almost done"}</span>
-                              </div>
-                            ) : (
-                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <div style={{ flex: 1, height: 4, borderRadius: 2, background: "#E8E0D8", overflow: "hidden" }}>
-                                  <div style={{ height: "100%", borderRadius: 2, background: "linear-gradient(90deg, #1A1815, #9B8B7B, #1A1815)", backgroundSize: "200% 100%", animation: "shimmer 1.5s ease infinite" }} />
-                                </div>
-                              </div>
-                            )}
-                            <span style={{ fontSize: 10, color: "#B8A898", marginTop: -2 }}>This can take up to a minute</span>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                              {searchProgress.steps.map((s, i) => {
+                                const isCurrent = i === searchProgress.step;
+                                const isDone = i < searchProgress.step;
+                                const isFuture = i > searchProgress.step;
+                                // During countdown (step 0), show count in first step
+                                const label = i === 0 && searchProgress.count > 0
+                                  ? s.replace(/[\d,]+/, searchProgress.count.toLocaleString())
+                                  : s;
+                                return (
+                                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0", opacity: isFuture ? 0.3 : 1, transition: "opacity .4s" }}>
+                                    {isDone ? (
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}><path d="M5 13l4 4L19 7" stroke="#5B8B6B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                    ) : isCurrent ? (
+                                      <div style={{ width: 14, height: 14, border: "2px solid #E8E0D8", borderTopColor: "#1A1815", borderRadius: "50%", animation: "spin .8s linear infinite", flexShrink: 0 }} />
+                                    ) : (
+                                      <div style={{ width: 14, height: 14, borderRadius: "50%", border: "1.5px solid #E0D8D0", flexShrink: 0 }} />
+                                    )}
+                                    <span style={{ fontSize: 12, color: isDone ? "#5B8B6B" : isCurrent ? "#1A1815" : "#C8BEB4", fontWeight: isCurrent ? 600 : 400, transition: "color .3s" }}>{label}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            <div style={{ marginTop: 10, height: 3, borderRadius: 2, background: "#E8E0D8", overflow: "hidden" }}>
+                              <div style={{ height: "100%", borderRadius: 2, background: searchProgress.step === 0 ? "#1A1815" : "linear-gradient(90deg, #5B8B6B, #7BA98B)", transition: "width .5s ease", width: searchProgress.step === 0 ? Math.min(12, Math.max(2, (1 - searchProgress.count / DB.length) * 12)) + "%" : Math.min(100, ((searchProgress.step + 1) / searchProgress.steps.length) * 100) + "%" }} />
+                            </div>
                           </div>
                         )}
                         <div ref={chatEnd} />
