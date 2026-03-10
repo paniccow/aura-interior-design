@@ -1034,6 +1034,7 @@ export default function App() {
       setSearchProgress({ stage: loadingSteps[currentLoadingStep], count: 0, step: currentLoadingStep, steps: loadingSteps });
     }, 3500);
 
+    try {
     // Combine curated DB + fresh API products + previously cached API products
     const cachedApiProducts = Array.from(featuredCache.values());
     const combinedDB = [...DB, ...apiProducts, ...cachedApiProducts];
@@ -1526,10 +1527,12 @@ export default function App() {
         setBoardsGenHint("Mood boards generated based on your request");
       }
     }
-    clearInterval(countdownInterval);
-    clearInterval(aiStageInterval);
-    setSearchProgress(null);
-    setBusy(false);
+    } finally {
+      clearInterval(countdownInterval);
+      clearInterval(aiStageInterval);
+      setSearchProgress(null);
+      setBusy(false);
+    }
   };
 
   const localMatch = (msg: string): Product[] => {
