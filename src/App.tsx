@@ -189,6 +189,8 @@ export default function App() {
   const [featuredCat, setFeaturedCat] = useState<string>("all");
   const [featuredLoading, setFeaturedLoading] = useState<boolean>(false);
   const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
+  const [heroRoomIdx, setHeroRoomIdx] = useState<number>(0);
   const [featuredTotal, setFeaturedTotal] = useState<number>(0);
   const [featuredPage, setFeaturedPage] = useState<number>(1);
   const [featuredRetailers, setFeaturedRetailers] = useState<string[]>([]);
@@ -353,6 +355,12 @@ export default function App() {
   const vizCount = (profile?.viz_month === currentMonth) ? (profile?.viz_count || 0) : 0;
   const vizLimit = userPlan === "pro" ? 100 : 1;
   const vizRemaining = Math.max(0, vizLimit - vizCount);
+  // AI generation limits for free users (tracked client-side)
+  const FREE_GEN_LIMIT = 1;
+  const genCount = (() => { try { return parseInt(localStorage.getItem("aura_gen_count") || "0"); } catch (_e) { return 0; } })();
+  const genRemaining = userPlan === "pro" ? 999 : Math.max(0, FREE_GEN_LIMIT - genCount);
+  // Hero cycling rooms
+  const heroRooms = ["your living room.", "your bedroom.", "your kitchen.", "your home office."];
 
   // Auto-save active project every 8 seconds when state changes
   useEffect(() => {
@@ -372,6 +380,12 @@ export default function App() {
     window.addEventListener("scroll", h);
     return () => window.removeEventListener("scroll", h);
   }, []);
+
+  // Cycle hero room text every 3 seconds
+  useEffect(() => {
+    const interval = setInterval(() => setHeroRoomIdx(prev => (prev + 1) % heroRooms.length), 3000);
+    return () => clearInterval(interval);
+  }, [heroRooms.length]);
 
   useEffect(() => {
     if (chatBoxRef.current) {
@@ -936,6 +950,11 @@ export default function App() {
   /* ─── AI CHAT ─── */
   const send = async () => {
     if (!inp.trim() || busy) return;
+    // Gate free users after their free generation
+    if (userPlan !== "pro" && genRemaining <= 0) {
+      setShowUpgradeModal(true);
+      return;
+    }
     const msg = inp.trim();
     setInp("");
     setBusy(true);
@@ -1532,6 +1551,14 @@ export default function App() {
       clearInterval(aiStageInterval);
       setSearchProgress(null);
       setBusy(false);
+      // Track generation usage for free users; nudge upgrade after limit reached
+      if (userPlan !== "pro") {
+        const newCount = genCount + 1;
+        try { localStorage.setItem("aura_gen_count", String(newCount)); } catch (_e) {}
+        if (newCount >= FREE_GEN_LIMIT) {
+          setTimeout(() => setShowUpgradeModal(true), 3500);
+        }
+      }
     }
   };
 
@@ -2304,8 +2331,8 @@ export default function App() {
         <div style={{ maxWidth: 380, width: "100%" }}>
           <div style={{ textAlign: "center", marginBottom: 32 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 8 }}><AuraLogo size={28} /><span style={{ fontSize: 21, fontWeight: 600 }}>AURA</span></div>
-            <h1 style={{ fontSize: 28, fontWeight: 700, margin: "0 0 6px", letterSpacing: "-0.02em" }}>{authMode === "signup" ? "Create your account" : authMode === "forgot" ? "Reset password" : "Welcome back"}</h1>
-            <p style={{ fontSize: 15, color: "#6e6e73", margin: 0 }}>{authMode === "signup" ? "Start designing in minutes." : authMode === "forgot" ? "We'll send you a link." : "Sign in to continue."}</p>
+            <h1 style={{ fontSize: 28, fontWeight: 700, margin: "0 0 6px", letterSpacing: "-0.02em" }}>{authMode === "signup" ? "Start creating magic" : authMode === "forgot" ? "Reset password" : "Welcome back, designer"}</h1>
+            <p style={{ fontSize: 15, color: "#6e6e73", margin: 0 }}>{authMode === "signup" ? "Your dream room is one conversation away." : authMode === "forgot" ? "We'll send you a reset link." : "Pick up where you left off."}</p>
           </div>
           {authMode !== "forgot" && (<>
             <button onClick={() => { supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } }); }} style={{ width: "100%", padding: "14px", background: "#fff", color: "#1d1d1f", border: "1px solid #d2d2d7", borderRadius: 12, fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, transition: "background .2s", boxSizing: "border-box" }} onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f5f7")} onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}>
@@ -2602,6 +2629,51 @@ export default function App() {
         }
       `}</style>
 
+      {/* UPGRADE MODAL — shown to free users after generation limit */}
+      {showUpgradeModal && (
+        <div onClick={e => { if (e.target === e.currentTarget) setShowUpgradeModal(false); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.72)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", padding: "0 16px" }}>
+          <div style={{ background: "#fff", borderRadius: 24, maxWidth: 460, width: "100%", padding: "48px 36px 36px", position: "relative", textAlign: "center", boxShadow: "0 40px 100px rgba(0,0,0,.35)", animation: "fadeUp .35s ease" }}>
+            <button onClick={() => setShowUpgradeModal(false)} style={{ position: "absolute", top: 14, right: 16, background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#86868b", lineHeight: 1, fontFamily: "inherit" }}>×</button>
+            <div style={{ width: 60, height: 60, borderRadius: "50%", background: "#1d1d1f", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+              <AuraLogo size={26} color="#fff" />
+            </div>
+            <h2 style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.025em", marginBottom: 8, color: "#1d1d1f" }}>Upgrade to keep designing</h2>
+            <p style={{ fontSize: 15, color: "#6e6e73", lineHeight: 1.55, margin: "0 auto 24px", maxWidth: 340 }}>You've used your free AI design generation. Upgrade to Pro for unlimited sessions, visualizations, and your full curated product selection.</p>
+            <div style={{ background: "#f5f5f7", borderRadius: 14, padding: "16px 20px", marginBottom: 20, textAlign: "left" }}>
+              {["Unlimited AI design generations", "Unlimited room visualizations", "100,000+ curated products", "AI floor plan layouts", "Mood board creation", "Save unlimited projects"].map(f => (
+                <div key={f} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0" }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#1d1d1f" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  <span style={{ fontSize: 13, color: "#1d1d1f" }}>{f}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "inline-flex", background: "#ebebeb", borderRadius: 980, padding: 3, marginBottom: 16 }}>
+              <button onClick={() => setBillingCycle("monthly")} style={{ padding: "8px 18px", borderRadius: 980, border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", background: billingCycle === "monthly" ? "#fff" : "transparent", color: billingCycle === "monthly" ? "#1d1d1f" : "#86868b", boxShadow: billingCycle === "monthly" ? "0 1px 4px rgba(0,0,0,.1)" : "none", transition: "all .2s" }}>Monthly</button>
+              <button onClick={() => setBillingCycle("yearly")} style={{ padding: "8px 18px", borderRadius: 980, border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", background: billingCycle === "yearly" ? "#fff" : "transparent", color: billingCycle === "yearly" ? "#1d1d1f" : "#86868b", boxShadow: billingCycle === "yearly" ? "0 1px 4px rgba(0,0,0,.1)" : "none", transition: "all .2s" }}>Yearly <span style={{ fontSize: 10, fontWeight: 700, color: "#34c759", marginLeft: 2 }}>SAVE 50%</span></button>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <span style={{ fontSize: 40, fontWeight: 700, letterSpacing: "-0.03em", color: "#1d1d1f" }}>{billingCycle === "yearly" ? "$10" : "$20"}</span>
+              <span style={{ fontSize: 15, color: "#86868b" }}>/mo</span>
+              {billingCycle === "yearly" && <p style={{ fontSize: 13, color: "#86868b", margin: "4px 0 0" }}>Billed $120/year · Save $120</p>}
+            </div>
+            <button onClick={async () => {
+              setShowUpgradeModal(false);
+              trackEvent("upgrade_modal_click", { billing: billingCycle });
+              if (!user) { go("auth"); return; }
+              if (userPlan === "pro") return;
+              try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) { go("auth"); return; }
+                const resp = await fetch("/api/create-checkout", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token }, body: JSON.stringify({ plan: billingCycle }) });
+                const result = await resp.json();
+                if (result.url) window.location.href = result.url;
+              } catch (err) { console.error("Checkout error:", err); }
+            }} style={{ width: "100%", background: "#1d1d1f", color: "#fff", border: "none", borderRadius: 12, padding: "15px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", marginBottom: 10, transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Upgrade to Pro →</button>
+            <button onClick={() => setShowUpgradeModal(false)} style={{ background: "none", border: "none", fontSize: 13, color: "#86868b", cursor: "pointer", fontFamily: "inherit" }}>Maybe later</button>
+          </div>
+        </div>
+      )}
+
       {/* NAV */}
       {/* Nav — white when over hero, dark glass when scrolled */}
       {(() => {
@@ -2640,13 +2712,56 @@ export default function App() {
             {/* Text positioned at bottom like Tesla */}
             <div className="aura-hero-bottom" style={{ position: "absolute", bottom: 0, left: 0, right: 0, textAlign: "center", padding: "0 6% 64px", animation: "fadeUp .8s ease" }}>
               <p style={{ fontSize: "clamp(10px,1.2vw,13px)", letterSpacing: ".2em", textTransform: "uppercase", color: "rgba(255,255,255,.6)", marginBottom: 10, fontWeight: 500 }}>AI Interior Design · No experience required</p>
-              <h1 style={{ fontSize: "clamp(36px,6vw,72px)", fontWeight: 700, lineHeight: 1.05, marginBottom: 12, letterSpacing: "-0.025em", color: "#fff" }}>Design your dream room.</h1>
+              <h1 style={{ fontSize: "clamp(36px,6vw,72px)", fontWeight: 700, lineHeight: 1.05, marginBottom: 12, letterSpacing: "-0.025em", color: "#fff" }}>Design <span key={heroRoomIdx} style={{ display: "inline-block", animation: "fadeInText .5s ease" }}>{heroRooms[heroRoomIdx]}</span></h1>
               <p style={{ fontSize: "clamp(14px,1.5vw,18px)", color: "rgba(255,255,255,.75)", lineHeight: 1.5, maxWidth: 480, margin: "0 auto 28px", fontWeight: 400 }}>Describe your space. Get curated furniture picks and a photorealistic visualization in minutes.</p>
               <div className="aura-hero-btns" style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
                 <button onClick={() => { go("design"); setTab("studio"); trackEvent("cta_click", { button: "hero_start_designing" }); }} style={{ background: "rgba(255,255,255,.95)", color: "#1d1d1f", padding: "15px 40px", border: "none", borderRadius: 4, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "background .2s", letterSpacing: ".02em", textTransform: "uppercase" }} onMouseEnter={e => e.currentTarget.style.background = "#fff"} onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.95)"}>Start Designing Free</button>
                 <button onClick={() => go("pricing")} style={{ background: "rgba(255,255,255,.12)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", color: "#fff", padding: "15px 36px", border: "1px solid rgba(255,255,255,.3)", borderRadius: 4, fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", transition: "background .2s", letterSpacing: ".02em", textTransform: "uppercase" }} onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.22)"} onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.12)"}>See Pricing</button>
               </div>
             </div>
+          </section>
+
+          {/* Quick-start widget — try it inline before signing up */}
+          <section style={{ padding: "80px 6%", background: "#1d1d1f" }}>
+            <RevealSection>
+              <div style={{ maxWidth: 760, margin: "0 auto", textAlign: "center" }}>
+                <p style={{ fontSize: 12, letterSpacing: ".2em", textTransform: "uppercase", color: "rgba(255,255,255,.45)", marginBottom: 12, fontWeight: 600 }}>Start in seconds</p>
+                <h2 style={{ fontSize: "clamp(28px,4vw,44px)", fontWeight: 700, color: "#fff", marginBottom: 8, letterSpacing: "-0.02em", lineHeight: 1.1 }}>What are you designing?</h2>
+                <p style={{ fontSize: 16, color: "rgba(255,255,255,.5)", marginBottom: 36 }}>Pick your room and style — we'll do the rest.</p>
+                {(() => {
+                  const quickRooms = ["Living Room", "Bedroom", "Dining Room", "Kitchen", "Home Office", "Bathroom"];
+                  const quickStyles = ["Warm Modern", "Japandi", "Scandinavian", "Mid-Century", "Coastal", "Industrial"];
+                  const [qRoom, setQRoom] = React.useState<string | null>(null);
+                  const [qStyle, setQStyle] = React.useState<string | null>(null);
+                  return (
+                    <div>
+                      <p style={{ fontSize: 11, letterSpacing: ".15em", textTransform: "uppercase", color: "rgba(255,255,255,.4)", marginBottom: 14, fontWeight: 600 }}>Room type</p>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginBottom: 28 }}>
+                        {quickRooms.map(r => (
+                          <button key={r} onClick={() => setQRoom(r)} style={{ padding: "10px 20px", borderRadius: 980, border: qRoom === r ? "2px solid #fff" : "1px solid rgba(255,255,255,.2)", background: qRoom === r ? "#fff" : "transparent", color: qRoom === r ? "#1d1d1f" : "rgba(255,255,255,.8)", fontSize: 14, fontWeight: qRoom === r ? 600 : 400, cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>{r}</button>
+                        ))}
+                      </div>
+                      <p style={{ fontSize: 11, letterSpacing: ".15em", textTransform: "uppercase", color: "rgba(255,255,255,.4)", marginBottom: 14, fontWeight: 600 }}>Design style</p>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginBottom: 36 }}>
+                        {quickStyles.map(s => (
+                          <button key={s} onClick={() => setQStyle(s)} style={{ padding: "10px 20px", borderRadius: 980, border: qStyle === s ? "2px solid #fff" : "1px solid rgba(255,255,255,.2)", background: qStyle === s ? "#fff" : "transparent", color: qStyle === s ? "#1d1d1f" : "rgba(255,255,255,.8)", fontSize: 14, fontWeight: qStyle === s ? 600 : 400, cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>{s}</button>
+                        ))}
+                      </div>
+                      <button onClick={() => {
+                        if (qRoom) setRoom(qRoom);
+                        if (qStyle) setVibe(qStyle);
+                        go("design");
+                        setTab("studio");
+                        trackEvent("quickstart_click", { room: qRoom || "none", style: qStyle || "none" });
+                      }} style={{ background: qRoom || qStyle ? "#fff" : "rgba(255,255,255,.15)", color: qRoom || qStyle ? "#1d1d1f" : "rgba(255,255,255,.4)", border: "none", borderRadius: 980, padding: "16px 48px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "all .2s", letterSpacing: ".01em" }}>
+                        {qRoom || qStyle ? "Start Designing →" : "Skip — just explore"}
+                      </button>
+                      {(qRoom || qStyle) && <p style={{ fontSize: 12, color: "rgba(255,255,255,.35)", marginTop: 10 }}>Free to start · No credit card required</p>}
+                    </div>
+                  );
+                })()}
+              </div>
+            </RevealSection>
           </section>
 
           {/* Section 2: Define Your Room — text left, product UI demo right */}
@@ -3235,12 +3350,25 @@ export default function App() {
                         )}
                         <div ref={chatEnd} />
                       </div>
+                      {userPlan !== "pro" && genRemaining <= 0 ? (
+                        <div className="aura-chat-input" style={{ padding: "16px", borderTop: "1px solid #F0EBE4", background: "#1d1d1f", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                          <div>
+                            <p style={{ fontSize: 14, fontWeight: 600, color: "#fff", margin: "0 0 2px" }}>Free generation used</p>
+                            <p style={{ fontSize: 12, color: "rgba(255,255,255,.5)", margin: 0 }}>Upgrade to Pro for unlimited AI design sessions</p>
+                          </div>
+                          <button onClick={() => setShowUpgradeModal(true)} style={{ background: "#fff", color: "#1d1d1f", border: "none", borderRadius: 10, padding: "12px 24px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0 }}>Upgrade to Pro →</button>
+                        </div>
+                      ) : (
                       <div className="aura-chat-input" style={{ padding: "14px 16px", borderTop: "1px solid #F0EBE4", background: "#FDFCFA" }}>
+                        {userPlan !== "pro" && genRemaining === 1 && (
+                          <p style={{ fontSize: 11, color: "#C17550", marginBottom: 8, textAlign: "center" }}>1 free generation remaining — <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => setShowUpgradeModal(true)}>upgrade for unlimited</span></p>
+                        )}
                         <div style={{ display: "flex", gap: 0, border: "1.5px solid #D8D0C8", borderRadius: 12, background: "#fff", overflow: "hidden", transition: "border-color .15s" }}>
                           <input value={inp} onChange={(e) => setInp(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder={room ? "Ask AI: What do you need for your " + room.toLowerCase() + "?" : "Ask AI: Describe your ideal space..."} style={{ flex: 1, background: "transparent", border: "none", padding: "14px 18px", fontFamily: "inherit", fontSize: 15, outline: "none", color: "#1A1815" }} />
                           <button onClick={send} disabled={busy} style={{ background: "#1A1815", color: "#fff", border: "none", padding: "10px 20px", margin: 5, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: busy ? 0.3 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}>Send</button>
                         </div>
                       </div>
+                      )}
                     </div>
                   </div>
 
