@@ -235,6 +235,9 @@ export default function App() {
   const [onboardStep, setOnboardStep] = useState<number>(0); // 0=welcome, 1=pick room, 2=pick style
 
   const [designStep, _setDesignStep] = useState<number>(0); // 0=setup, 1=chat, 2=review
+  // Quickstart widget state (lifted from IIFE to avoid hooks-in-conditional violation)
+  const [qRoom, setQRoom] = useState<string | null>(null);
+  const [qStyle, setQStyle] = useState<string | null>(null);
   // AI Studio Tools state
   const [aiToolMode, setAiToolMode] = useState<"none"|"transfer"|"color"|"texture">("none");
   const [aiInspFile, setAiInspFile] = useState<{data:string;type:string}|null>(null);
@@ -2776,8 +2779,6 @@ export default function App() {
                 {(() => {
                   const quickRooms = ["Living Room", "Bedroom", "Dining Room", "Kitchen", "Home Office", "Bathroom"];
                   const quickStyles = ["Warm Modern", "Japandi", "Scandinavian", "Mid-Century", "Coastal", "Industrial"];
-                  const [qRoom, setQRoom] = React.useState<string | null>(null);
-                  const [qStyle, setQStyle] = React.useState<string | null>(null);
                   return (
                     <div>
                       <p style={{ fontSize: 11, letterSpacing: ".15em", textTransform: "uppercase", color: "rgba(255,255,255,.4)", marginBottom: 14, fontWeight: 600 }}>Room type</p>
