@@ -2571,15 +2571,28 @@ export default function App() {
       `}</style>
 
       {/* NAV */}
-      <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000, padding: sc ? "8px 5%" : "12px 5%", display: "flex", alignItems: "center", justifyContent: "space-between", background: sc ? "rgba(255,255,255,.72)" : "rgba(255,255,255,0)", backdropFilter: sc ? "saturate(180%) blur(20px)" : "none", WebkitBackdropFilter: sc ? "saturate(180%) blur(20px)" : "none", transition: "all .3s", borderBottom: sc ? "1px solid rgba(0,0,0,.06)" : "none" }}>
-        <div onClick={() => go("home")} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}><AuraLogo size={28} /><span style={{ fontSize: 21, fontWeight: 600, letterSpacing: "-0.01em" }}>AURA</span></div>
-        <div className="aura-nav-links" style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          {sel.size > 0 && <span className="aura-nav-cart" style={{ fontSize: 11, color: "#1d1d1f", fontWeight: 600, background: "rgba(0,0,0,.04)", padding: "5px 12px", borderRadius: 20, whiteSpace: "nowrap" }}>{selCount} items - {fmt(selTotal)}</span>}
-          <button onClick={() => go("pricing")} style={{ background: "none", border: "none", fontSize: 12, color: "#6e6e73", cursor: "pointer", fontFamily: "inherit", fontWeight: 400 }}>Pricing</button>
-          {user ? <button onClick={() => go("account")} style={{ background: "none", border: "none", fontSize: 12, color: "#6e6e73", cursor: "pointer", fontFamily: "inherit", fontWeight: 400 }}>{user.name || "Account"}</button> : <button onClick={() => go("auth")} style={{ background: "none", border: "none", fontSize: 12, color: "#6e6e73", cursor: "pointer", fontFamily: "inherit", fontWeight: 400 }}>Sign In</button>}
-          <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#1d1d1f", color: "#fff", borderRadius: 980, padding: "8px 18px", border: "none", fontSize: 12, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Get Started</button>
-        </div>
-      </nav>
+      {/* Nav — white when over hero, dark glass when scrolled */}
+      {(() => {
+        const onHero = pg === "home" && !sc;
+        const logoColor = onHero ? "#fff" : "#1A1815";
+        const textColor = onHero ? "rgba(255,255,255,.92)" : "#6e6e73";
+        const ctaBg = onHero ? "rgba(255,255,255,.18)" : "#1d1d1f";
+        const ctaBorder = onHero ? "1px solid rgba(255,255,255,.35)" : "none";
+        return (
+          <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000, padding: sc ? "10px 5%" : "16px 5%", display: "flex", alignItems: "center", justifyContent: "space-between", background: sc ? "rgba(255,255,255,.82)" : "transparent", backdropFilter: sc ? "saturate(180%) blur(20px)" : "none", WebkitBackdropFilter: sc ? "saturate(180%) blur(20px)" : "none", transition: "all .35s ease", borderBottom: sc ? "1px solid rgba(0,0,0,.06)" : "none" }}>
+            <div onClick={() => go("home")} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+              <AuraLogo size={26} color={logoColor} />
+              <span style={{ fontFamily: "Georgia,'Times New Roman',serif", fontSize: 22, fontWeight: 400, letterSpacing: "0.18em", color: logoColor, transition: "color .35s ease", lineHeight: 1, textTransform: "uppercase" }}>Aura</span>
+            </div>
+            <div className="aura-nav-links" style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+              {sel.size > 0 && <span className="aura-nav-cart" style={{ fontSize: 11, color: textColor, fontWeight: 600, background: onHero ? "rgba(255,255,255,.15)" : "rgba(0,0,0,.04)", padding: "5px 12px", borderRadius: 20, whiteSpace: "nowrap" }}>{selCount} items · {fmt(selTotal)}</span>}
+              <button onClick={() => go("pricing")} style={{ background: "none", border: "none", fontSize: 13, color: textColor, cursor: "pointer", fontFamily: "inherit", fontWeight: 400, transition: "color .35s ease", padding: "6px 12px" }}>Pricing</button>
+              {user ? <button onClick={() => go("account")} style={{ background: "none", border: "none", fontSize: 13, color: textColor, cursor: "pointer", fontFamily: "inherit", fontWeight: 400, transition: "color .35s ease", padding: "6px 12px" }}>{user.name || "Account"}</button> : <button onClick={() => go("auth")} style={{ background: "none", border: "none", fontSize: 13, color: textColor, cursor: "pointer", fontFamily: "inherit", fontWeight: 400, transition: "color .35s ease", padding: "6px 12px" }}>Sign In</button>}
+              <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: ctaBg, color: "#fff", borderRadius: 980, padding: "9px 22px", border: ctaBorder, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", transition: "all .35s ease", backdropFilter: onHero ? "blur(8px)" : "none", WebkitBackdropFilter: onHero ? "blur(8px)" : "none" }} onMouseEnter={e => { e.currentTarget.style.opacity = "0.82"; }} onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}>Get Started</button>
+            </div>
+          </nav>
+        );
+      })()}
 
       {/* HOME — SCROLL ANIMATED LANDING */}
       {pg === "home" && (() => {
@@ -2589,9 +2602,9 @@ export default function App() {
           {/* Hero — Tesla-style full-screen immersive */}
           <section className="aura-hero" style={{ height: "100vh", minHeight: 600, position: "relative", overflow: "hidden" }}>
             {/* Full-screen background image */}
-            <img src={homeHeroImg} alt="Modern living room interior design" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 40%" }} />
-            {/* Dark gradient overlay for text readability */}
-            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,.15) 0%, rgba(0,0,0,0) 40%, rgba(0,0,0,0) 50%, rgba(0,0,0,.55) 100%)" }} />
+            <img src={homeHeroImg} alt="Modern living room interior design" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 30%" }} />
+            {/* Gradient overlay — subtle dark at top for nav, strong at bottom for text */}
+            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,.45) 0%, rgba(0,0,0,.05) 35%, rgba(0,0,0,0) 55%, rgba(0,0,0,.72) 100%)" }} />
             {/* Text positioned at bottom like Tesla */}
             <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, textAlign: "center", padding: "0 6% 64px", animation: "fadeUp .8s ease" }}>
               <h1 style={{ fontSize: "clamp(40px,6vw,72px)", fontWeight: 700, lineHeight: 1.05, marginBottom: 12, letterSpacing: "-0.025em", color: "#fff" }}>Design your dream room.</h1>
