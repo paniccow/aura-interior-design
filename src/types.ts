@@ -1,7 +1,7 @@
 // ─── Product Database Types ───
 export type FurnitureCategory = "sofa" | "bed" | "table" | "chair" | "stool" | "light" | "rug" | "art" | "accent" | "decor" | "storage";
 
-export type RoomType = "Living Room" | "Dining Room" | "Kitchen" | "Bedroom" | "Office" | "Outdoor" | "Bathroom" | "Great Room" | "Exterior" | "Garden" | "Patio / Deck";
+export type RoomType = "Living Room" | "Dining Room" | "Kitchen" | "Bedroom" | "Office" | "Outdoor" | "Bathroom" | "Great Room";
 
 export type StyleName =
   | "Warm Modern" | "Minimalist" | "Bohemian" | "Scandinavian"

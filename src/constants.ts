@@ -1,6 +1,6 @@
 import type { RoomType, StyleName, BudgetKey, FurnitureDim, FurnitureCategory, StylePalette, RoomNeed } from "./types";
 
-export const ROOMS: readonly RoomType[] = ["Living Room","Dining Room","Kitchen","Bedroom","Office","Outdoor","Bathroom","Great Room","Exterior","Garden","Patio / Deck"];
+export const ROOMS: readonly RoomType[] = ["Living Room","Dining Room","Kitchen","Bedroom","Office","Outdoor","Bathroom","Great Room"];
 export const VIBES: readonly StyleName[] = ["Warm Modern","Minimalist","Bohemian","Scandinavian","Mid-Century","Luxury","Coastal","Japandi","Industrial","Art Deco","Rustic","Glam","Transitional","Organic Modern"];
 export const fmt = (n: number): string => "$" + n.toLocaleString();
 export const budgets: readonly [BudgetKey, string][] = [["all","All Budgets"],["u500","Under $500"],["u1k","Under $1K"],["1k5k","$1K-$5K"],["5k10k","$5K-$10K"],["10k25k","$10K-$25K"],["25k","$25K+"]];
@@ -105,9 +105,6 @@ export const ROOM_CAT_TIERS: Record<string, Record<string, 1|2|3>> = {
   "Outdoor":      { chair:1, table:1, sofa:2, light:2, accent:3 },
   "Bathroom":     { light:1, accent:2, art:3 },
   "Great Room":   { sofa:1, table:1, light:1, chair:2, rug:2, art:3, accent:3, stool:2 },
-  "Exterior":     { light:1, accent:2, chair:2, table:2 },
-  "Garden":       { chair:1, table:2, light:2, accent:2 },
-  "Patio / Deck": { chair:1, table:1, sofa:2, light:2, accent:3 },
 };
 
 /* ─── ROOM TYPE REQUIREMENTS + SPATIAL RULES ─── */
@@ -122,7 +119,4 @@ export const ROOM_NEEDS: Record<RoomType, RoomNeed> = {
   "Outdoor":      { essential: ["chair","table"], recommended: ["sofa","light","accent"], layout: "Lounge zone with weather-resistant seating. Dining set in covered area. 36\" pathways between zones. Lighting along perimeter.", minSqft: 100, zones: ["lounge","dining","pathway"] },
   "Bathroom":     { essential: ["light","accent"], recommended: ["art"], layout: "Vanity lighting at face height. Stool near tub or vanity. Mirror centered above sink. Art on dry walls only.", minSqft: 40, zones: ["vanity","bath"] },
   "Great Room":   { essential: ["sofa","table","rug","light","chair"], recommended: ["art","accent","stool"], layout: "Define zones with rugs — conversation area anchored by sofa, dining zone behind, reading nook by windows. 48\" walkways between zones. Consistent style across zones.", minSqft: 250, zones: ["conversation","dining","entry","reading"] },
-  "Exterior":     { essential: ["light","accent"], recommended: ["chair","table"], layout: "Frame the entrance with symmetrical plantings and lighting. Path lighting along walkways. Potted plants flanking the doorway. Seating area in covered porch if available.", minSqft: 100, zones: ["entrance","pathway","porch"] },
-  "Garden":       { essential: ["chair","accent"], recommended: ["table","light"], layout: "Create a focal point with a central seating area. Winding paths between planting beds. Ambient lighting along borders. Container garden groupings at 3 heights.", minSqft: 150, zones: ["seating","planting","pathway"] },
-  "Patio / Deck": { essential: ["chair","table","light"], recommended: ["sofa","accent"], layout: "Anchor with an outdoor sectional or dining set facing the view. Side table within reach of every seat. String lights or lanterns overhead. Rug to define the zone. 36\" clearance around furniture.", minSqft: 120, zones: ["lounge","dining","transition"] },
 };

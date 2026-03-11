@@ -106,41 +106,6 @@ function getAnalyticsSummary(): { total: number; byEvent: Record<string, number>
   } catch (_e) { return { total: 0, byEvent: {}, last7Days: {}, uniqueSessions: 0, buyPageVisits: 0, checkoutClicks: 0, recentEvents: [] }; }
 }
 
-/* ─── BEFORE/AFTER SLIDER COMPONENT ─── */
-const BeforeAfterSlider: React.FC = () => {
-  const [sliderPos, setSliderPos] = React.useState(50);
-  const [dragging, setDragging] = React.useState(false);
-  const beforeImg = "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=900&q=80";
-  const afterImg = "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=900&q=80";
-  const updatePos = (clientX: number, rect: DOMRect) => {
-    const pct = Math.min(95, Math.max(5, (clientX - rect.left) / rect.width * 100));
-    setSliderPos(pct);
-  };
-  return (
-    <div
-      style={{ position: "relative", overflow: "hidden", borderRadius: 20, cursor: "ew-resize", userSelect: "none", boxShadow: "0 24px 80px rgba(0,0,0,.12)" }}
-      onMouseDown={e => { setDragging(true); updatePos(e.clientX, e.currentTarget.getBoundingClientRect()); }}
-      onMouseMove={e => { if (dragging) updatePos(e.clientX, e.currentTarget.getBoundingClientRect()); }}
-      onMouseUp={() => setDragging(false)}
-      onMouseLeave={() => setDragging(false)}
-      onTouchStart={e => { setDragging(true); updatePos(e.touches[0].clientX, e.currentTarget.getBoundingClientRect()); }}
-      onTouchMove={e => { if (dragging) { e.preventDefault(); updatePos(e.touches[0].clientX, e.currentTarget.getBoundingClientRect()); } }}
-      onTouchEnd={() => setDragging(false)}
-    >
-      <img src={beforeImg} alt="Before — empty room" style={{ width: "100%", display: "block", height: 480, objectFit: "cover", objectPosition: "center" }} draggable={false} />
-      <div style={{ position: "absolute", inset: 0, clipPath: `inset(0 ${100 - sliderPos}% 0 0)` }}>
-        <img src={afterImg} alt="After — AI designed room" style={{ width: "100%", display: "block", height: 480, objectFit: "cover", objectPosition: "center" }} draggable={false} />
-      </div>
-      <div style={{ position: "absolute", top: 0, bottom: 0, left: `${sliderPos}%`, width: 2, background: "#fff", transform: "translateX(-50%)", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", top: "50%", left: `${sliderPos}%`, transform: "translate(-50%,-50%)", width: 44, height: 44, borderRadius: "50%", background: "#fff", boxShadow: "0 2px 16px rgba(0,0,0,.3)", display: "flex", alignItems: "center", justifyContent: "center", animation: "sliderPulse 1.2s ease 1.2s 1 both", pointerEvents: "none", zIndex: 2 }}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M8 5l-5 7 5 7M16 5l5 7-5 7" stroke="#1d1d1f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-      </div>
-      <span style={{ position: "absolute", top: 16, left: 16, fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", background: "rgba(0,0,0,.5)", color: "#fff", padding: "5px 12px", borderRadius: 6, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}>Before</span>
-      <span style={{ position: "absolute", top: 16, right: 16, fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", background: "rgba(29,29,31,.7)", color: "#fff", padding: "5px 12px", borderRadius: 6, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}>After · AI</span>
-    </div>
-  );
-};
-
 /* ─── MAIN APP ─── */
 export default function App() {
   const [pg, setPg] = useState<string>("home");
@@ -224,8 +189,6 @@ export default function App() {
   const [featuredCat, setFeaturedCat] = useState<string>("all");
   const [featuredLoading, setFeaturedLoading] = useState<boolean>(false);
   const [showOnboarding, setShowOnboarding] = useState<boolean>(false);
-  const [showUpgradeModal, setShowUpgradeModal] = useState<boolean>(false);
-  const [heroRoomIdx, setHeroRoomIdx] = useState<number>(0);
   const [featuredTotal, setFeaturedTotal] = useState<number>(0);
   const [featuredPage, setFeaturedPage] = useState<number>(1);
   const [featuredRetailers, setFeaturedRetailers] = useState<string[]>([]);
@@ -235,17 +198,6 @@ export default function App() {
   const [onboardStep, setOnboardStep] = useState<number>(0); // 0=welcome, 1=pick room, 2=pick style
 
   const [designStep, _setDesignStep] = useState<number>(0); // 0=setup, 1=chat, 2=review
-  // Quickstart widget state (lifted from IIFE to avoid hooks-in-conditional violation)
-  const [qRoom, setQRoom] = useState<string | null>(null);
-  const [qStyle, setQStyle] = useState<string | null>(null);
-  // AI Studio Tools state
-  const [aiToolMode, setAiToolMode] = useState<"none"|"transfer"|"color"|"texture">("none");
-  const [aiInspFile, setAiInspFile] = useState<{data:string;type:string}|null>(null);
-  const [aiInspLoading, setAiInspLoading] = useState(false);
-  const [aiSelectedColor, setAiSelectedColor] = useState<string|null>(null);
-  const [aiMatCategory, setAiMatCategory] = useState<"floor"|"wall">("floor");
-  const [aiSelectedFloorMat, setAiSelectedFloorMat] = useState<string|null>(null);
-  const [aiSelectedWallMat, setAiSelectedWallMat] = useState<string|null>(null);
   const setDesignStep = (step: number) => { _setDesignStep(step); window.scrollTo({ top: 0, behavior: "smooth" }); };
   const [setupSubStep, setSetupSubStep] = useState<number>(0); // 0=room, 1=style, 2=budget, 3=dimensions+uploads
   const chatEnd = useRef<HTMLDivElement>(null);
@@ -401,12 +353,6 @@ export default function App() {
   const vizCount = (profile?.viz_month === currentMonth) ? (profile?.viz_count || 0) : 0;
   const vizLimit = userPlan === "pro" ? 100 : 1;
   const vizRemaining = Math.max(0, vizLimit - vizCount);
-  // AI generation limits for free users (tracked client-side)
-  const FREE_GEN_LIMIT = 0;
-  const genCount = (() => { try { return parseInt(localStorage.getItem("aura_gen_count") || "0"); } catch (_e) { return 0; } })();
-  const genRemaining = userPlan === "pro" ? 999 : Math.max(0, FREE_GEN_LIMIT - genCount);
-  // Hero cycling rooms
-  const heroRooms = ["your living room.", "your bedroom.", "your garden.", "your patio."];
 
   // Auto-save active project every 8 seconds when state changes
   useEffect(() => {
@@ -426,12 +372,6 @@ export default function App() {
     window.addEventListener("scroll", h);
     return () => window.removeEventListener("scroll", h);
   }, []);
-
-  // Cycle hero room text every 3 seconds
-  useEffect(() => {
-    const interval = setInterval(() => setHeroRoomIdx(prev => (prev + 1) % heroRooms.length), 3000);
-    return () => clearInterval(interval);
-  }, [heroRooms.length]);
 
   useEffect(() => {
     if (chatBoxRef.current) {
@@ -996,11 +936,6 @@ export default function App() {
   /* ─── AI CHAT ─── */
   const send = async () => {
     if (!inp.trim() || busy) return;
-    // Gate free users after their free generation
-    if (userPlan !== "pro" && genRemaining <= 0) {
-      setShowUpgradeModal(true);
-      return;
-    }
     const msg = inp.trim();
     setInp("");
     setBusy(true);
@@ -1597,14 +1532,6 @@ export default function App() {
       clearInterval(aiStageInterval);
       setSearchProgress(null);
       setBusy(false);
-      // Track generation usage for free users; nudge upgrade after limit reached
-      if (userPlan !== "pro") {
-        const newCount = genCount + 1;
-        try { localStorage.setItem("aura_gen_count", String(newCount)); } catch (_e) {}
-        if (newCount >= FREE_GEN_LIMIT) {
-          setTimeout(() => setShowUpgradeModal(true), 3500);
-        }
-      }
     }
   };
 
@@ -2377,8 +2304,8 @@ export default function App() {
         <div style={{ maxWidth: 380, width: "100%" }}>
           <div style={{ textAlign: "center", marginBottom: 32 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 8 }}><AuraLogo size={28} /><span style={{ fontSize: 21, fontWeight: 600 }}>AURA</span></div>
-            <h1 style={{ fontSize: 28, fontWeight: 700, margin: "0 0 6px", letterSpacing: "-0.02em" }}>{authMode === "signup" ? "Start creating magic" : authMode === "forgot" ? "Reset password" : "Welcome back, designer"}</h1>
-            <p style={{ fontSize: 15, color: "#6e6e73", margin: 0 }}>{authMode === "signup" ? "Your dream room is one conversation away." : authMode === "forgot" ? "We'll send you a reset link." : "Pick up where you left off."}</p>
+            <h1 style={{ fontSize: 28, fontWeight: 700, margin: "0 0 6px", letterSpacing: "-0.02em" }}>{authMode === "signup" ? "Create your account" : authMode === "forgot" ? "Reset password" : "Welcome back"}</h1>
+            <p style={{ fontSize: 15, color: "#6e6e73", margin: 0 }}>{authMode === "signup" ? "Start designing in minutes." : authMode === "forgot" ? "We'll send you a link." : "Sign in to continue."}</p>
           </div>
           {authMode !== "forgot" && (<>
             <button onClick={() => { supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } }); }} style={{ width: "100%", padding: "14px", background: "#fff", color: "#1d1d1f", border: "1px solid #d2d2d7", borderRadius: 12, fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, transition: "background .2s", boxSizing: "border-box" }} onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f5f7")} onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}>
@@ -2547,7 +2474,6 @@ export default function App() {
         @keyframes drawLine{from{stroke-dashoffset:1000}to{stroke-dashoffset:0}}
         @keyframes growLine{from{transform:scaleY(0)}to{transform:scaleY(1)}}
         @keyframes glowPulse{0%,100%{box-shadow:0 0 20px rgba(193,117,80,.15)}50%{box-shadow:0 0 40px rgba(193,117,80,.35)}}
-        @keyframes sliderPulse{0%{transform:translate(-50%,-50%) scale(1)}30%{transform:translate(-50%,-50%) scale(1.18)}60%{transform:translate(-50%,-50%) scale(0.9)}100%{transform:translate(-50%,-50%) scale(1)}}
         @keyframes slideInLeft{from{opacity:0;transform:translateX(-60px)}to{opacity:1;transform:translateX(0)}}
         @keyframes slideInRight{from{opacity:0;transform:translateX(60px)}to{opacity:1;transform:translateX(0)}}
         @keyframes scaleIn{from{opacity:0;transform:scale(.5)}to{opacity:1;transform:scale(1)}}
@@ -2606,7 +2532,6 @@ export default function App() {
           .aura-chat-input input{width:100%!important}
           .aura-chat-input button{width:100%!important}
           .aura-viz-grid{grid-template-columns:1fr!important}
-          .aura-usecase-grid{grid-template-columns:1fr!important}
           .aura-mood-tabs{flex-wrap:wrap!important}
           .aura-upload-row{grid-template-columns:1fr!important;gap:12px!important}
           .aura-sel-header{flex-direction:column!important;align-items:flex-start!important;gap:12px!important}
@@ -2677,51 +2602,6 @@ export default function App() {
         }
       `}</style>
 
-      {/* UPGRADE MODAL — shown to free users after generation limit */}
-      {showUpgradeModal && (
-        <div onClick={e => { if (e.target === e.currentTarget) setShowUpgradeModal(false); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.72)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", padding: "0 16px" }}>
-          <div style={{ background: "#fff", borderRadius: 24, maxWidth: 460, width: "100%", padding: "48px 36px 36px", position: "relative", textAlign: "center", boxShadow: "0 40px 100px rgba(0,0,0,.35)", animation: "fadeUp .35s ease" }}>
-            <button onClick={() => setShowUpgradeModal(false)} style={{ position: "absolute", top: 14, right: 16, background: "none", border: "none", fontSize: 22, cursor: "pointer", color: "#86868b", lineHeight: 1, fontFamily: "inherit" }}>×</button>
-            <div style={{ width: 60, height: 60, borderRadius: "50%", background: "#1d1d1f", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
-              <AuraLogo size={26} color="#fff" />
-            </div>
-            <h2 style={{ fontSize: 26, fontWeight: 700, letterSpacing: "-0.025em", marginBottom: 8, color: "#1d1d1f" }}>Upgrade to keep designing</h2>
-            <p style={{ fontSize: 15, color: "#6e6e73", lineHeight: 1.55, margin: "0 auto 24px", maxWidth: 340 }}>You've used your free AI design generation. Upgrade to Pro for unlimited sessions, visualizations, and your full curated product selection.</p>
-            <div style={{ background: "#f5f5f7", borderRadius: 14, padding: "16px 20px", marginBottom: 20, textAlign: "left" }}>
-              {["Unlimited AI design generations", "Unlimited room visualizations", "100,000+ curated products", "AI floor plan layouts", "Mood board creation", "Save unlimited projects"].map(f => (
-                <div key={f} style={{ display: "flex", alignItems: "center", gap: 10, padding: "5px 0" }}>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#1d1d1f" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  <span style={{ fontSize: 13, color: "#1d1d1f" }}>{f}</span>
-                </div>
-              ))}
-            </div>
-            <div style={{ display: "inline-flex", background: "#ebebeb", borderRadius: 980, padding: 3, marginBottom: 16 }}>
-              <button onClick={() => setBillingCycle("monthly")} style={{ padding: "8px 18px", borderRadius: 980, border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", background: billingCycle === "monthly" ? "#fff" : "transparent", color: billingCycle === "monthly" ? "#1d1d1f" : "#86868b", boxShadow: billingCycle === "monthly" ? "0 1px 4px rgba(0,0,0,.1)" : "none", transition: "all .2s" }}>Monthly</button>
-              <button onClick={() => setBillingCycle("yearly")} style={{ padding: "8px 18px", borderRadius: 980, border: "none", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", background: billingCycle === "yearly" ? "#fff" : "transparent", color: billingCycle === "yearly" ? "#1d1d1f" : "#86868b", boxShadow: billingCycle === "yearly" ? "0 1px 4px rgba(0,0,0,.1)" : "none", transition: "all .2s" }}>Yearly <span style={{ fontSize: 10, fontWeight: 700, color: "#34c759", marginLeft: 2 }}>SAVE 50%</span></button>
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <span style={{ fontSize: 40, fontWeight: 700, letterSpacing: "-0.03em", color: "#1d1d1f" }}>{billingCycle === "yearly" ? "$10" : "$20"}</span>
-              <span style={{ fontSize: 15, color: "#86868b" }}>/mo</span>
-              {billingCycle === "yearly" && <p style={{ fontSize: 13, color: "#86868b", margin: "4px 0 0" }}>Billed $120/year · Save $120</p>}
-            </div>
-            <button onClick={async () => {
-              setShowUpgradeModal(false);
-              trackEvent("upgrade_modal_click", { billing: billingCycle });
-              if (!user) { go("auth"); return; }
-              if (userPlan === "pro") return;
-              try {
-                const { data: { session } } = await supabase.auth.getSession();
-                if (!session) { go("auth"); return; }
-                const resp = await fetch("/api/create-checkout", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token }, body: JSON.stringify({ plan: billingCycle }) });
-                const result = await resp.json();
-                if (result.url) window.location.href = result.url;
-              } catch (err) { console.error("Checkout error:", err); }
-            }} style={{ width: "100%", background: "#1d1d1f", color: "#fff", border: "none", borderRadius: 12, padding: "15px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", marginBottom: 10, transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Upgrade to Pro →</button>
-            <button onClick={() => setShowUpgradeModal(false)} style={{ background: "none", border: "none", fontSize: 13, color: "#86868b", cursor: "pointer", fontFamily: "inherit" }}>Maybe later</button>
-          </div>
-        </div>
-      )}
-
       {/* NAV */}
       {/* Nav — white when over hero, dark glass when scrolled */}
       {(() => {
@@ -2760,54 +2640,13 @@ export default function App() {
             {/* Text positioned at bottom like Tesla */}
             <div className="aura-hero-bottom" style={{ position: "absolute", bottom: 0, left: 0, right: 0, textAlign: "center", padding: "0 6% 64px", animation: "fadeUp .8s ease" }}>
               <p style={{ fontSize: "clamp(10px,1.2vw,13px)", letterSpacing: ".2em", textTransform: "uppercase", color: "rgba(255,255,255,.6)", marginBottom: 10, fontWeight: 500 }}>AI Interior Design · No experience required</p>
-              <h1 style={{ fontSize: "clamp(36px,6vw,72px)", fontWeight: 700, lineHeight: 1.05, marginBottom: 12, letterSpacing: "-0.025em", color: "#fff" }}>Design <span key={heroRoomIdx} style={{ display: "inline-block", animation: "fadeInText .5s ease" }}>{heroRooms[heroRoomIdx]}</span></h1>
+              <h1 style={{ fontSize: "clamp(36px,6vw,72px)", fontWeight: 700, lineHeight: 1.05, marginBottom: 12, letterSpacing: "-0.025em", color: "#fff" }}>Design your dream room.</h1>
               <p style={{ fontSize: "clamp(14px,1.5vw,18px)", color: "rgba(255,255,255,.75)", lineHeight: 1.5, maxWidth: 480, margin: "0 auto 28px", fontWeight: 400 }}>Describe your space. Get curated furniture picks and a photorealistic visualization in minutes.</p>
               <div className="aura-hero-btns" style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
                 <button onClick={() => { go("design"); setTab("studio"); trackEvent("cta_click", { button: "hero_start_designing" }); }} style={{ background: "rgba(255,255,255,.95)", color: "#1d1d1f", padding: "15px 40px", border: "none", borderRadius: 4, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "background .2s", letterSpacing: ".02em", textTransform: "uppercase" }} onMouseEnter={e => e.currentTarget.style.background = "#fff"} onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.95)"}>Start Designing Free</button>
                 <button onClick={() => go("pricing")} style={{ background: "rgba(255,255,255,.12)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", color: "#fff", padding: "15px 36px", border: "1px solid rgba(255,255,255,.3)", borderRadius: 4, fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", transition: "background .2s", letterSpacing: ".02em", textTransform: "uppercase" }} onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.22)"} onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.12)"}>See Pricing</button>
               </div>
             </div>
-          </section>
-
-          {/* Quick-start widget — try it inline before signing up */}
-          <section style={{ padding: "80px 6%", background: "#1d1d1f" }}>
-            <RevealSection>
-              <div style={{ maxWidth: 760, margin: "0 auto", textAlign: "center" }}>
-                <p style={{ fontSize: 12, letterSpacing: ".2em", textTransform: "uppercase", color: "rgba(255,255,255,.45)", marginBottom: 12, fontWeight: 600 }}>Start in seconds</p>
-                <h2 style={{ fontSize: "clamp(28px,4vw,44px)", fontWeight: 700, color: "#fff", marginBottom: 8, letterSpacing: "-0.02em", lineHeight: 1.1 }}>What are you designing?</h2>
-                <p style={{ fontSize: 16, color: "rgba(255,255,255,.5)", marginBottom: 36 }}>Pick your room and style — we'll do the rest.</p>
-                {(() => {
-                  const quickRooms = ["Living Room", "Bedroom", "Dining Room", "Kitchen", "Home Office", "Bathroom"];
-                  const quickStyles = ["Warm Modern", "Japandi", "Scandinavian", "Mid-Century", "Coastal", "Industrial"];
-                  return (
-                    <div>
-                      <p style={{ fontSize: 11, letterSpacing: ".15em", textTransform: "uppercase", color: "rgba(255,255,255,.4)", marginBottom: 14, fontWeight: 600 }}>Room type</p>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginBottom: 28 }}>
-                        {quickRooms.map(r => (
-                          <button key={r} onClick={() => setQRoom(r)} style={{ padding: "10px 20px", borderRadius: 980, border: qRoom === r ? "2px solid #fff" : "1px solid rgba(255,255,255,.2)", background: qRoom === r ? "#fff" : "transparent", color: qRoom === r ? "#1d1d1f" : "rgba(255,255,255,.8)", fontSize: 14, fontWeight: qRoom === r ? 600 : 400, cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>{r}</button>
-                        ))}
-                      </div>
-                      <p style={{ fontSize: 11, letterSpacing: ".15em", textTransform: "uppercase", color: "rgba(255,255,255,.4)", marginBottom: 14, fontWeight: 600 }}>Design style</p>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginBottom: 36 }}>
-                        {quickStyles.map(s => (
-                          <button key={s} onClick={() => setQStyle(s)} style={{ padding: "10px 20px", borderRadius: 980, border: qStyle === s ? "2px solid #fff" : "1px solid rgba(255,255,255,.2)", background: qStyle === s ? "#fff" : "transparent", color: qStyle === s ? "#1d1d1f" : "rgba(255,255,255,.8)", fontSize: 14, fontWeight: qStyle === s ? 600 : 400, cursor: "pointer", fontFamily: "inherit", transition: "all .2s" }}>{s}</button>
-                        ))}
-                      </div>
-                      <button onClick={() => {
-                        if (qRoom) setRoom(qRoom);
-                        if (qStyle) setVibe(qStyle);
-                        go("design");
-                        setTab("studio");
-                        trackEvent("quickstart_click", { room: qRoom || "none", style: qStyle || "none" });
-                      }} style={{ background: qRoom || qStyle ? "#fff" : "rgba(255,255,255,.15)", color: qRoom || qStyle ? "#1d1d1f" : "rgba(255,255,255,.4)", border: "none", borderRadius: 980, padding: "16px 48px", fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "all .2s", letterSpacing: ".01em" }}>
-                        {qRoom || qStyle ? "Start Designing →" : "Skip — just explore"}
-                      </button>
-                      {(qRoom || qStyle) && <p style={{ fontSize: 12, color: "rgba(255,255,255,.35)", marginTop: 10 }}>Free to start · No credit card required</p>}
-                    </div>
-                  );
-                })()}
-              </div>
-            </RevealSection>
           </section>
 
           {/* Section 2: Define Your Room — text left, product UI demo right */}
@@ -2983,41 +2822,6 @@ export default function App() {
             </RevealSection>
           </section>
 
-          {/* Use Case Section: Interiors / Exteriors / Gardens */}
-          <section className="aura-home-section" style={{ padding: "100px 6%", background: "#fff" }}>
-            <RevealSection>
-              <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-                <div style={{ textAlign: "center", marginBottom: 56 }}>
-                  <p style={{ fontSize: 12, letterSpacing: ".2em", textTransform: "uppercase", color: "#86868b", fontWeight: 600, marginBottom: 10 }}>What can you design?</p>
-                  <h2 style={{ fontSize: "clamp(28px,3.5vw,44px)", fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.02em", marginBottom: 0 }}>Every space. Inside and out.</h2>
-                </div>
-                <div className="aura-usecase-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 24 }}>
-                  {[
-                    { icon: "🛋️", title: "Interiors", desc: "AI-personalized furniture picks, mood boards, and photorealistic renders for every room in your home.", rooms: ["Living Room", "Bedroom", "Kitchen", "Dining Room", "Office", "Bathroom"] },
-                    { icon: "🏡", title: "Exteriors", desc: "Transform your home's facade, entrance, and outdoor living areas with curated furniture and lighting.", rooms: ["Front Yard", "Backyard", "Balcony", "Entryway"] },
-                    { icon: "🌿", title: "Gardens", desc: "Design lush, intentional outdoor spaces — from Japanese zen gardens to English cottage styles.", rooms: ["English Garden", "Japanese Zen", "Herb Garden", "Rooftop"] },
-                  ].map(card => (
-                    <div key={card.title} style={{ background: "#f5f5f7", borderRadius: 20, padding: "36px 28px", transition: "transform .2s, box-shadow .2s", cursor: "default" }}
-                      onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = "translateY(-4px)"; (e.currentTarget as HTMLDivElement).style.boxShadow = "0 16px 48px rgba(0,0,0,.1)"; }}
-                      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = ""; (e.currentTarget as HTMLDivElement).style.boxShadow = ""; }}>
-                      <div style={{ fontSize: 40, marginBottom: 16 }}>{card.icon}</div>
-                      <h3 style={{ fontSize: 22, fontWeight: 700, color: "#1d1d1f", marginBottom: 10, letterSpacing: "-0.01em" }}>{card.title}</h3>
-                      <p style={{ fontSize: 15, color: "#6e6e73", lineHeight: 1.6, marginBottom: 20 }}>{card.desc}</p>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                        {card.rooms.map(r => (
-                          <span key={r} style={{ fontSize: 12, padding: "5px 12px", borderRadius: 980, background: "#fff", color: "#1d1d1f", fontWeight: 500, border: "1px solid #e5e5e5" }}>{r}</span>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ textAlign: "center", marginTop: 40 }}>
-                  <button onClick={() => { go("design"); setTab("studio"); trackEvent("cta_click", { button: "usecase_start_designing" }); }} style={{ background: "#1d1d1f", color: "#fff", padding: "14px 36px", border: "none", borderRadius: 980, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Start designing any space →</button>
-                </div>
-              </div>
-            </RevealSection>
-          </section>
-
           {/* Section 5: Product Catalog — scrolling marquee */}
           <section className="aura-home-section" style={{ padding: "64px 0", background: "#f5f5f7", overflow: "hidden" }}>
             <RevealSection style={{ width: "100%" }}>
@@ -3101,20 +2905,6 @@ export default function App() {
             </RevealSection>
           </section>
 
-          {/* Before/After Drag Slider */}
-          <section className="aura-home-section" style={{ padding: "100px 6%", background: "#f5f5f7" }}>
-            <RevealSection>
-              <div style={{ maxWidth: 900, margin: "0 auto" }}>
-                <div style={{ textAlign: "center", marginBottom: 40 }}>
-                  <p style={{ fontSize: 12, letterSpacing: ".2em", textTransform: "uppercase", color: "#86868b", fontWeight: 600, marginBottom: 10 }}>The transformation</p>
-                  <h2 style={{ fontSize: "clamp(28px,3.5vw,44px)", fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.02em" }}>See it before you buy it.</h2>
-                  <p style={{ fontSize: 16, color: "#6e6e73", marginTop: 10, lineHeight: 1.5 }}>Drag to compare — same room, completely redesigned by AI.</p>
-                </div>
-                <BeforeAfterSlider />
-              </div>
-            </RevealSection>
-          </section>
-
           {/* Section 7: Pricing teaser — light section */}
           <section className="aura-home-section" style={{ padding: "100px 6%", background: "#f5f5f7" }}>
             <RevealSection>
@@ -3126,7 +2916,7 @@ export default function App() {
                   <div style={{ background: "#fff", borderRadius: 20, padding: "32px 24px", border: "1px solid #e5e5e5", textAlign: "left" }}>
                     <p style={{ fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", color: "#86868b", fontWeight: 600, marginBottom: 6 }}>Free</p>
                     <p style={{ fontSize: 28, fontWeight: 700, color: "#1d1d1f", marginBottom: 20 }}>$0<span style={{ fontSize: 14, fontWeight: 400, color: "#86868b" }}>/month</span></p>
-                    {["1 mood board", "Browse products", "Basic AI chat", "Style matching"].map(f => (
+                    {["AI mood boards", "Style matching", DB.length + "+ products", "Save projects"].map(f => (
                       <div key={f} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#86868b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                         <span style={{ fontSize: 14, color: "#6e6e73" }}>{f}</span>
@@ -3138,7 +2928,7 @@ export default function App() {
                   <div style={{ background: "#1d1d1f", borderRadius: 20, padding: "32px 24px", textAlign: "left", position: "relative" }}>
                     <p style={{ fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,.4)", fontWeight: 600, marginBottom: 6 }}>Pro</p>
                     <p style={{ fontSize: 28, fontWeight: 700, color: "#fff", marginBottom: 20 }}>$20<span style={{ fontSize: 14, fontWeight: 400, color: "rgba(255,255,255,.4)" }}>/month</span></p>
-                    {["Everything in Free", "Unlimited AI generations", "AI room visualization", "Design Transfer & Color Swap", "CAD floor plans", "Unlimited projects"].map(f => (
+                    {["Everything in Free", "AI visualization", "CAD floor plans", "Clearance analysis", "Unlimited projects"].map(f => (
                       <div key={f} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="rgba(255,255,255,.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                         <span style={{ fontSize: 14, color: "rgba(255,255,255,.8)" }}>{f}</span>
@@ -3146,46 +2936,6 @@ export default function App() {
                     ))}
                     <button onClick={() => go("pricing")} style={{ width: "100%", marginTop: 16, background: "#fff", color: "#1d1d1f", padding: "12px", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Upgrade to Pro</button>
                   </div>
-                </div>
-              </div>
-            </RevealSection>
-          </section>
-
-          {/* Comparison Table */}
-          <section className="aura-home-section" style={{ padding: "100px 6%", background: "#fff" }}>
-            <RevealSection>
-              <div style={{ maxWidth: 900, margin: "0 auto" }}>
-                <div style={{ textAlign: "center", marginBottom: 48 }}>
-                  <h2 style={{ fontSize: "clamp(28px,3.5vw,44px)", fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.02em" }}>Why AURA beats the alternatives</h2>
-                </div>
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontFamily: "inherit" }}>
-                    <thead>
-                      <tr>
-                        <th style={{ padding: "14px 20px", textAlign: "left", fontSize: 13, fontWeight: 600, color: "#86868b", borderBottom: "1px solid #e5e5e5" }}>Feature</th>
-                        <th style={{ padding: "14px 20px", textAlign: "center", fontSize: 14, fontWeight: 700, color: "#fff", background: "#1d1d1f", borderRadius: "12px 12px 0 0" }}>AURA</th>
-                        <th style={{ padding: "14px 20px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "#86868b", borderBottom: "1px solid #e5e5e5" }}>Hiring a Designer</th>
-                        <th style={{ padding: "14px 20px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "#86868b", borderBottom: "1px solid #e5e5e5" }}>DIY Pinterest</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[
-                        ["AI-personalized recommendations", "✓", "✓ (expensive)", "✗"],
-                        ["Real shoppable products (100k+)", "✓", "varies", "✗"],
-                        ["Photo-realistic visualization", "✓", "sometimes", "✗"],
-                        ["Ready in under 2 minutes", "✓", "✗ weeks", "✗"],
-                        ["Free to start", "✓", "✗", "✓ (sort of)"],
-                        ["Design Transfer from inspiration", "✓", "✓", "✗"],
-                      ].map(([feature, aura, designer, diy], i) => (
-                        <tr key={feature} style={{ background: i % 2 === 0 ? "#fafafa" : "#fff" }}>
-                          <td style={{ padding: "14px 20px", fontSize: 14, color: "#1d1d1f", borderBottom: "1px solid #f0f0f0" }}>{feature}</td>
-                          <td style={{ padding: "14px 20px", textAlign: "center", fontSize: 14, fontWeight: 600, color: "#fff", background: i % 2 === 0 ? "#222" : "#1d1d1f", borderBottom: "1px solid rgba(255,255,255,.1)" }}>{aura}</td>
-                          <td style={{ padding: "14px 20px", textAlign: "center", fontSize: 13, color: designer.startsWith("✗") ? "#b0b0b0" : "#6e6e73", borderBottom: "1px solid #f0f0f0" }}>{designer}</td>
-                          <td style={{ padding: "14px 20px", textAlign: "center", fontSize: 13, color: diy.startsWith("✗") ? "#b0b0b0" : "#6e6e73", borderBottom: "1px solid #f0f0f0" }}>{diy}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
                 </div>
               </div>
             </RevealSection>
@@ -3485,22 +3235,12 @@ export default function App() {
                         )}
                         <div ref={chatEnd} />
                       </div>
-                      {userPlan !== "pro" && genRemaining <= 0 ? (
-                        <div className="aura-chat-input" style={{ padding: "16px", borderTop: "1px solid #F0EBE4", background: "#1d1d1f", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-                          <div>
-                            <p style={{ fontSize: 14, fontWeight: 600, color: "#fff", margin: "0 0 2px" }}>Free generation used</p>
-                            <p style={{ fontSize: 12, color: "rgba(255,255,255,.5)", margin: 0 }}>Upgrade to Pro for unlimited AI design sessions</p>
-                          </div>
-                          <button onClick={() => setShowUpgradeModal(true)} style={{ background: "#fff", color: "#1d1d1f", border: "none", borderRadius: 10, padding: "12px 24px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0 }}>Upgrade to Pro →</button>
-                        </div>
-                      ) : (
                       <div className="aura-chat-input" style={{ padding: "14px 16px", borderTop: "1px solid #F0EBE4", background: "#FDFCFA" }}>
                         <div style={{ display: "flex", gap: 0, border: "1.5px solid #D8D0C8", borderRadius: 12, background: "#fff", overflow: "hidden", transition: "border-color .15s" }}>
                           <input value={inp} onChange={(e) => setInp(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder={room ? "Ask AI: What do you need for your " + room.toLowerCase() + "?" : "Ask AI: Describe your ideal space..."} style={{ flex: 1, background: "transparent", border: "none", padding: "14px 18px", fontFamily: "inherit", fontSize: 15, outline: "none", color: "#1A1815" }} />
                           <button onClick={send} disabled={busy} style={{ background: "#1A1815", color: "#fff", border: "none", padding: "10px 20px", margin: 5, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: busy ? 0.3 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}>Send</button>
                         </div>
                       </div>
-                      )}
                     </div>
                   </div>
 
@@ -3589,118 +3329,6 @@ export default function App() {
                       <span style={{ fontSize: 11, color: vizRemaining <= 3 ? "#F0A080" : "rgba(255,255,255,.4)", alignSelf: "flex-end" }}>{vizCount}/{vizLimit} used · {vizRemaining} remaining</span>
                     </div>
                   </div>
-
-                  {/* AI Studio Tools: Design Transfer / Color Swap / Texture Swap */}
-                  {(() => {
-                    const aiWallColors = [
-                      { name: "White", hex: "#F5F5F0" }, { name: "Cream", hex: "#F5EDD6" },
-                      { name: "Gray", hex: "#B0B0B0" }, { name: "Navy", hex: "#1B2A4A" },
-                      { name: "Sage", hex: "#7A9E7E" }, { name: "Terracotta", hex: "#C1714F" },
-                      { name: "Black", hex: "#1A1A1A" }, { name: "Dusty Pink", hex: "#D4A5A5" },
-                      { name: "Warm Beige", hex: "#D4C4A8" }, { name: "Charcoal", hex: "#3C3C3C" },
-                      { name: "Forest Green", hex: "#2D5A3D" }, { name: "Clay", hex: "#B8735A" },
-                    ];
-                    const aiFloorMats = ["Hardwood", "Marble", "Concrete", "Carpet", "Tile", "Bamboo"];
-                    const aiWallMats = ["Brick", "Stone", "Wood Paneling", "Plaster"];
-                    const runAITool = async () => {
-                      if (userPlan !== "pro") { setShowUpgradeModal(true); return; }
-                      if (aiToolMode === "transfer") {
-                        if (!aiInspFile) return;
-                        setVizSt("loading"); setVizErr("");
-                        try {
-                          const styleDesc = await analyzeImage(aiInspFile.data, aiInspFile.type, "Describe this room's design style, color palette, materials, and aesthetic in detail for recreation in another space.");
-                          const prompt = `Photorealistic interior photo of a ${room || "room"}. Apply this design style: ${styleDesc}. Keep the room's architectural structure, change only the furniture, colors, and materials.`;
-                          const imgUrl = await generateAIImage(prompt, roomPhoto?.data || null, [], null);
-                          if (imgUrl && imgUrl !== "__CREDITS_REQUIRED__") { setVizUrls([{ url: imgUrl, label: "Design Transfer" }]); } else { setVizErr("Could not generate visualization. Please try again."); }
-                        } catch (_e) { setVizErr("An error occurred. Please try again."); }
-                        setVizSt("idle");
-                      } else if (aiToolMode === "color") {
-                        if (!aiSelectedColor) return;
-                        setVizSt("loading"); setVizErr("");
-                        try {
-                          const imgUrl = await generateAIImage(`Same ${room || "room"} but with ${aiSelectedColor} walls. Photorealistic interior photo. Keep all furniture exactly the same.`, roomPhoto?.data || null, [], null);
-                          if (imgUrl && imgUrl !== "__CREDITS_REQUIRED__") { setVizUrls([{ url: imgUrl, label: `Color Swap — ${aiSelectedColor} walls` }]); } else { setVizErr("Could not generate visualization. Please try again."); }
-                        } catch (_e) { setVizErr("An error occurred. Please try again."); }
-                        setVizSt("idle");
-                      } else if (aiToolMode === "texture") {
-                        const mat = aiMatCategory === "floor" ? aiSelectedFloorMat : aiSelectedWallMat;
-                        if (!mat) return;
-                        setVizSt("loading"); setVizErr("");
-                        try {
-                          const imgUrl = await generateAIImage(`Same ${room || "room"} with ${mat} ${aiMatCategory === "floor" ? "flooring" : "wall treatment"}. Photorealistic interior photo. Keep all furniture the same.`, roomPhoto?.data || null, [], null);
-                          if (imgUrl && imgUrl !== "__CREDITS_REQUIRED__") { setVizUrls([{ url: imgUrl, label: `Texture Swap — ${mat}` }]); } else { setVizErr("Could not generate visualization. Please try again."); }
-                        } catch (_e) { setVizErr("An error occurred. Please try again."); }
-                        setVizSt("idle");
-                      }
-                    };
-                    const isReady = aiToolMode === "transfer" ? !!aiInspFile : aiToolMode === "color" ? !!aiSelectedColor : aiToolMode === "texture" ? !!(aiMatCategory === "floor" ? aiSelectedFloorMat : aiSelectedWallMat) : false;
-                    return (
-                      <div style={{ marginBottom: 20 }}>
-                        <p style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: "#9B8B7B", fontWeight: 600, marginBottom: 10 }}>AI Studio Tools {userPlan !== "pro" && <span style={{ background: "#F0D8C0", color: "#C17550", borderRadius: 4, padding: "2px 8px", fontSize: 10, marginLeft: 6 }}>Pro only</span>}</p>
-                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: aiToolMode !== "none" ? 16 : 0 }}>
-                          {(["transfer","color","texture"] as const).map(mode => {
-                            const labels = { transfer: "🎨 Design Transfer", color: "🖌️ Color Swap", texture: "🪵 Texture Swap" };
-                            return <button key={mode} onClick={() => setAiToolMode(aiToolMode === mode ? "none" : mode)} style={{ padding: "9px 18px", borderRadius: 8, border: aiToolMode === mode ? "2px solid #C17550" : "1px solid #E8E0D8", background: aiToolMode === mode ? "#FFF8F0" : "#fff", color: aiToolMode === mode ? "#C17550" : "#7A6B5B", fontSize: 13, fontWeight: aiToolMode === mode ? 600 : 400, cursor: "pointer", fontFamily: "inherit", transition: "all .15s" }}>{labels[mode]}</button>;
-                          })}
-                        </div>
-                        {aiToolMode === "transfer" && (
-                          <div style={{ background: "#FDFCFA", border: "1px solid #EDE8E0", borderRadius: 12, padding: "20px 20px 16px" }}>
-                            <p style={{ fontSize: 13, fontWeight: 600, color: "#1A1815", margin: "0 0 6px" }}>Upload an inspiration photo</p>
-                            <p style={{ fontSize: 12, color: "#9B8B7B", margin: "0 0 14px", lineHeight: 1.5 }}>AI will analyze its style and apply it to your room layout.</p>
-                            {!aiInspFile ? (
-                              <label style={{ display: "inline-block", padding: "10px 20px", background: "#1A1815", color: "#fff", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                                Choose photo
-                                <input type="file" accept="image/*" style={{ display: "none" }} onChange={async e => {
-                                  const file = e.target.files?.[0]; if (!file) return;
-                                  setAiInspLoading(true);
-                                  try { const compressed = await compressImage(file); setAiInspFile({ data: compressed.data, type: compressed.type }); } catch (_e) {}
-                                  setAiInspLoading(false);
-                                }} />
-                              </label>
-                            ) : (
-                              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                                <img src={"data:" + aiInspFile.type + ";base64," + aiInspFile.data} alt="Inspiration" style={{ width: 72, height: 52, objectFit: "cover", borderRadius: 8, border: "1px solid #EDE8E0" }} />
-                                <div><p style={{ fontSize: 13, fontWeight: 600, color: "#1A1815", margin: "0 0 4px" }}>Inspiration uploaded</p><button onClick={() => setAiInspFile(null)} style={{ fontSize: 11, color: "#C17550", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: 0 }}>Remove</button></div>
-                              </div>
-                            )}
-                            {aiInspLoading && <p style={{ fontSize: 12, color: "#9B8B7B", marginTop: 8 }}>Processing image...</p>}
-                            {isReady && vizRemaining > 0 && <button onClick={runAITool} disabled={vizSt === "loading"} style={{ marginTop: 14, padding: "10px 22px", background: "#C17550", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: vizSt === "loading" ? 0.6 : 1 }}>{vizSt === "loading" ? "Generating..." : "Apply Design Transfer"}</button>}
-                          </div>
-                        )}
-                        {aiToolMode === "color" && (
-                          <div style={{ background: "#FDFCFA", border: "1px solid #EDE8E0", borderRadius: 12, padding: "20px 20px 16px" }}>
-                            <p style={{ fontSize: 13, fontWeight: 600, color: "#1A1815", margin: "0 0 14px" }}>Pick a wall color</p>
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
-                              {aiWallColors.map(c => <button key={c.name} title={c.name} onClick={() => setAiSelectedColor(c.name)} style={{ width: 36, height: 36, borderRadius: "50%", background: c.hex, border: aiSelectedColor === c.name ? "3px solid #C17550" : "2px solid rgba(0,0,0,.1)", cursor: "pointer", outline: "none", transition: "transform .1s", transform: aiSelectedColor === c.name ? "scale(1.2)" : "scale(1)" }} />)}
-                            </div>
-                            {aiSelectedColor && <p style={{ fontSize: 13, color: "#6e6e73", margin: "0 0 12px" }}>Selected: <strong>{aiSelectedColor}</strong></p>}
-                            {isReady && vizRemaining > 0 && <button onClick={runAITool} disabled={vizSt === "loading"} style={{ padding: "10px 22px", background: "#C17550", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: vizSt === "loading" ? 0.6 : 1 }}>{vizSt === "loading" ? "Generating..." : "Apply Color Swap"}</button>}
-                          </div>
-                        )}
-                        {aiToolMode === "texture" && (
-                          <div style={{ background: "#FDFCFA", border: "1px solid #EDE8E0", borderRadius: 12, padding: "20px 20px 16px" }}>
-                            <p style={{ fontSize: 13, fontWeight: 600, color: "#1A1815", margin: "0 0 12px" }}>Choose surface & material</p>
-                            <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-                              {(["floor","wall"] as const).map(cat => <button key={cat} onClick={() => setAiMatCategory(cat)} style={{ padding: "8px 18px", borderRadius: 8, border: aiMatCategory === cat ? "2px solid #1A1815" : "1px solid #E8E0D8", background: aiMatCategory === cat ? "#1A1815" : "#fff", color: aiMatCategory === cat ? "#fff" : "#7A6B5B", fontSize: 13, fontWeight: aiMatCategory === cat ? 600 : 400, cursor: "pointer", fontFamily: "inherit", textTransform: "capitalize" }}>{cat}</button>)}
-                            </div>
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-                              {(aiMatCategory === "floor" ? aiFloorMats : aiWallMats).map(m => {
-                                const active = aiMatCategory === "floor" ? aiSelectedFloorMat === m : aiSelectedWallMat === m;
-                                return <button key={m} onClick={() => aiMatCategory === "floor" ? setAiSelectedFloorMat(m) : setAiSelectedWallMat(m)} style={{ padding: "8px 16px", borderRadius: 8, border: active ? "2px solid #C17550" : "1px solid #E8E0D8", background: active ? "#FFF8F0" : "#fff", color: active ? "#C17550" : "#7A6B5B", fontSize: 13, fontWeight: active ? 600 : 400, cursor: "pointer", fontFamily: "inherit" }}>{m}</button>;
-                              })}
-                            </div>
-                            {isReady && vizRemaining > 0 && <button onClick={runAITool} disabled={vizSt === "loading"} style={{ padding: "10px 22px", background: "#C17550", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: vizSt === "loading" ? 0.6 : 1 }}>{vizSt === "loading" ? "Generating..." : "Apply Texture Swap"}</button>}
-                          </div>
-                        )}
-                        {aiToolMode !== "none" && userPlan !== "pro" && (
-                          <div style={{ marginTop: 12, padding: "14px 18px", background: "#FFF8F0", borderRadius: 10, border: "1px solid #F0D8C0", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-                            <p style={{ fontSize: 13, color: "#7A6B5B", margin: 0 }}>AI Studio Tools are available on Pro.</p>
-                            <button onClick={() => setShowUpgradeModal(true)} style={{ background: "#C17550", color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Upgrade to Pro</button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
 
                   {/* Viz images — ABOVE floor plan */}
                   {vizErr && vizErr === "sign_up_prompt" ? (
