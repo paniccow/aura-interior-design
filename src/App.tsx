@@ -2567,6 +2567,38 @@ export default function App() {
           .aura-fp-statusbar{display:none!important}
           .aura-brands-section{background:#f5f5f7!important}
           .aura-cta-section{background:#1d1d1f!important}
+          /* Nav — hide pricing link to prevent crowding; shrink wordmark */
+          .aura-nav-pricing{display:none!important}
+          .aura-nav-wordmark{font-size:18px!important;letter-spacing:.1em!important}
+          /* Hero — safe-area bottom padding for iPhone notch */
+          .aura-hero-bottom{padding-bottom:max(52px,calc(36px + env(safe-area-inset-bottom)))!important;padding-left:5%!important;padding-right:5%!important}
+          /* Hero buttons — full width stack on small screens */
+          .aura-hero-btns{flex-direction:column!important;align-items:stretch!important;gap:10px!important;max-width:280px;margin:0 auto}
+          .aura-hero-btns button{text-align:center!important;padding:14px 20px!important;font-size:14px!important}
+          /* Wizard substep labels */
+          .aura-substep-label{font-size:10px!important;max-width:44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+          /* Sticky bars — safe area on iPhone */
+          .aura-review-bar{padding:12px 4% max(12px,calc(10px + env(safe-area-inset-bottom))) 4%!important}
+          /* Viz banner — less padding */
+          .aura-viz-banner{padding:18px 16px!important;gap:12px!important;flex-direction:column!important;align-items:stretch!important}
+          .aura-viz-banner h2{font-size:18px!important}
+          .aura-viz-btns{justify-content:stretch!important}
+          .aura-viz-btns button{flex:1!important;text-align:center!important}
+          /* Chat input — safe area */
+          .aura-chat-input{padding-bottom:max(14px,calc(10px + env(safe-area-inset-bottom)))!important}
+          /* Purchase table — horizontal scroll */
+          .aura-purchase-table{overflow-x:auto!important;-webkit-overflow-scrolling:touch!important}
+          /* Final CTA buttons */
+          .aura-final-cta-btns{flex-direction:column!important;align-items:stretch!important}
+          .aura-final-cta-btns button{text-align:center!important}
+          /* Home sections horizontal padding */
+          .aura-home-section{padding-left:5%!important;padding-right:5%!important}
+          /* Setup wizard container */
+          .aura-setup-container{padding-left:5%!important;padding-right:5%!important}
+        }
+        @media(max-width:400px){
+          .aura-substep-label{display:none!important}
+          .aura-nav-wordmark{font-size:16px!important}
         }
       `}</style>
 
@@ -2582,13 +2614,13 @@ export default function App() {
           <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000, padding: sc ? "10px 5%" : "16px 5%", display: "flex", alignItems: "center", justifyContent: "space-between", background: sc ? "rgba(255,255,255,.82)" : "transparent", backdropFilter: sc ? "saturate(180%) blur(20px)" : "none", WebkitBackdropFilter: sc ? "saturate(180%) blur(20px)" : "none", transition: "all .35s ease", borderBottom: sc ? "1px solid rgba(0,0,0,.06)" : "none" }}>
             <div onClick={() => go("home")} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
               <AuraLogo size={26} color={logoColor} />
-              <span style={{ fontFamily: "Georgia,'Times New Roman',serif", fontSize: 22, fontWeight: 400, letterSpacing: "0.18em", color: logoColor, transition: "color .35s ease", lineHeight: 1, textTransform: "uppercase" }}>Aura</span>
+              <span className="aura-nav-wordmark" style={{ fontFamily: "Georgia,'Times New Roman',serif", fontSize: 22, fontWeight: 400, letterSpacing: "0.18em", color: logoColor, transition: "color .35s ease", lineHeight: 1, textTransform: "uppercase" }}>Aura</span>
             </div>
             <div className="aura-nav-links" style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
               {sel.size > 0 && <span className="aura-nav-cart" style={{ fontSize: 11, color: textColor, fontWeight: 600, background: onHero ? "rgba(255,255,255,.15)" : "rgba(0,0,0,.04)", padding: "5px 12px", borderRadius: 20, whiteSpace: "nowrap" }}>{selCount} items · {fmt(selTotal)}</span>}
-              <button onClick={() => go("pricing")} style={{ background: "none", border: "none", fontSize: 13, color: textColor, cursor: "pointer", fontFamily: "inherit", fontWeight: 400, transition: "color .35s ease", padding: "6px 12px" }}>Pricing</button>
-              {user ? <button onClick={() => go("account")} style={{ background: "none", border: "none", fontSize: 13, color: textColor, cursor: "pointer", fontFamily: "inherit", fontWeight: 400, transition: "color .35s ease", padding: "6px 12px" }}>{user.name || "Account"}</button> : <button onClick={() => go("auth")} style={{ background: "none", border: "none", fontSize: 13, color: textColor, cursor: "pointer", fontFamily: "inherit", fontWeight: 400, transition: "color .35s ease", padding: "6px 12px" }}>Sign In</button>}
-              <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: ctaBg, color: "#fff", borderRadius: 980, padding: "9px 22px", border: ctaBorder, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", transition: "all .35s ease", backdropFilter: onHero ? "blur(8px)" : "none", WebkitBackdropFilter: onHero ? "blur(8px)" : "none" }} onMouseEnter={e => { e.currentTarget.style.opacity = "0.82"; }} onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}>Get Started</button>
+              <button className="aura-nav-pricing" onClick={() => go("pricing")} style={{ background: "none", border: "none", fontSize: 13, color: textColor, cursor: "pointer", fontFamily: "inherit", fontWeight: 400, transition: "color .35s ease", padding: "6px 12px", whiteSpace: "nowrap" }}>Pricing</button>
+              {user ? <button onClick={() => go("account")} style={{ background: "none", border: "none", fontSize: 13, color: textColor, cursor: "pointer", fontFamily: "inherit", fontWeight: 400, transition: "color .35s ease", padding: "6px 10px", whiteSpace: "nowrap" }}>{user.name || "Account"}</button> : <button onClick={() => go("auth")} style={{ background: "none", border: "none", fontSize: 13, color: textColor, cursor: "pointer", fontFamily: "inherit", fontWeight: 400, transition: "color .35s ease", padding: "6px 10px", whiteSpace: "nowrap" }}>Sign In</button>}
+              <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: ctaBg, color: "#fff", borderRadius: 980, padding: "9px 18px", border: ctaBorder, fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", transition: "all .35s ease", backdropFilter: onHero ? "blur(8px)" : "none", WebkitBackdropFilter: onHero ? "blur(8px)" : "none", whiteSpace: "nowrap" }} onMouseEnter={e => { e.currentTarget.style.opacity = "0.82"; }} onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}>Get Started</button>
             </div>
           </nav>
         );
@@ -2606,12 +2638,13 @@ export default function App() {
             {/* Gradient overlay — subtle dark at top for nav, strong at bottom for text */}
             <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,.45) 0%, rgba(0,0,0,.05) 35%, rgba(0,0,0,0) 55%, rgba(0,0,0,.72) 100%)" }} />
             {/* Text positioned at bottom like Tesla */}
-            <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, textAlign: "center", padding: "0 6% 64px", animation: "fadeUp .8s ease" }}>
-              <h1 style={{ fontSize: "clamp(40px,6vw,72px)", fontWeight: 700, lineHeight: 1.05, marginBottom: 12, letterSpacing: "-0.025em", color: "#fff" }}>Design your dream room.</h1>
-              <p style={{ fontSize: "clamp(14px,1.5vw,18px)", color: "rgba(255,255,255,.8)", lineHeight: 1.5, maxWidth: 500, margin: "0 auto 28px", fontWeight: 400 }}>AI picks the furniture. You pick the style.</p>
+            <div className="aura-hero-bottom" style={{ position: "absolute", bottom: 0, left: 0, right: 0, textAlign: "center", padding: "0 6% 64px", animation: "fadeUp .8s ease" }}>
+              <p style={{ fontSize: "clamp(10px,1.2vw,13px)", letterSpacing: ".2em", textTransform: "uppercase", color: "rgba(255,255,255,.6)", marginBottom: 10, fontWeight: 500 }}>AI Interior Design · No experience required</p>
+              <h1 style={{ fontSize: "clamp(36px,6vw,72px)", fontWeight: 700, lineHeight: 1.05, marginBottom: 12, letterSpacing: "-0.025em", color: "#fff" }}>Design your dream room.</h1>
+              <p style={{ fontSize: "clamp(14px,1.5vw,18px)", color: "rgba(255,255,255,.75)", lineHeight: 1.5, maxWidth: 480, margin: "0 auto 28px", fontWeight: 400 }}>Describe your space. Get curated furniture picks and a photorealistic visualization in minutes.</p>
               <div className="aura-hero-btns" style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-                <button onClick={() => { go("design"); setTab("studio"); trackEvent("cta_click", { button: "hero_start_designing" }); }} style={{ background: "rgba(255,255,255,.95)", color: "#1d1d1f", padding: "14px 40px", border: "none", borderRadius: 4, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "background .2s", letterSpacing: ".02em", textTransform: "uppercase" }} onMouseEnter={e => e.currentTarget.style.background = "#fff"} onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.95)"}>Get Started</button>
-                <button onClick={() => go("pricing")} style={{ background: "rgba(255,255,255,.15)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", color: "#fff", padding: "14px 40px", border: "1px solid rgba(255,255,255,.3)", borderRadius: 4, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "background .2s", letterSpacing: ".02em", textTransform: "uppercase" }} onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.25)"} onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.15)"}>See Pricing</button>
+                <button onClick={() => { go("design"); setTab("studio"); trackEvent("cta_click", { button: "hero_start_designing" }); }} style={{ background: "rgba(255,255,255,.95)", color: "#1d1d1f", padding: "15px 40px", border: "none", borderRadius: 4, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "background .2s", letterSpacing: ".02em", textTransform: "uppercase" }} onMouseEnter={e => e.currentTarget.style.background = "#fff"} onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.95)"}>Start Designing Free</button>
+                <button onClick={() => go("pricing")} style={{ background: "rgba(255,255,255,.12)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", color: "#fff", padding: "15px 36px", border: "1px solid rgba(255,255,255,.3)", borderRadius: 4, fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", transition: "background .2s", letterSpacing: ".02em", textTransform: "uppercase" }} onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.22)"} onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.12)"}>See Pricing</button>
               </div>
             </div>
           </section>
@@ -2914,9 +2947,9 @@ export default function App() {
               <p style={{ fontSize: 13, color: "#86868b", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 24, fontWeight: 500 }}>Products from Lulu & Georgia, McGee & Co, West Elm, and more</p>
               <h2 style={{ fontSize: "clamp(32px,4.5vw,52px)", fontWeight: 700, marginBottom: 16, letterSpacing: "-0.025em", lineHeight: 1.08, color: "#1d1d1f" }}>Your dream room<br />is one click away.</h2>
               <p style={{ fontSize: 17, color: "#86868b", marginBottom: 36, lineHeight: 1.5 }}>Join thousands of homeowners designing smarter with AI.</p>
-              <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-                <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#1d1d1f", color: "#fff", padding: "16px 40px", border: "none", borderRadius: 980, fontSize: 16, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Get started free</button>
-                <button onClick={() => go("pricing")} style={{ background: "#f5f5f7", border: "none", padding: "16px 32px", borderRadius: 980, fontSize: 16, color: "#1d1d1f", cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>See pricing</button>
+              <div className="aura-final-cta-btns" style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", maxWidth: 400, margin: "0 auto" }}>
+                <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#1d1d1f", color: "#fff", padding: "16px 40px", border: "none", borderRadius: 980, fontSize: 16, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s", flex: "1 1 auto" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Start designing free</button>
+                <button onClick={() => go("pricing")} style={{ background: "#f5f5f7", border: "none", padding: "16px 32px", borderRadius: 980, fontSize: 16, color: "#1d1d1f", cursor: "pointer", fontFamily: "inherit", fontWeight: 500, flex: "1 1 auto" }}>See pricing</button>
               </div>
             </RevealSection>
           </section>
@@ -2970,7 +3003,7 @@ export default function App() {
 
               {/* ═══════ STEP 0: SET UP YOUR SPACE — STEP-BY-STEP WIZARD ═══════ */}
               {designStep === 0 && (
-                <div style={{ maxWidth: 640, margin: "0 auto", padding: "36px 5% 48px" }}>
+                <div className="aura-setup-container" style={{ maxWidth: 640, margin: "0 auto", padding: "36px 5% 48px" }}>
                   {/* Progress indicator */}
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 32 }}>
                     {["Room", "Style", "Budget", "Details"].map((label, i) => (
@@ -2979,7 +3012,7 @@ export default function App() {
                           <div style={{ width: 28, height: 28, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, background: setupSubStep === i ? "#1A1815" : i < setupSubStep ? "#5B8B6B" : "#E8E0D8", color: setupSubStep === i || i < setupSubStep ? "#fff" : "#9B8B7B", transition: "all .3s" }}>
                             {i < setupSubStep ? "\u2713" : i + 1}
                           </div>
-                          <span style={{ fontSize: 12, fontWeight: setupSubStep === i ? 700 : 400, color: setupSubStep === i ? "#1A1815" : "#9B8B7B", transition: "all .2s" }}>{label}</span>
+                          <span className="aura-substep-label" style={{ fontSize: 12, fontWeight: setupSubStep === i ? 700 : 400, color: setupSubStep === i ? "#1A1815" : "#9B8B7B", transition: "all .2s" }}>{label}</span>
                         </button>
                         {i < 3 && <div style={{ flex: 1, height: 1, background: i < setupSubStep ? "#5B8B6B40" : "#E8E0D8", minWidth: 16, borderRadius: 1 }} />}
                       </React.Fragment>
@@ -3252,10 +3285,10 @@ export default function App() {
 
                   {/* Continue to Visualize — sticky bottom bar */}
                   {sel.size > 0 && (
-                    <div style={{ padding: "14px 5%", background: "#fff", borderTop: "1px solid #EDE8E0", position: "sticky", bottom: 0, zIndex: 10 }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: 900, margin: "0 auto" }}>
-                        <span style={{ fontSize: 13, color: "#5A5045" }}><strong>{selCount}</strong> items · <strong>{fmt(selTotal)}</strong></span>
-                        <button onClick={() => setDesignStep(2)} style={{ background: "#1A1815", color: "#fff", padding: "12px 28px", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Review & Visualize →</button>
+                    <div className="aura-review-bar" style={{ padding: "14px 5%", background: "#fff", borderTop: "1px solid #EDE8E0", position: "sticky", bottom: 0, zIndex: 10 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, maxWidth: 900, margin: "0 auto" }}>
+                        <span style={{ fontSize: 13, color: "#5A5045", whiteSpace: "nowrap" }}><strong>{selCount}</strong> items · <strong>{fmt(selTotal)}</strong></span>
+                        <button onClick={() => setDesignStep(2)} style={{ background: "#1A1815", color: "#fff", padding: "13px 28px", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", flex: "0 0 auto" }}>Review & Visualize →</button>
                       </div>
                     </div>
                   )}
@@ -3279,23 +3312,21 @@ export default function App() {
               {sel.size > 0 ? (
                 <div style={{ padding: "28px 5%", background: "#FDFCFA" }}>
                   {/* Prominent Visualize banner */}
-                  <div style={{ background: "linear-gradient(135deg, #1A1815, #2A2520)", borderRadius: 16, padding: "28px 32px", marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
+                  <div className="aura-viz-banner" style={{ background: "linear-gradient(135deg, #1A1815, #2A2520)", borderRadius: 16, padding: "24px 28px", marginBottom: 24, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
                     <div>
-                      <h2 style={{ fontFamily: "Georgia,serif", fontSize: 22, fontWeight: 400, color: "#fff", marginBottom: 4 }}>{selCount} items · {fmt(selTotal)}</h2>
+                      <h2 className="aura-viz-banner-h2" style={{ fontFamily: "Georgia,serif", fontSize: 22, fontWeight: 400, color: "#fff", marginBottom: 4 }}>{selCount} items · {fmt(selTotal)}</h2>
                       <p style={{ fontSize: 13, color: "rgba(255,255,255,.55)", margin: 0 }}>Ready to see your room come to life?</p>
                     </div>
-                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-                        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                          {vizRemaining > 0 ? (
-                            <button onClick={generateViz} disabled={vizSt === "loading"} style={{ background: "#C17550", color: "#fff", border: "none", borderRadius: 10, padding: "14px 32px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: vizSt === "loading" ? 0.6 : 1, transition: "all .2s", boxShadow: "0 4px 16px rgba(193,117,80,.35)", letterSpacing: ".02em" }}>{vizSt === "loading" ? "Generating..." : "✦ Visualize Room"}</button>
-                          ) : (
-                            <button onClick={() => go("pricing")} style={{ background: "#C17550", color: "#fff", border: "none", borderRadius: 10, padding: "14px 32px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 16px rgba(193,117,80,.35)", letterSpacing: ".02em" }}>{userPlan === "pro" ? "Limit Reached" : "Upgrade to Pro"}</button>
-                          )}
-                          <button onClick={() => { setSel(new Map()); setVizUrls([]); setVizSt("idle"); setVizErr(""); setCadLayout(null); setDesignStep(1); }} style={{ background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.2)", borderRadius: 10, padding: "10px 18px", fontSize: 12, color: "rgba(255,255,255,.7)", cursor: "pointer", fontFamily: "inherit" }}>Clear all</button>
-                        </div>
-                        <span style={{ fontSize: 11, color: vizRemaining <= 3 ? "#F0A080" : "rgba(255,255,255,.4)" }}>{vizCount}/{vizLimit} used this month · {vizRemaining} remaining</span>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+                      <div className="aura-viz-btns" style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                        {vizRemaining > 0 ? (
+                          <button onClick={generateViz} disabled={vizSt === "loading"} style={{ background: "#C17550", color: "#fff", border: "none", borderRadius: 10, padding: "14px 28px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: vizSt === "loading" ? 0.6 : 1, transition: "all .2s", boxShadow: "0 4px 16px rgba(193,117,80,.35)", letterSpacing: ".02em", whiteSpace: "nowrap" }}>{vizSt === "loading" ? "Generating..." : "✦ Visualize Room"}</button>
+                        ) : (
+                          <button onClick={() => go("pricing")} style={{ background: "#C17550", color: "#fff", border: "none", borderRadius: 10, padding: "14px 28px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", boxShadow: "0 4px 16px rgba(193,117,80,.35)", letterSpacing: ".02em", whiteSpace: "nowrap" }}>{userPlan === "pro" ? "Limit Reached" : "Upgrade to Pro"}</button>
+                        )}
+                        <button onClick={() => { setSel(new Map()); setVizUrls([]); setVizSt("idle"); setVizErr(""); setCadLayout(null); setDesignStep(1); }} style={{ background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.2)", borderRadius: 10, padding: "10px 16px", fontSize: 12, color: "rgba(255,255,255,.7)", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }}>Clear all</button>
                       </div>
+                      <span style={{ fontSize: 11, color: vizRemaining <= 3 ? "#F0A080" : "rgba(255,255,255,.4)", alignSelf: "flex-end" }}>{vizCount}/{vizLimit} used · {vizRemaining} remaining</span>
                     </div>
                   </div>
 
@@ -3464,7 +3495,7 @@ export default function App() {
                   {sel.size > 0 ? (
                   <div style={{ padding: "28px 5%", background: "#FDFCFA" }}>
                     {/* Purchase List */}
-                    <div style={{ background: "#fff", borderRadius: 16, border: "1px solid #E8E0D8", overflow: "hidden" }}>
+                    <div className="aura-purchase-table" style={{ background: "#fff", borderRadius: 16, border: "1px solid #E8E0D8", overflow: "hidden" }}>
                       <div style={{ padding: "20px 24px", borderBottom: "1px solid #F0EBE4", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
                         <div>
                           <h2 style={{ fontFamily: "Georgia,serif", fontSize: 24, fontWeight: 400, color: "#1A1815", margin: 0 }}>Purchase List</h2>
