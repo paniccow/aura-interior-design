@@ -356,11 +356,11 @@ export default function App() {
   const vizLimit = userPlan === "pro" ? 100 : 1;
   const vizRemaining = Math.max(0, vizLimit - vizCount);
   // AI generation limits for free users (tracked client-side)
-  const FREE_GEN_LIMIT = 1;
+  const FREE_GEN_LIMIT = 0;
   const genCount = (() => { try { return parseInt(localStorage.getItem("aura_gen_count") || "0"); } catch (_e) { return 0; } })();
   const genRemaining = userPlan === "pro" ? 999 : Math.max(0, FREE_GEN_LIMIT - genCount);
   // Hero cycling rooms
-  const heroRooms = ["your living room.", "your bedroom.", "your kitchen.", "your home office."];
+  const heroRooms = ["your living room.", "your bedroom.", "your garden.", "your patio."];
 
   // Auto-save active project every 8 seconds when state changes
   useEffect(() => {
@@ -2501,6 +2501,7 @@ export default function App() {
         @keyframes drawLine{from{stroke-dashoffset:1000}to{stroke-dashoffset:0}}
         @keyframes growLine{from{transform:scaleY(0)}to{transform:scaleY(1)}}
         @keyframes glowPulse{0%,100%{box-shadow:0 0 20px rgba(193,117,80,.15)}50%{box-shadow:0 0 40px rgba(193,117,80,.35)}}
+        @keyframes sliderPulse{0%{transform:translate(-50%,-50%) scale(1)}30%{transform:translate(-50%,-50%) scale(1.18)}60%{transform:translate(-50%,-50%) scale(0.9)}100%{transform:translate(-50%,-50%) scale(1)}}
         @keyframes slideInLeft{from{opacity:0;transform:translateX(-60px)}to{opacity:1;transform:translateX(0)}}
         @keyframes slideInRight{from{opacity:0;transform:translateX(60px)}to{opacity:1;transform:translateX(0)}}
         @keyframes scaleIn{from{opacity:0;transform:scale(.5)}to{opacity:1;transform:scale(1)}}
@@ -2559,6 +2560,7 @@ export default function App() {
           .aura-chat-input input{width:100%!important}
           .aura-chat-input button{width:100%!important}
           .aura-viz-grid{grid-template-columns:1fr!important}
+          .aura-usecase-grid{grid-template-columns:1fr!important}
           .aura-mood-tabs{flex-wrap:wrap!important}
           .aura-upload-row{grid-template-columns:1fr!important;gap:12px!important}
           .aura-sel-header{flex-direction:column!important;align-items:flex-start!important;gap:12px!important}
@@ -2937,6 +2939,41 @@ export default function App() {
             </RevealSection>
           </section>
 
+          {/* Use Case Section: Interiors / Exteriors / Gardens */}
+          <section className="aura-home-section" style={{ padding: "100px 6%", background: "#fff" }}>
+            <RevealSection>
+              <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+                <div style={{ textAlign: "center", marginBottom: 56 }}>
+                  <p style={{ fontSize: 12, letterSpacing: ".2em", textTransform: "uppercase", color: "#86868b", fontWeight: 600, marginBottom: 10 }}>What can you design?</p>
+                  <h2 style={{ fontSize: "clamp(28px,3.5vw,44px)", fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.02em", marginBottom: 0 }}>Every space. Inside and out.</h2>
+                </div>
+                <div className="aura-usecase-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 24 }}>
+                  {[
+                    { icon: "🛋️", title: "Interiors", desc: "AI-personalized furniture picks, mood boards, and photorealistic renders for every room in your home.", rooms: ["Living Room", "Bedroom", "Kitchen", "Dining Room", "Office", "Bathroom"] },
+                    { icon: "🏡", title: "Exteriors", desc: "Transform your home's facade, entrance, and outdoor living areas with curated furniture and lighting.", rooms: ["Front Yard", "Backyard", "Balcony", "Entryway"] },
+                    { icon: "🌿", title: "Gardens", desc: "Design lush, intentional outdoor spaces — from Japanese zen gardens to English cottage styles.", rooms: ["English Garden", "Japanese Zen", "Herb Garden", "Rooftop"] },
+                  ].map(card => (
+                    <div key={card.title} style={{ background: "#f5f5f7", borderRadius: 20, padding: "36px 28px", transition: "transform .2s, box-shadow .2s", cursor: "default" }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = "translateY(-4px)"; (e.currentTarget as HTMLDivElement).style.boxShadow = "0 16px 48px rgba(0,0,0,.1)"; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = ""; (e.currentTarget as HTMLDivElement).style.boxShadow = ""; }}>
+                      <div style={{ fontSize: 40, marginBottom: 16 }}>{card.icon}</div>
+                      <h3 style={{ fontSize: 22, fontWeight: 700, color: "#1d1d1f", marginBottom: 10, letterSpacing: "-0.01em" }}>{card.title}</h3>
+                      <p style={{ fontSize: 15, color: "#6e6e73", lineHeight: 1.6, marginBottom: 20 }}>{card.desc}</p>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {card.rooms.map(r => (
+                          <span key={r} style={{ fontSize: 12, padding: "5px 12px", borderRadius: 980, background: "#fff", color: "#1d1d1f", fontWeight: 500, border: "1px solid #e5e5e5" }}>{r}</span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ textAlign: "center", marginTop: 40 }}>
+                  <button onClick={() => { go("design"); setTab("studio"); trackEvent("cta_click", { button: "usecase_start_designing" }); }} style={{ background: "#1d1d1f", color: "#fff", padding: "14px 36px", border: "none", borderRadius: 980, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Start designing any space →</button>
+                </div>
+              </div>
+            </RevealSection>
+          </section>
+
           {/* Section 5: Product Catalog — scrolling marquee */}
           <section className="aura-home-section" style={{ padding: "64px 0", background: "#f5f5f7", overflow: "hidden" }}>
             <RevealSection style={{ width: "100%" }}>
@@ -3020,6 +3057,66 @@ export default function App() {
             </RevealSection>
           </section>
 
+          {/* Before/After Drag Slider */}
+          <section className="aura-home-section" style={{ padding: "100px 6%", background: "#f5f5f7" }}>
+            <RevealSection>
+              <div style={{ maxWidth: 900, margin: "0 auto" }}>
+                <div style={{ textAlign: "center", marginBottom: 40 }}>
+                  <p style={{ fontSize: 12, letterSpacing: ".2em", textTransform: "uppercase", color: "#86868b", fontWeight: 600, marginBottom: 10 }}>The transformation</p>
+                  <h2 style={{ fontSize: "clamp(28px,3.5vw,44px)", fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.02em" }}>See it before you buy it.</h2>
+                  <p style={{ fontSize: 16, color: "#6e6e73", marginTop: 10, lineHeight: 1.5 }}>Drag to compare — same room, completely redesigned by AI.</p>
+                </div>
+                {(() => {
+                  const [sliderPos, setSliderPos] = React.useState(50);
+                  const [dragging, setDragging] = React.useState(false);
+                  const [hinted, setHinted] = React.useState(false);
+                  const containerRef = React.useRef<HTMLDivElement>(null);
+                  const beforeImg = "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=900&q=80";
+                  const afterImg = "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=900&q=80";
+                  React.useEffect(() => {
+                    const t = setTimeout(() => setHinted(true), 800);
+                    return () => clearTimeout(t);
+                  }, []);
+                  const updatePos = (clientX: number) => {
+                    if (!containerRef.current) return;
+                    const rect = containerRef.current.getBoundingClientRect();
+                    const pct = Math.min(95, Math.max(5, (clientX - rect.left) / rect.width * 100));
+                    setSliderPos(pct);
+                  };
+                  return (
+                    <div
+                      ref={containerRef}
+                      style={{ position: "relative", overflow: "hidden", borderRadius: 20, cursor: "ew-resize", userSelect: "none", boxShadow: "0 24px 80px rgba(0,0,0,.12)" }}
+                      onMouseDown={e => { setDragging(true); updatePos(e.clientX); }}
+                      onMouseMove={e => { if (dragging) updatePos(e.clientX); }}
+                      onMouseUp={() => setDragging(false)}
+                      onMouseLeave={() => setDragging(false)}
+                      onTouchStart={e => { setDragging(true); updatePos(e.touches[0].clientX); }}
+                      onTouchMove={e => { if (dragging) { e.preventDefault(); updatePos(e.touches[0].clientX); } }}
+                      onTouchEnd={() => setDragging(false)}
+                    >
+                      {/* Before image (full width, behind) */}
+                      <img src={beforeImg} alt="Before — empty room" style={{ width: "100%", display: "block", height: 480, objectFit: "cover", objectPosition: "center" }} draggable={false} />
+                      {/* After image (clipped to reveal left portion) */}
+                      <div style={{ position: "absolute", inset: 0, clipPath: `inset(0 ${100 - sliderPos}% 0 0)` }}>
+                        <img src={afterImg} alt="After — AI designed room" style={{ width: "100%", display: "block", height: 480, objectFit: "cover", objectPosition: "center" }} draggable={false} />
+                      </div>
+                      {/* Divider line */}
+                      <div style={{ position: "absolute", top: 0, bottom: 0, left: `${sliderPos}%`, width: 2, background: "#fff", transform: "translateX(-50%)", pointerEvents: "none" }} />
+                      {/* Handle */}
+                      <div style={{ position: "absolute", top: "50%", left: `${sliderPos}%`, transform: "translate(-50%,-50%)", width: 44, height: 44, borderRadius: "50%", background: "#fff", boxShadow: "0 2px 16px rgba(0,0,0,.3)", display: "flex", alignItems: "center", justifyContent: "center", animation: hinted && !dragging ? "sliderPulse 1.2s ease 1" : "none", pointerEvents: "none", zIndex: 2 }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M8 5l-5 7 5 7M16 5l5 7-5 7" stroke="#1d1d1f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      </div>
+                      {/* Labels */}
+                      <span style={{ position: "absolute", top: 16, left: 16, fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", background: "rgba(0,0,0,.5)", color: "#fff", padding: "5px 12px", borderRadius: 6, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}>Before</span>
+                      <span style={{ position: "absolute", top: 16, right: 16, fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", background: "rgba(29,29,31,.7)", color: "#fff", padding: "5px 12px", borderRadius: 6, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}>After · AI</span>
+                    </div>
+                  );
+                })()}
+              </div>
+            </RevealSection>
+          </section>
+
           {/* Section 7: Pricing teaser — light section */}
           <section className="aura-home-section" style={{ padding: "100px 6%", background: "#f5f5f7" }}>
             <RevealSection>
@@ -3031,7 +3128,7 @@ export default function App() {
                   <div style={{ background: "#fff", borderRadius: 20, padding: "32px 24px", border: "1px solid #e5e5e5", textAlign: "left" }}>
                     <p style={{ fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", color: "#86868b", fontWeight: 600, marginBottom: 6 }}>Free</p>
                     <p style={{ fontSize: 28, fontWeight: 700, color: "#1d1d1f", marginBottom: 20 }}>$0<span style={{ fontSize: 14, fontWeight: 400, color: "#86868b" }}>/month</span></p>
-                    {["AI mood boards", "Style matching", DB.length + "+ products", "Save projects"].map(f => (
+                    {["1 mood board", "Browse products", "Basic AI chat", "Style matching"].map(f => (
                       <div key={f} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#86868b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                         <span style={{ fontSize: 14, color: "#6e6e73" }}>{f}</span>
@@ -3043,7 +3140,7 @@ export default function App() {
                   <div style={{ background: "#1d1d1f", borderRadius: 20, padding: "32px 24px", textAlign: "left", position: "relative" }}>
                     <p style={{ fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,.4)", fontWeight: 600, marginBottom: 6 }}>Pro</p>
                     <p style={{ fontSize: 28, fontWeight: 700, color: "#fff", marginBottom: 20 }}>$20<span style={{ fontSize: 14, fontWeight: 400, color: "rgba(255,255,255,.4)" }}>/month</span></p>
-                    {["Everything in Free", "AI visualization", "CAD floor plans", "Clearance analysis", "Unlimited projects"].map(f => (
+                    {["Everything in Free", "Unlimited AI generations", "AI room visualization", "Design Transfer & Color Swap", "CAD floor plans", "Unlimited projects"].map(f => (
                       <div key={f} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="rgba(255,255,255,.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                         <span style={{ fontSize: 14, color: "rgba(255,255,255,.8)" }}>{f}</span>
@@ -3051,6 +3148,46 @@ export default function App() {
                     ))}
                     <button onClick={() => go("pricing")} style={{ width: "100%", marginTop: 16, background: "#fff", color: "#1d1d1f", padding: "12px", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Upgrade to Pro</button>
                   </div>
+                </div>
+              </div>
+            </RevealSection>
+          </section>
+
+          {/* Comparison Table */}
+          <section className="aura-home-section" style={{ padding: "100px 6%", background: "#fff" }}>
+            <RevealSection>
+              <div style={{ maxWidth: 900, margin: "0 auto" }}>
+                <div style={{ textAlign: "center", marginBottom: 48 }}>
+                  <h2 style={{ fontSize: "clamp(28px,3.5vw,44px)", fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.02em" }}>Why AURA beats the alternatives</h2>
+                </div>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontFamily: "inherit" }}>
+                    <thead>
+                      <tr>
+                        <th style={{ padding: "14px 20px", textAlign: "left", fontSize: 13, fontWeight: 600, color: "#86868b", borderBottom: "1px solid #e5e5e5" }}>Feature</th>
+                        <th style={{ padding: "14px 20px", textAlign: "center", fontSize: 14, fontWeight: 700, color: "#fff", background: "#1d1d1f", borderRadius: "12px 12px 0 0" }}>AURA</th>
+                        <th style={{ padding: "14px 20px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "#86868b", borderBottom: "1px solid #e5e5e5" }}>Hiring a Designer</th>
+                        <th style={{ padding: "14px 20px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "#86868b", borderBottom: "1px solid #e5e5e5" }}>DIY Pinterest</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        ["AI-personalized recommendations", "✓", "✓ (expensive)", "✗"],
+                        ["Real shoppable products (100k+)", "✓", "varies", "✗"],
+                        ["Photo-realistic visualization", "✓", "sometimes", "✗"],
+                        ["Ready in under 2 minutes", "✓", "✗ weeks", "✗"],
+                        ["Free to start", "✓", "✗", "✓ (sort of)"],
+                        ["Design Transfer from inspiration", "✓", "✓", "✗"],
+                      ].map(([feature, aura, designer, diy], i) => (
+                        <tr key={feature} style={{ background: i % 2 === 0 ? "#fafafa" : "#fff" }}>
+                          <td style={{ padding: "14px 20px", fontSize: 14, color: "#1d1d1f", borderBottom: "1px solid #f0f0f0" }}>{feature}</td>
+                          <td style={{ padding: "14px 20px", textAlign: "center", fontSize: 14, fontWeight: 600, color: "#fff", background: i % 2 === 0 ? "#222" : "#1d1d1f", borderBottom: "1px solid rgba(255,255,255,.1)" }}>{aura}</td>
+                          <td style={{ padding: "14px 20px", textAlign: "center", fontSize: 13, color: designer.startsWith("✗") ? "#b0b0b0" : "#6e6e73", borderBottom: "1px solid #f0f0f0" }}>{designer}</td>
+                          <td style={{ padding: "14px 20px", textAlign: "center", fontSize: 13, color: diy.startsWith("✗") ? "#b0b0b0" : "#6e6e73", borderBottom: "1px solid #f0f0f0" }}>{diy}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </RevealSection>
@@ -3360,9 +3497,6 @@ export default function App() {
                         </div>
                       ) : (
                       <div className="aura-chat-input" style={{ padding: "14px 16px", borderTop: "1px solid #F0EBE4", background: "#FDFCFA" }}>
-                        {userPlan !== "pro" && genRemaining === 1 && (
-                          <p style={{ fontSize: 11, color: "#C17550", marginBottom: 8, textAlign: "center" }}>1 free generation remaining — <span style={{ cursor: "pointer", textDecoration: "underline" }} onClick={() => setShowUpgradeModal(true)}>upgrade for unlimited</span></p>
-                        )}
                         <div style={{ display: "flex", gap: 0, border: "1.5px solid #D8D0C8", borderRadius: 12, background: "#fff", overflow: "hidden", transition: "border-color .15s" }}>
                           <input value={inp} onChange={(e) => setInp(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder={room ? "Ask AI: What do you need for your " + room.toLowerCase() + "?" : "Ask AI: Describe your ideal space..."} style={{ flex: 1, background: "transparent", border: "none", padding: "14px 18px", fontFamily: "inherit", fontSize: 15, outline: "none", color: "#1A1815" }} />
                           <button onClick={send} disabled={busy} style={{ background: "#1A1815", color: "#fff", border: "none", padding: "10px 20px", margin: 5, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", opacity: busy ? 0.3 : 1, fontFamily: "inherit", whiteSpace: "nowrap" }}>Send</button>
@@ -3457,6 +3591,167 @@ export default function App() {
                       <span style={{ fontSize: 11, color: vizRemaining <= 3 ? "#F0A080" : "rgba(255,255,255,.4)", alignSelf: "flex-end" }}>{vizCount}/{vizLimit} used · {vizRemaining} remaining</span>
                     </div>
                   </div>
+
+                  {/* AI Studio Tools: Design Transfer / Color Swap / Texture Swap */}
+                  {(() => {
+                    const [aiToolMode, setAiToolMode] = React.useState<"none"|"transfer"|"color"|"texture">("none");
+                    const [inspFile, setInspFile] = React.useState<{data:string;type:string}|null>(null);
+                    const [inspLoading, setInspLoading] = React.useState(false);
+                    const [selectedColor, setSelectedColor] = React.useState<string|null>(null);
+                    const [selectedFloorMat, setSelectedFloorMat] = React.useState<string|null>(null);
+                    const [selectedWallMat, setSelectedWallMat] = React.useState<string|null>(null);
+                    const [matCategory, setMatCategory] = React.useState<"floor"|"wall">("floor");
+                    const wallColors = [
+                      { name: "White", hex: "#F5F5F0" }, { name: "Cream", hex: "#F5EDD6" },
+                      { name: "Gray", hex: "#B0B0B0" }, { name: "Navy", hex: "#1B2A4A" },
+                      { name: "Sage", hex: "#7A9E7E" }, { name: "Terracotta", hex: "#C1714F" },
+                      { name: "Black", hex: "#1A1A1A" }, { name: "Dusty Pink", hex: "#D4A5A5" },
+                      { name: "Warm Beige", hex: "#D4C4A8" }, { name: "Charcoal", hex: "#3C3C3C" },
+                      { name: "Forest Green", hex: "#2D5A3D" }, { name: "Clay", hex: "#B8735A" },
+                    ];
+                    const floorMats = ["Hardwood", "Marble", "Concrete", "Carpet", "Tile", "Bamboo"];
+                    const wallMats = ["Brick", "Stone", "Wood Paneling", "Plaster"];
+
+                    const runAITool = async () => {
+                      if (userPlan !== "pro") { setShowUpgradeModal(true); return; }
+                      if (aiToolMode === "transfer") {
+                        if (!inspFile) return;
+                        setVizSt("loading");
+                        setVizErr("");
+                        try {
+                          const styleDesc = await analyzeImage(inspFile.data, inspFile.type, "Describe this room's design style, color palette, materials, and aesthetic in detail for recreation in another space.");
+                          const prompt = `Photorealistic interior photo of a ${room || "room"}. Apply this design style: ${styleDesc}. Keep the room's architectural structure, change only the furniture, colors, and materials.`;
+                          const imgUrl = await generateAIImage(prompt, roomPhoto?.data || null, [], null);
+                          if (imgUrl && imgUrl !== "__CREDITS_REQUIRED__") {
+                            setVizUrls([{ url: imgUrl, label: "Design Transfer" }]);
+                          } else {
+                            setVizErr("Could not generate visualization. Please try again.");
+                          }
+                        } catch (_e) { setVizErr("An error occurred. Please try again."); }
+                        setVizSt("idle");
+                      } else if (aiToolMode === "color") {
+                        if (!selectedColor) return;
+                        setVizSt("loading");
+                        setVizErr("");
+                        try {
+                          const prompt = `Same ${room || "room"} but with ${selectedColor} walls. Photorealistic interior photo. Keep all furniture exactly the same. High quality render.`;
+                          const imgUrl = await generateAIImage(prompt, roomPhoto?.data || null, [], null);
+                          if (imgUrl && imgUrl !== "__CREDITS_REQUIRED__") {
+                            setVizUrls([{ url: imgUrl, label: `Color Swap — ${selectedColor} walls` }]);
+                          } else {
+                            setVizErr("Could not generate visualization. Please try again.");
+                          }
+                        } catch (_e) { setVizErr("An error occurred. Please try again."); }
+                        setVizSt("idle");
+                      } else if (aiToolMode === "texture") {
+                        const mat = matCategory === "floor" ? selectedFloorMat : selectedWallMat;
+                        if (!mat) return;
+                        setVizSt("loading");
+                        setVizErr("");
+                        try {
+                          const prompt = `Same ${room || "room"} with ${mat} ${matCategory === "floor" ? "flooring" : "wall treatment"}. Photorealistic interior photo. Keep all furniture the same. High quality render.`;
+                          const imgUrl = await generateAIImage(prompt, roomPhoto?.data || null, [], null);
+                          if (imgUrl && imgUrl !== "__CREDITS_REQUIRED__") {
+                            setVizUrls([{ url: imgUrl, label: `Texture Swap — ${mat} ${matCategory === "floor" ? "Floor" : "Wall"}` }]);
+                          } else {
+                            setVizErr("Could not generate visualization. Please try again.");
+                          }
+                        } catch (_e) { setVizErr("An error occurred. Please try again."); }
+                        setVizSt("idle");
+                      }
+                    };
+
+                    const isReady = aiToolMode === "transfer" ? !!inspFile
+                      : aiToolMode === "color" ? !!selectedColor
+                      : aiToolMode === "texture" ? !!(matCategory === "floor" ? selectedFloorMat : selectedWallMat)
+                      : false;
+
+                    return (
+                      <div style={{ marginBottom: 20 }}>
+                        <p style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: "#9B8B7B", fontWeight: 600, marginBottom: 10 }}>AI Studio Tools {userPlan !== "pro" && <span style={{ background: "#F0D8C0", color: "#C17550", borderRadius: 4, padding: "2px 8px", fontSize: 10, marginLeft: 6 }}>Pro only</span>}</p>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: aiToolMode !== "none" ? 16 : 0 }}>
+                          {(["transfer","color","texture"] as const).map(mode => {
+                            const labels = { transfer: "🎨 Design Transfer", color: "🖌️ Color Swap", texture: "🪵 Texture Swap" };
+                            return (
+                              <button key={mode} onClick={() => setAiToolMode(aiToolMode === mode ? "none" : mode)} style={{ padding: "9px 18px", borderRadius: 8, border: aiToolMode === mode ? "2px solid #C17550" : "1px solid #E8E0D8", background: aiToolMode === mode ? "#FFF8F0" : "#fff", color: aiToolMode === mode ? "#C17550" : "#7A6B5B", fontSize: 13, fontWeight: aiToolMode === mode ? 600 : 400, cursor: "pointer", fontFamily: "inherit", transition: "all .15s" }}>{labels[mode]}</button>
+                            );
+                          })}
+                        </div>
+
+                        {aiToolMode === "transfer" && (
+                          <div style={{ background: "#FDFCFA", border: "1px solid #EDE8E0", borderRadius: 12, padding: "20px 20px 16px" }}>
+                            <p style={{ fontSize: 13, fontWeight: 600, color: "#1A1815", margin: "0 0 6px" }}>Upload an inspiration photo</p>
+                            <p style={{ fontSize: 12, color: "#9B8B7B", margin: "0 0 14px", lineHeight: 1.5 }}>AI will analyze its style and apply it to your room layout.</p>
+                            {!inspFile ? (
+                              <label style={{ display: "inline-block", padding: "10px 20px", background: "#1A1815", color: "#fff", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                                Choose photo
+                                <input type="file" accept="image/*" style={{ display: "none" }} onChange={async e => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  setInspLoading(true);
+                                  try {
+                                    const compressed = await compressImage(file);
+                                    setInspFile({ data: compressed.data, type: compressed.type });
+                                  } catch (_e) {}
+                                  setInspLoading(false);
+                                }} />
+                              </label>
+                            ) : (
+                              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                <img src={"data:" + inspFile.type + ";base64," + inspFile.data} alt="Inspiration" style={{ width: 72, height: 52, objectFit: "cover", borderRadius: 8, border: "1px solid #EDE8E0" }} />
+                                <div>
+                                  <p style={{ fontSize: 13, fontWeight: 600, color: "#1A1815", margin: "0 0 4px" }}>Inspiration uploaded</p>
+                                  <button onClick={() => setInspFile(null)} style={{ fontSize: 11, color: "#C17550", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: 0 }}>Remove</button>
+                                </div>
+                              </div>
+                            )}
+                            {inspLoading && <p style={{ fontSize: 12, color: "#9B8B7B", marginTop: 8 }}>Processing image...</p>}
+                            {isReady && vizRemaining > 0 && <button onClick={runAITool} disabled={vizSt === "loading"} style={{ marginTop: 14, padding: "10px 22px", background: "#C17550", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: vizSt === "loading" ? 0.6 : 1 }}>{vizSt === "loading" ? "Generating..." : "Apply Design Transfer"}</button>}
+                          </div>
+                        )}
+
+                        {aiToolMode === "color" && (
+                          <div style={{ background: "#FDFCFA", border: "1px solid #EDE8E0", borderRadius: 12, padding: "20px 20px 16px" }}>
+                            <p style={{ fontSize: 13, fontWeight: 600, color: "#1A1815", margin: "0 0 14px" }}>Pick a wall color</p>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
+                              {wallColors.map(c => (
+                                <button key={c.name} title={c.name} onClick={() => setSelectedColor(c.name)} style={{ width: 36, height: 36, borderRadius: "50%", background: c.hex, border: selectedColor === c.name ? "3px solid #C17550" : "2px solid rgba(0,0,0,.1)", cursor: "pointer", outline: "none", transition: "transform .1s", transform: selectedColor === c.name ? "scale(1.2)" : "scale(1)" }} />
+                              ))}
+                            </div>
+                            {selectedColor && <p style={{ fontSize: 13, color: "#6e6e73", margin: "0 0 12px" }}>Selected: <strong>{selectedColor}</strong></p>}
+                            {isReady && vizRemaining > 0 && <button onClick={runAITool} disabled={vizSt === "loading"} style={{ padding: "10px 22px", background: "#C17550", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: vizSt === "loading" ? 0.6 : 1 }}>{vizSt === "loading" ? "Generating..." : "Apply Color Swap"}</button>}
+                          </div>
+                        )}
+
+                        {aiToolMode === "texture" && (
+                          <div style={{ background: "#FDFCFA", border: "1px solid #EDE8E0", borderRadius: 12, padding: "20px 20px 16px" }}>
+                            <p style={{ fontSize: 13, fontWeight: 600, color: "#1A1815", margin: "0 0 12px" }}>Choose surface & material</p>
+                            <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                              {(["floor","wall"] as const).map(cat => (
+                                <button key={cat} onClick={() => setMatCategory(cat)} style={{ padding: "8px 18px", borderRadius: 8, border: matCategory === cat ? "2px solid #1A1815" : "1px solid #E8E0D8", background: matCategory === cat ? "#1A1815" : "#fff", color: matCategory === cat ? "#fff" : "#7A6B5B", fontSize: 13, fontWeight: matCategory === cat ? 600 : 400, cursor: "pointer", fontFamily: "inherit", textTransform: "capitalize" }}>{cat}</button>
+                              ))}
+                            </div>
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+                              {(matCategory === "floor" ? floorMats : wallMats).map(m => {
+                                const active = matCategory === "floor" ? selectedFloorMat === m : selectedWallMat === m;
+                                return (
+                                  <button key={m} onClick={() => matCategory === "floor" ? setSelectedFloorMat(m) : setSelectedWallMat(m)} style={{ padding: "8px 16px", borderRadius: 8, border: active ? "2px solid #C17550" : "1px solid #E8E0D8", background: active ? "#FFF8F0" : "#fff", color: active ? "#C17550" : "#7A6B5B", fontSize: 13, fontWeight: active ? 600 : 400, cursor: "pointer", fontFamily: "inherit" }}>{m}</button>
+                                );
+                              })}
+                            </div>
+                            {isReady && vizRemaining > 0 && <button onClick={runAITool} disabled={vizSt === "loading"} style={{ padding: "10px 22px", background: "#C17550", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: vizSt === "loading" ? 0.6 : 1 }}>{vizSt === "loading" ? "Generating..." : "Apply Texture Swap"}</button>}
+                          </div>
+                        )}
+
+                        {aiToolMode !== "none" && userPlan !== "pro" && (
+                          <div style={{ marginTop: 12, padding: "14px 18px", background: "#FFF8F0", borderRadius: 10, border: "1px solid #F0D8C0", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+                            <p style={{ fontSize: 13, color: "#7A6B5B", margin: 0 }}>AI Studio Tools are available on Pro.</p>
+                            <button onClick={() => setShowUpgradeModal(true)} style={{ background: "#C17550", color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Upgrade to Pro</button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Viz images — ABOVE floor plan */}
                   {vizErr && vizErr === "sign_up_prompt" ? (
