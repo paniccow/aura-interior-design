@@ -1009,14 +1009,22 @@ export default function App() {
         const result = await searchFeaturedProducts(searchQuery.trim(), 1);
         apiProducts = result.products;
         console.log("[AURA] API returned:", apiProducts.length, "products");
-        // Retry once if first attempt returned empty (handles cold-start / transient failures)
+        // Retry with same query first (handles cold-start / transient failures)
+        if (apiProducts.length === 0) {
+          console.log("[AURA] API empty — retrying same query...");
+          await new Promise(r => setTimeout(r, 2000));
+          const retry1 = await searchFeaturedProducts(searchQuery.trim(), 1);
+          apiProducts = retry1.products;
+          console.log("[AURA] API retry #1 returned:", apiProducts.length, "products");
+        }
+        // If still empty, retry with broader fallback query
         if (apiProducts.length === 0) {
           const fallbackQuery = (vibe ? vibe.toLowerCase() + " " : "") + (room ? room.toLowerCase() + " " : "") + "furniture";
           console.log("[AURA] API empty — retrying with broader query:", fallbackQuery);
-          await new Promise(r => setTimeout(r, 1500));
-          const retry = await searchFeaturedProducts(fallbackQuery, 1);
-          apiProducts = retry.products;
-          console.log("[AURA] API retry returned:", apiProducts.length, "products");
+          await new Promise(r => setTimeout(r, 2000));
+          const retry2 = await searchFeaturedProducts(fallbackQuery, 1);
+          apiProducts = retry2.products;
+          console.log("[AURA] API retry #2 returned:", apiProducts.length, "products");
         }
         if (apiProducts.length > 0) {
           setFeaturedCache(prev => {
