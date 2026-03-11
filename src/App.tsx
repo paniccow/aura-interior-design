@@ -106,6 +106,47 @@ function getAnalyticsSummary(): { total: number; byEvent: Record<string, number>
   } catch (_e) { return { total: 0, byEvent: {}, last7Days: {}, uniqueSessions: 0, buyPageVisits: 0, checkoutClicks: 0, recentEvents: [] }; }
 }
 
+/* ─── Before/After Slider (defined outside App to avoid hook violations) ─── */
+const BeforeAfterSlider: React.FC = () => {
+  const [sliderPos, setSliderPos] = React.useState(50);
+  const [dragging, setDragging] = React.useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const updatePos = (clientX: number) => {
+    const el = containerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const pct = Math.max(5, Math.min(95, ((clientX - rect.left) / rect.width) * 100));
+    setSliderPos(pct);
+  };
+  React.useEffect(() => {
+    if (!dragging) return;
+    const onMove = (e: MouseEvent) => updatePos(e.clientX);
+    const onTouchMove = (e: TouchEvent) => { if (e.touches[0]) updatePos(e.touches[0].clientX); };
+    const onUp = () => setDragging(false);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchmove", onTouchMove, { passive: true });
+    window.addEventListener("touchend", onUp);
+    return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); window.removeEventListener("touchmove", onTouchMove); window.removeEventListener("touchend", onUp); };
+  }, [dragging]);
+  const BEFORE = "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=900&q=80";
+  const AFTER = "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=900&q=80";
+  return (
+    <div ref={containerRef} style={{ position: "relative", width: "100%", aspectRatio: "16/10", borderRadius: 20, overflow: "hidden", cursor: "ew-resize", userSelect: "none", boxShadow: "0 20px 60px rgba(0,0,0,.12)" }}
+      onMouseDown={() => setDragging(true)}
+      onTouchStart={() => setDragging(true)}>
+      <img src={BEFORE} alt="Before" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+      <img src={AFTER} alt="After" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", clipPath: `inset(0 ${100 - sliderPos}% 0 0)` }} />
+      <div style={{ position: "absolute", top: 0, bottom: 0, left: `${sliderPos}%`, width: 3, background: "#fff", transform: "translateX(-50%)", zIndex: 2, boxShadow: "0 0 8px rgba(0,0,0,.3)" }} />
+      <div style={{ position: "absolute", top: "50%", left: `${sliderPos}%`, transform: "translate(-50%,-50%)", width: 48, height: 48, borderRadius: "50%", background: "#fff", boxShadow: "0 2px 16px rgba(0,0,0,.3)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 3, animation: dragging ? "none" : "sliderPulse 1.5s ease 1s 1 both" }}>
+        <span style={{ fontSize: 16, color: "#1d1d1f", fontWeight: 600, letterSpacing: 2 }}>{"<>"}</span>
+      </div>
+      <span style={{ position: "absolute", top: 16, left: 16, fontSize: 11, fontWeight: 700, background: "rgba(0,0,0,.6)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", color: "#fff", padding: "6px 14px", borderRadius: 980, letterSpacing: ".08em", textTransform: "uppercase", zIndex: 4 }}>Before</span>
+      <span style={{ position: "absolute", top: 16, right: 16, fontSize: 11, fontWeight: 700, background: "rgba(255,255,255,.9)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", color: "#1d1d1f", padding: "6px 14px", borderRadius: 980, letterSpacing: ".08em", textTransform: "uppercase", zIndex: 4 }}>After · AI</span>
+    </div>
+  );
+};
+
 /* ─── MAIN APP ─── */
 export default function App() {
   const [pg, setPg] = useState<string>("home");
@@ -115,6 +156,8 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState<boolean>(true); // true until Supabase session check completes
   const [confirmationPending, setConfirmationPending] = useState<boolean>(false);
   const [resetEmailSent, setResetEmailSent] = useState<boolean>(false);
+  const [heroRoomIdx, setHeroRoomIdx] = useState<number>(0);
+  const [faqOpen, setFaqOpen] = useState<number>(0);
   const [adminAuthed, setAdminAuthed] = useState<boolean>(false);
   const [adminPassInput, setAdminPassInput] = useState<string>("");
   const [adminPassErr, setAdminPassErr] = useState<string>("");
@@ -212,6 +255,12 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem("aura_projects", JSON.stringify(projects)); } catch (_e) {}
   }, [projects]);
+  // Hero room cycling
+  const heroRooms = ["your living room.", "your bedroom.", "your kitchen.", "your office."];
+  useEffect(() => {
+    const t = setInterval(() => setHeroRoomIdx(i => (i + 1) % heroRooms.length), 3000);
+    return () => clearInterval(t);
+  }, []);
   useEffect(() => {
     try { sessionStorage.setItem("aura_sel", JSON.stringify(Array.from(sel.entries()))); } catch (_e) {}
   }, [sel]);
@@ -2488,6 +2537,10 @@ export default function App() {
         @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
         @keyframes bentoScrollLeft{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
         @keyframes bentoScrollRight{0%{transform:translateX(-50%)}100%{transform:translateX(0)}}
+        @keyframes sliderPulse{0%{transform:translate(-50%,-50%) scale(1)}30%{transform:translate(-50%,-50%) scale(1.18)}60%{transform:translate(-50%,-50%) scale(0.9)}100%{transform:translate(-50%,-50%) scale(1)}}
+        @keyframes tickerScroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+        .aura-ticker-track{animation:tickerScroll 30s linear infinite}
+        .aura-ticker-track:hover{animation-play-state:paused}
         .aura-bento-scroll-left{animation:bentoScrollLeft 40s linear infinite}
         .aura-bento-scroll-right{animation:bentoScrollRight 40s linear infinite}
         .aura-bento-scroll-left,.aura-bento-scroll-right{pointer-events:none}
@@ -2599,6 +2652,13 @@ export default function App() {
           /* Final CTA buttons */
           .aura-final-cta-btns{flex-direction:column!important;align-items:stretch!important}
           .aura-final-cta-btns button{text-align:center!important}
+          .aura-usecase-grid{grid-template-columns:1fr!important}
+          .aura-howit-grid{grid-template-columns:1fr!important}
+          .aura-badges-grid{grid-template-columns:1fr 1fr!important}
+          .aura-why-grid{grid-template-columns:1fr!important}
+          .aura-compare-table{font-size:12px!important}
+          .aura-compare-table th,.aura-compare-table td{padding:10px 8px!important}
+          .aura-testimonials-grid{grid-template-columns:1fr!important}
           /* Home sections horizontal padding */
           .aura-home-section{padding-left:5%!important;padding-right:5%!important}
           /* Setup wizard container */
@@ -2648,7 +2708,7 @@ export default function App() {
             {/* Text positioned at bottom like Tesla */}
             <div className="aura-hero-bottom" style={{ position: "absolute", bottom: 0, left: 0, right: 0, textAlign: "center", padding: "0 6% 64px", animation: "fadeUp .8s ease" }}>
               <p style={{ fontSize: "clamp(10px,1.2vw,13px)", letterSpacing: ".2em", textTransform: "uppercase", color: "rgba(255,255,255,.6)", marginBottom: 10, fontWeight: 500 }}>AI Interior Design · No experience required</p>
-              <h1 style={{ fontSize: "clamp(36px,6vw,72px)", fontWeight: 700, lineHeight: 1.05, marginBottom: 12, letterSpacing: "-0.025em", color: "#fff" }}>Design your dream room.</h1>
+              <h1 style={{ fontSize: "clamp(36px,6vw,72px)", fontWeight: 700, lineHeight: 1.05, marginBottom: 12, letterSpacing: "-0.025em", color: "#fff" }}>Design <span key={heroRoomIdx} style={{ display: "inline-block", animation: "fadeInText .5s ease" }}>{heroRooms[heroRoomIdx]}</span></h1>
               <p style={{ fontSize: "clamp(14px,1.5vw,18px)", color: "rgba(255,255,255,.75)", lineHeight: 1.5, maxWidth: 480, margin: "0 auto 28px", fontWeight: 400 }}>Describe your space. Get curated furniture picks and a photorealistic visualization in minutes.</p>
               <div className="aura-hero-btns" style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
                 <button onClick={() => { go("design"); setTab("studio"); trackEvent("cta_click", { button: "hero_start_designing" }); }} style={{ background: "rgba(255,255,255,.95)", color: "#1d1d1f", padding: "15px 40px", border: "none", borderRadius: 4, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "background .2s", letterSpacing: ".02em", textTransform: "uppercase" }} onMouseEnter={e => e.currentTarget.style.background = "#fff"} onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.95)"}>Start Designing Free</button>
@@ -2657,9 +2717,44 @@ export default function App() {
             </div>
           </section>
 
+          {/* ─── Retailer Trust Ticker ─── */}
+          <section style={{ padding: "20px 0", background: "#fff", borderBottom: "1px solid #f0f0f0", overflow: "hidden" }}>
+            <div style={{ overflow: "hidden", maskImage: "linear-gradient(90deg, transparent, black 8%, black 92%, transparent)", WebkitMaskImage: "linear-gradient(90deg, transparent, black 8%, black 92%, transparent)" }}>
+              <div className="aura-ticker-track" style={{ display: "flex", gap: 48, alignItems: "center", width: "max-content", whiteSpace: "nowrap" }}>
+                {[...["Lulu & Georgia", "McGee & Co", "West Elm", "Crate & Barrel", "Article", "Restoration Hardware", "Serena & Lily", "AllModern", "Rejuvenation", "Shoppe Amber Interiors"], ...["Lulu & Georgia", "McGee & Co", "West Elm", "Crate & Barrel", "Article", "Restoration Hardware", "Serena & Lily", "AllModern", "Rejuvenation", "Shoppe Amber Interiors"]].map((name, i) => (
+                  <span key={i} style={{ fontSize: 14, fontWeight: 600, color: "#b0b0b0", letterSpacing: ".04em", flexShrink: 0 }}>{name}</span>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* ─── How It Works — 3 Steps ─── */}
+          <section className="aura-home-section" style={{ padding: "80px 6%", background: "#fff" }}>
+            <div style={{ maxWidth: 1000, margin: "0 auto", textAlign: "center" }}>
+              <p style={{ fontSize: 12, letterSpacing: ".2em", textTransform: "uppercase", color: "#86868b", fontWeight: 600, marginBottom: 10 }}>How it works</p>
+              <h2 style={{ fontSize: "clamp(28px,3.5vw,44px)", fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.02em", marginBottom: 48 }}>Design any room in 3 steps.</h2>
+              <div className="aura-howit-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 32 }}>
+                {[
+                  { num: "01", title: "Describe your space", desc: "Pick a room type, choose your style, enter dimensions. Upload a photo if you have one.", icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" },
+                  { num: "02", title: "AI finds your furniture", desc: "Chat with your AI designer. It searches " + DB.length + "+ real products and builds mood boards that match your style.", icon: "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" },
+                  { num: "03", title: "Visualize & shop", desc: "See a photorealistic render of your room with the products you picked. Then buy everything with one click.", icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" },
+                ].map(step => (
+                  <div key={step.num} style={{ textAlign: "center", padding: "32px 20px" }}>
+                    <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#f5f5f7", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{ opacity: .6 }}><path d={step.icon} stroke="#1d1d1f" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    </div>
+                    <p style={{ fontSize: 12, fontWeight: 700, color: "#C17550", letterSpacing: ".1em", marginBottom: 8 }}>{step.num}</p>
+                    <h3 style={{ fontSize: 20, fontWeight: 700, color: "#1d1d1f", marginBottom: 8, letterSpacing: "-0.01em" }}>{step.title}</h3>
+                    <p style={{ fontSize: 15, color: "#6e6e73", lineHeight: 1.6 }}>{step.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
           {/* Section 2: Define Your Room — text left, product UI demo right */}
-          <section className="aura-home-section" style={{ padding: "120px 6%", background: "#fff" }}>
-            <RevealSection>
+          <section className="aura-home-section" style={{ padding: "120px 6%", background: "#f5f5f7" }}>
+            <div>
               <div className="aura-grid-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 80, alignItems: "center", maxWidth: 1200, margin: "0 auto" }}>
                 <div>
                   <p style={{ fontSize: 13, letterSpacing: ".2em", textTransform: "uppercase", color: "#86868b", marginBottom: 12, fontWeight: 600 }}>Step 1</p>
@@ -2709,12 +2804,12 @@ export default function App() {
                   </div>
                 </div>
               </div>
-            </RevealSection>
+            </div>
           </section>
 
           {/* Section 3: Style — text right, palette UI demo left */}
           <section className="aura-home-section" style={{ padding: "120px 6%", background: "#f5f5f7" }}>
-            <RevealSection>
+            <div>
               <div className="aura-grid-2col aura-grid-reverse" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 80, alignItems: "center", maxWidth: 1200, margin: "0 auto" }}>
                 {/* Style selector UI mockup */}
                 <div style={{ background: "#fff", borderRadius: 24, border: "1px solid #e5e5e5", boxShadow: "0 20px 60px rgba(0,0,0,.08)", overflow: "hidden" }}>
@@ -2764,12 +2859,12 @@ export default function App() {
                   </div>
                 </div>
               </div>
-            </RevealSection>
+            </div>
           </section>
 
           {/* Section 4: AI Chat — text left, chat UI demo right */}
           <section className="aura-home-section" style={{ padding: "120px 6%", background: "#fff" }}>
-            <RevealSection>
+            <div>
               <div className="aura-grid-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 80, alignItems: "center", maxWidth: 1200, margin: "0 auto" }}>
                 <div>
                   <p style={{ fontSize: 13, letterSpacing: ".2em", textTransform: "uppercase", color: "#86868b", marginBottom: 12, fontWeight: 600 }}>Step 3</p>
@@ -2827,12 +2922,12 @@ export default function App() {
                   </div>
                 </div>
               </div>
-            </RevealSection>
+            </div>
           </section>
 
           {/* Section 5: Product Catalog — scrolling marquee */}
           <section className="aura-home-section" style={{ padding: "64px 0", background: "#f5f5f7", overflow: "hidden" }}>
-            <RevealSection style={{ width: "100%" }}>
+            <div>
               <div style={{ textAlign: "center", padding: "0 6%", marginBottom: 32, maxWidth: 800, margin: "0 auto 32px" }}>
                 <h2 style={{ fontSize: "clamp(24px,3vw,36px)", fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.02em", marginBottom: 10 }}>{DB.length}+ products. All real. All shoppable.</h2>
                 <p style={{ fontSize: 16, color: "#6e6e73", lineHeight: 1.5 }}>Hand-picked from Lulu & Georgia, McGee & Co, West Elm, and more.</p>
@@ -2873,12 +2968,12 @@ export default function App() {
               <div style={{ textAlign: "center", marginTop: 28, padding: "0 6%" }}>
                 <button onClick={() => { go("design"); setTab("catalog"); }} style={{ background: "#1d1d1f", color: "#fff", padding: "14px 32px", border: "none", borderRadius: 980, fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Browse full catalog</button>
               </div>
-            </RevealSection>
+            </div>
           </section>
 
           {/* Section 6: Visualization — text right, large viz image left */}
           <section className="aura-home-section" style={{ padding: "120px 6%", background: "#fff" }}>
-            <RevealSection>
+            <div>
               <div className="aura-grid-2col aura-grid-reverse" style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 80, alignItems: "center", maxWidth: 1200, margin: "0 auto" }}>
                 {/* Large visualization image */}
                 <div style={{ borderRadius: 24, overflow: "hidden", boxShadow: "0 24px 80px rgba(0,0,0,.1)", position: "relative" }}>
@@ -2910,12 +3005,129 @@ export default function App() {
                   <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#1d1d1f", color: "#fff", padding: "14px 32px", border: "none", borderRadius: 980, fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Try it free</button>
                 </div>
               </div>
-            </RevealSection>
+            </div>
+          </section>
+
+          {/* ─── Use Case Tabs: Interiors / Exteriors / Gardens ─── */}
+          <section className="aura-home-section" style={{ padding: "100px 6%", background: "#fff" }}>
+            <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+              <div style={{ textAlign: "center", marginBottom: 56 }}>
+                <p style={{ fontSize: 12, letterSpacing: ".2em", textTransform: "uppercase", color: "#86868b", fontWeight: 600, marginBottom: 10 }}>What can you design?</p>
+                <h2 style={{ fontSize: "clamp(28px,3.5vw,44px)", fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.02em" }}>Every space. Inside and out.</h2>
+              </div>
+              <div className="aura-usecase-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 24 }}>
+                {[
+                  { icon: "\uD83D\uDECB\uFE0F", title: "Interiors", desc: "AI-personalized furniture picks, mood boards, and photorealistic renders for every room in your home.", rooms: ["Living Room", "Bedroom", "Kitchen", "Dining Room", "Office", "Bathroom"] },
+                  { icon: "\uD83C\uDFE1", title: "Exteriors", desc: "Transform your home's entrance and outdoor living areas with curated outdoor furniture and lighting.", rooms: ["Front Yard", "Backyard", "Balcony", "Entryway"] },
+                  { icon: "\uD83C\uDF3F", title: "Gardens", desc: "Design lush, intentional outdoor spaces — from Japanese zen gardens to modern rooftop retreats.", rooms: ["English Garden", "Zen Garden", "Herb Garden", "Rooftop"] },
+                ].map(card => (
+                  <div key={card.title} style={{ background: "#f5f5f7", borderRadius: 20, padding: "36px 28px", transition: "transform .2s, box-shadow .2s", cursor: "default" }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform = "translateY(-4px)"; (e.currentTarget as HTMLDivElement).style.boxShadow = "0 16px 48px rgba(0,0,0,.1)"; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform = ""; (e.currentTarget as HTMLDivElement).style.boxShadow = ""; }}>
+                    <div style={{ fontSize: 40, marginBottom: 16 }}>{card.icon}</div>
+                    <h3 style={{ fontSize: 22, fontWeight: 700, color: "#1d1d1f", marginBottom: 10, letterSpacing: "-0.01em" }}>{card.title}</h3>
+                    <p style={{ fontSize: 15, color: "#6e6e73", lineHeight: 1.6, marginBottom: 20 }}>{card.desc}</p>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                      {card.rooms.map(r => (
+                        <span key={r} style={{ fontSize: 12, padding: "5px 12px", borderRadius: 980, background: "#fff", color: "#1d1d1f", fontWeight: 500, border: "1px solid #e5e5e5" }}>{r}</span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ textAlign: "center", marginTop: 40 }}>
+                <button onClick={() => { go("design"); setTab("studio"); trackEvent("cta_click", { button: "usecase_start" }); }} style={{ background: "#1d1d1f", color: "#fff", padding: "14px 36px", border: "none", borderRadius: 980, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Start designing any space →</button>
+              </div>
+            </div>
+          </section>
+
+          {/* ─── Before/After Slider ─── */}
+          <section className="aura-home-section" style={{ padding: "100px 6%", background: "#f5f5f7" }}>
+            <div style={{ maxWidth: 900, margin: "0 auto" }}>
+              <div style={{ textAlign: "center", marginBottom: 40 }}>
+                <p style={{ fontSize: 12, letterSpacing: ".2em", textTransform: "uppercase", color: "#86868b", fontWeight: 600, marginBottom: 10 }}>The transformation</p>
+                <h2 style={{ fontSize: "clamp(28px,3.5vw,44px)", fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.02em" }}>See the difference AI makes.</h2>
+                <p style={{ fontSize: 16, color: "#6e6e73", marginTop: 10, lineHeight: 1.5 }}>Drag to compare — same room, completely redesigned by AI.</p>
+              </div>
+              <BeforeAfterSlider />
+            </div>
+          </section>
+
+          {/* ─── Feature Badges Grid ─── */}
+          <section className="aura-home-section" style={{ padding: "80px 6%", background: "#fff" }}>
+            <div style={{ maxWidth: 1000, margin: "0 auto" }}>
+              <div className="aura-badges-grid" style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 16 }}>
+                {[
+                  { icon: "M13 10V3L4 14h7v7l9-11h-7z", label: "Instant AI Design" },
+                  { icon: "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z", label: "Photorealistic Renders" },
+                  { icon: "M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z", label: "Real Shoppable Products" },
+                  { icon: "M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01", label: "14 Design Styles" },
+                  { icon: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z", label: "Zero Design Skills Needed" },
+                  { icon: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4", label: "CAD Floor Plans" },
+                  { icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z", label: "Ready in Under 2 Min" },
+                  { icon: "M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z", label: "100% Customizable" },
+                  { icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4", label: "AI Mood Boards" },
+                  { icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z", label: "For Everyone" },
+                ].map(badge => (
+                  <div key={badge.label} style={{ textAlign: "center", padding: "20px 10px", borderRadius: 16, background: "#f5f5f7", transition: "transform .15s" }}
+                    onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)"}
+                    onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.transform = ""}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style={{ margin: "0 auto 10px", display: "block" }}><path d={badge.icon} stroke="#C17550" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    <p style={{ fontSize: 13, fontWeight: 600, color: "#1d1d1f", margin: 0, lineHeight: 1.3 }}>{badge.label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* ─── Comparison Table ─── */}
+          <section className="aura-home-section" style={{ padding: "100px 6%", background: "#f5f5f7" }}>
+            <div style={{ maxWidth: 900, margin: "0 auto" }}>
+              <div style={{ textAlign: "center", marginBottom: 48 }}>
+                <p style={{ fontSize: 12, letterSpacing: ".2em", textTransform: "uppercase", color: "#86868b", fontWeight: 600, marginBottom: 10 }}>The comparison</p>
+                <h2 style={{ fontSize: "clamp(28px,3.5vw,44px)", fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.02em" }}>AURA vs. the alternatives</h2>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table className="aura-compare-table" style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontFamily: "inherit" }}>
+                  <thead>
+                    <tr>
+                      <th style={{ padding: "16px 20px", textAlign: "left", fontSize: 13, fontWeight: 600, color: "#86868b", borderBottom: "1px solid #e5e5e5", background: "#fff" }}>Feature</th>
+                      <th style={{ padding: "16px 20px", textAlign: "center", fontSize: 14, fontWeight: 700, color: "#fff", background: "#1d1d1f", borderRadius: "12px 12px 0 0", minWidth: 100 }}>AURA</th>
+                      <th style={{ padding: "16px 20px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "#86868b", borderBottom: "1px solid #e5e5e5", background: "#fff" }}>Hiring a Designer</th>
+                      <th style={{ padding: "16px 20px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "#86868b", borderBottom: "1px solid #e5e5e5", background: "#fff" }}>DIY Pinterest</th>
+                      <th style={{ padding: "16px 20px", textAlign: "center", fontSize: 13, fontWeight: 600, color: "#86868b", borderBottom: "1px solid #e5e5e5", background: "#fff" }}>Other AI Tools</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      ["AI-personalized recommendations", true, "Expensive", false, "Limited"],
+                      ["Real shoppable products (" + DB.length + "+)", true, "Varies", false, false],
+                      ["Photorealistic room renders", true, "Sometimes", false, true],
+                      ["CAD floor plans & layouts", true, false, false, false],
+                      ["Ready in under 2 minutes", true, "Weeks", false, true],
+                      ["Free to start", true, false, "Sort of", "Limited"],
+                      ["AI mood boards", true, true, false, false],
+                      ["Traffic flow analysis", true, true, false, false],
+                    ].map(([feature, aura, designer, diy, other], i) => (
+                      <tr key={feature as string}>
+                        <td style={{ padding: "14px 20px", fontSize: 14, color: "#1d1d1f", borderBottom: "1px solid #f0f0f0", background: i % 2 === 0 ? "#fafafa" : "#fff" }}>{feature}</td>
+                        <td style={{ padding: "14px 20px", textAlign: "center", fontSize: 14, fontWeight: 600, color: "#fff", background: i % 2 === 0 ? "#252525" : "#1d1d1f", borderBottom: "1px solid rgba(255,255,255,.08)" }}>{aura === true ? "\u2713" : aura}</td>
+                        {[designer, diy, other].map((val, ci) => (
+                          <td key={ci} style={{ padding: "14px 20px", textAlign: "center", fontSize: 13, color: val === false ? "#c8c8c8" : val === true ? "#5B8B6B" : "#86868b", borderBottom: "1px solid #f0f0f0", background: i % 2 === 0 ? "#fafafa" : "#fff", fontWeight: val === true ? 600 : 400 }}>
+                            {val === true ? "\u2713" : val === false ? "\u2715" : val}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </section>
 
           {/* Section 7: Pricing teaser — light section */}
           <section className="aura-home-section" style={{ padding: "100px 6%", background: "#f5f5f7" }}>
-            <RevealSection>
+            <div>
               <div style={{ maxWidth: 800, margin: "0 auto", textAlign: "center" }}>
                 <h2 style={{ fontSize: "clamp(28px,3.5vw,44px)", fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.02em", marginBottom: 12 }}>Start free. Upgrade when you're ready.</h2>
                 <p style={{ fontSize: 17, color: "#6e6e73", lineHeight: 1.5, maxWidth: 520, margin: "0 auto 40px" }}>Design mood boards and browse products at no cost. Upgrade to Pro for AI room renders and CAD floor plans.</p>
@@ -2946,12 +3158,97 @@ export default function App() {
                   </div>
                 </div>
               </div>
-            </RevealSection>
+            </div>
+          </section>
+
+          {/* ─── Testimonials ─── */}
+          <section className="aura-home-section" style={{ padding: "100px 6%", background: "#fff" }}>
+            <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+              <div style={{ textAlign: "center", marginBottom: 48 }}>
+                <p style={{ fontSize: 12, letterSpacing: ".2em", textTransform: "uppercase", color: "#86868b", fontWeight: 600, marginBottom: 10 }}>What users say</p>
+                <h2 style={{ fontSize: "clamp(28px,3.5vw,44px)", fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.02em" }}>Loved by homeowners and designers.</h2>
+              </div>
+              <div className="aura-testimonials-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 24 }}>
+                {[
+                  { name: "Sarah M.", role: "Homeowner", text: "I redesigned my entire living room in one afternoon. The AI understood exactly what I wanted when I said 'warm modern with earthy tones.' Every product it recommended was spot on.", rating: 5 },
+                  { name: "James K.", role: "Interior Designer", text: "I use AURA to quickly prototype ideas for clients. The mood board feature saves me hours — and the photorealistic renders are impressive enough to show at presentations.", rating: 5 },
+                  { name: "Maria L.", role: "First-time Homebuyer", text: "As someone with zero design experience, AURA made furnishing my new apartment feel effortless. The AI picked furniture that actually fits my space and budget.", rating: 5 },
+                ].map(t => (
+                  <div key={t.name} style={{ background: "#f5f5f7", borderRadius: 20, padding: "32px 28px" }}>
+                    <div style={{ display: "flex", gap: 2, marginBottom: 16 }}>
+                      {Array.from({ length: t.rating }).map((_, i) => (
+                        <svg key={i} width="16" height="16" viewBox="0 0 24 24" fill="#C17550"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                      ))}
+                    </div>
+                    <p style={{ fontSize: 15, color: "#3A3530", lineHeight: 1.7, marginBottom: 20, fontStyle: "italic" }}>"{t.text}"</p>
+                    <div>
+                      <p style={{ fontSize: 14, fontWeight: 700, color: "#1d1d1f", margin: 0 }}>{t.name}</p>
+                      <p style={{ fontSize: 13, color: "#86868b", margin: "2px 0 0" }}>{t.role}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* ─── Why AURA ─── */}
+          <section className="aura-home-section" style={{ padding: "100px 6%", background: "#1d1d1f" }}>
+            <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+              <div style={{ textAlign: "center", marginBottom: 56 }}>
+                <h2 style={{ fontSize: "clamp(28px,3.5vw,44px)", fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.02em", color: "#fff" }}>Why choose AURA?</h2>
+              </div>
+              <div className="aura-why-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 20 }}>
+                {[
+                  { icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z", title: "Budget Friendly", desc: "Free to start. Pro is just $20/mo — a fraction of hiring a designer." },
+                  { icon: "M13 10V3L4 14h7v7l9-11h-7z", title: "Ultra-Fast", desc: "Get AI-generated designs, mood boards, and renders in under 2 minutes." },
+                  { icon: "M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z", title: "Professional Quality", desc: "Photorealistic renders and CAD floor plans trusted by interior designers." },
+                  { icon: "M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z", title: "Zero Learning Curve", desc: "Just describe what you want in plain English. No design skills required." },
+                ].map(card => (
+                  <div key={card.title} style={{ padding: "28px 24px", borderRadius: 18, background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.08)" }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{ marginBottom: 16 }}><path d={card.icon} stroke="#C17550" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    <h3 style={{ fontSize: 18, fontWeight: 700, color: "#fff", marginBottom: 8 }}>{card.title}</h3>
+                    <p style={{ fontSize: 14, color: "rgba(255,255,255,.55)", lineHeight: 1.6, margin: 0 }}>{card.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* ─── FAQ ─── */}
+          <section className="aura-home-section" style={{ padding: "100px 6%", background: "#fff" }}>
+            <div style={{ maxWidth: 720, margin: "0 auto" }}>
+              <div style={{ textAlign: "center", marginBottom: 48 }}>
+                <p style={{ fontSize: 12, letterSpacing: ".2em", textTransform: "uppercase", color: "#86868b", fontWeight: 600, marginBottom: 10 }}>FAQ</p>
+                <h2 style={{ fontSize: "clamp(28px,3.5vw,44px)", fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.02em" }}>Common questions</h2>
+              </div>
+              {[
+                ["How does AURA work?", "Tell AURA your room type, design style, and dimensions. Our AI searches " + DB.length + "+ real products from premium brands, generates mood boards, and creates photorealistic renders of your room — all in under 2 minutes."],
+                ["Do I need design experience?", "Not at all. AURA is built for everyone — from first-time homeowners to professional designers. Just describe what you want in plain English and our AI handles the rest."],
+                ["Are the products real?", "Yes! Every product in AURA is a real, shoppable item from brands like Lulu & Georgia, McGee & Co, West Elm, Crate & Barrel, Article, and more. Click any product to buy it directly from the retailer."],
+                ["What's included in the free plan?", "The free plan includes AI chat, mood board generation, style matching, and browsing our full product catalog. Upgrade to Pro ($20/mo) for AI room visualization, CAD floor plans, and unlimited projects."],
+                ["How accurate are the visualizations?", "Our AI generates photorealistic renders using the exact products you selected. It considers your room dimensions, style palette, and furniture placement to create an accurate preview of how your room will look."],
+                ["Can I upload my own room photo?", "Yes! Upload a photo of your actual room and our AI will analyze it, then place your selected furniture into the real space for an accurate visualization."],
+                ["Does it work on mobile?", "AURA works on any device — desktop, tablet, or phone. The interface is fully responsive and optimized for touch."],
+                ["How do I cancel my subscription?", "You can cancel anytime from your account settings. No commitments, no cancellation fees. Your access continues through the end of your billing period."],
+              ].map(([q, a], i) => (
+                <div key={q} style={{ borderBottom: "1px solid #e5e5e5" }}>
+                  <button onClick={() => setFaqOpen(faqOpen === i ? -1 : i)} style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px 0", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+                    <span style={{ fontSize: 16, fontWeight: 600, color: "#1d1d1f", flex: 1, paddingRight: 16 }}>{q}</span>
+                    <span style={{ fontSize: 22, color: "#86868b", fontWeight: 300, flexShrink: 0, transform: faqOpen === i ? "rotate(45deg)" : "none", transition: "transform .2s" }}>+</span>
+                  </button>
+                  {faqOpen === i && (
+                    <div style={{ paddingBottom: 20 }}>
+                      <p style={{ fontSize: 15, color: "#6e6e73", lineHeight: 1.7, margin: 0 }}>{a}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </section>
 
           {/* Final CTA */}
           <section className="aura-cta-section" style={{ padding: "100px 6%", textAlign: "center", background: "#fff" }}>
-            <RevealSection>
+            <div>
               <p style={{ fontSize: 13, color: "#86868b", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 24, fontWeight: 500 }}>Products from Lulu & Georgia, McGee & Co, West Elm, and more</p>
               <h2 style={{ fontSize: "clamp(32px,4.5vw,52px)", fontWeight: 700, marginBottom: 16, letterSpacing: "-0.025em", lineHeight: 1.08, color: "#1d1d1f" }}>Your dream room<br />is one click away.</h2>
               <p style={{ fontSize: 17, color: "#86868b", marginBottom: 36, lineHeight: 1.5 }}>Join thousands of homeowners designing smarter with AI.</p>
@@ -2959,7 +3256,7 @@ export default function App() {
                 <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#1d1d1f", color: "#fff", padding: "16px 40px", border: "none", borderRadius: 980, fontSize: 16, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s", flex: "1 1 auto" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Start designing free</button>
                 <button onClick={() => go("pricing")} style={{ background: "#f5f5f7", border: "none", padding: "16px 32px", borderRadius: 980, fontSize: 16, color: "#1d1d1f", cursor: "pointer", fontFamily: "inherit", fontWeight: 500, flex: "1 1 auto" }}>See pricing</button>
               </div>
-            </RevealSection>
+            </div>
           </section>
         </div>
         );
