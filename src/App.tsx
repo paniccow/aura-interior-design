@@ -106,6 +106,41 @@ function getAnalyticsSummary(): { total: number; byEvent: Record<string, number>
   } catch (_e) { return { total: 0, byEvent: {}, last7Days: {}, uniqueSessions: 0, buyPageVisits: 0, checkoutClicks: 0, recentEvents: [] }; }
 }
 
+/* ─── BEFORE/AFTER SLIDER COMPONENT ─── */
+const BeforeAfterSlider: React.FC = () => {
+  const [sliderPos, setSliderPos] = React.useState(50);
+  const [dragging, setDragging] = React.useState(false);
+  const beforeImg = "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=900&q=80";
+  const afterImg = "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=900&q=80";
+  const updatePos = (clientX: number, rect: DOMRect) => {
+    const pct = Math.min(95, Math.max(5, (clientX - rect.left) / rect.width * 100));
+    setSliderPos(pct);
+  };
+  return (
+    <div
+      style={{ position: "relative", overflow: "hidden", borderRadius: 20, cursor: "ew-resize", userSelect: "none", boxShadow: "0 24px 80px rgba(0,0,0,.12)" }}
+      onMouseDown={e => { setDragging(true); updatePos(e.clientX, e.currentTarget.getBoundingClientRect()); }}
+      onMouseMove={e => { if (dragging) updatePos(e.clientX, e.currentTarget.getBoundingClientRect()); }}
+      onMouseUp={() => setDragging(false)}
+      onMouseLeave={() => setDragging(false)}
+      onTouchStart={e => { setDragging(true); updatePos(e.touches[0].clientX, e.currentTarget.getBoundingClientRect()); }}
+      onTouchMove={e => { if (dragging) { e.preventDefault(); updatePos(e.touches[0].clientX, e.currentTarget.getBoundingClientRect()); } }}
+      onTouchEnd={() => setDragging(false)}
+    >
+      <img src={beforeImg} alt="Before — empty room" style={{ width: "100%", display: "block", height: 480, objectFit: "cover", objectPosition: "center" }} draggable={false} />
+      <div style={{ position: "absolute", inset: 0, clipPath: `inset(0 ${100 - sliderPos}% 0 0)` }}>
+        <img src={afterImg} alt="After — AI designed room" style={{ width: "100%", display: "block", height: 480, objectFit: "cover", objectPosition: "center" }} draggable={false} />
+      </div>
+      <div style={{ position: "absolute", top: 0, bottom: 0, left: `${sliderPos}%`, width: 2, background: "#fff", transform: "translateX(-50%)", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", top: "50%", left: `${sliderPos}%`, transform: "translate(-50%,-50%)", width: 44, height: 44, borderRadius: "50%", background: "#fff", boxShadow: "0 2px 16px rgba(0,0,0,.3)", display: "flex", alignItems: "center", justifyContent: "center", animation: "sliderPulse 1.2s ease 1.2s 1 both", pointerEvents: "none", zIndex: 2 }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M8 5l-5 7 5 7M16 5l5 7-5 7" stroke="#1d1d1f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      </div>
+      <span style={{ position: "absolute", top: 16, left: 16, fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", background: "rgba(0,0,0,.5)", color: "#fff", padding: "5px 12px", borderRadius: 6, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}>Before</span>
+      <span style={{ position: "absolute", top: 16, right: 16, fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", background: "rgba(29,29,31,.7)", color: "#fff", padding: "5px 12px", borderRadius: 6, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}>After · AI</span>
+    </div>
+  );
+};
+
 /* ─── MAIN APP ─── */
 export default function App() {
   const [pg, setPg] = useState<string>("home");
@@ -200,6 +235,14 @@ export default function App() {
   const [onboardStep, setOnboardStep] = useState<number>(0); // 0=welcome, 1=pick room, 2=pick style
 
   const [designStep, _setDesignStep] = useState<number>(0); // 0=setup, 1=chat, 2=review
+  // AI Studio Tools state
+  const [aiToolMode, setAiToolMode] = useState<"none"|"transfer"|"color"|"texture">("none");
+  const [aiInspFile, setAiInspFile] = useState<{data:string;type:string}|null>(null);
+  const [aiInspLoading, setAiInspLoading] = useState(false);
+  const [aiSelectedColor, setAiSelectedColor] = useState<string|null>(null);
+  const [aiMatCategory, setAiMatCategory] = useState<"floor"|"wall">("floor");
+  const [aiSelectedFloorMat, setAiSelectedFloorMat] = useState<string|null>(null);
+  const [aiSelectedWallMat, setAiSelectedWallMat] = useState<string|null>(null);
   const setDesignStep = (step: number) => { _setDesignStep(step); window.scrollTo({ top: 0, behavior: "smooth" }); };
   const [setupSubStep, setSetupSubStep] = useState<number>(0); // 0=room, 1=style, 2=budget, 3=dimensions+uploads
   const chatEnd = useRef<HTMLDivElement>(null);
@@ -3066,53 +3109,7 @@ export default function App() {
                   <h2 style={{ fontSize: "clamp(28px,3.5vw,44px)", fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.02em" }}>See it before you buy it.</h2>
                   <p style={{ fontSize: 16, color: "#6e6e73", marginTop: 10, lineHeight: 1.5 }}>Drag to compare — same room, completely redesigned by AI.</p>
                 </div>
-                {(() => {
-                  const [sliderPos, setSliderPos] = React.useState(50);
-                  const [dragging, setDragging] = React.useState(false);
-                  const [hinted, setHinted] = React.useState(false);
-                  const containerRef = React.useRef<HTMLDivElement>(null);
-                  const beforeImg = "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=900&q=80";
-                  const afterImg = "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=900&q=80";
-                  React.useEffect(() => {
-                    const t = setTimeout(() => setHinted(true), 800);
-                    return () => clearTimeout(t);
-                  }, []);
-                  const updatePos = (clientX: number) => {
-                    if (!containerRef.current) return;
-                    const rect = containerRef.current.getBoundingClientRect();
-                    const pct = Math.min(95, Math.max(5, (clientX - rect.left) / rect.width * 100));
-                    setSliderPos(pct);
-                  };
-                  return (
-                    <div
-                      ref={containerRef}
-                      style={{ position: "relative", overflow: "hidden", borderRadius: 20, cursor: "ew-resize", userSelect: "none", boxShadow: "0 24px 80px rgba(0,0,0,.12)" }}
-                      onMouseDown={e => { setDragging(true); updatePos(e.clientX); }}
-                      onMouseMove={e => { if (dragging) updatePos(e.clientX); }}
-                      onMouseUp={() => setDragging(false)}
-                      onMouseLeave={() => setDragging(false)}
-                      onTouchStart={e => { setDragging(true); updatePos(e.touches[0].clientX); }}
-                      onTouchMove={e => { if (dragging) { e.preventDefault(); updatePos(e.touches[0].clientX); } }}
-                      onTouchEnd={() => setDragging(false)}
-                    >
-                      {/* Before image (full width, behind) */}
-                      <img src={beforeImg} alt="Before — empty room" style={{ width: "100%", display: "block", height: 480, objectFit: "cover", objectPosition: "center" }} draggable={false} />
-                      {/* After image (clipped to reveal left portion) */}
-                      <div style={{ position: "absolute", inset: 0, clipPath: `inset(0 ${100 - sliderPos}% 0 0)` }}>
-                        <img src={afterImg} alt="After — AI designed room" style={{ width: "100%", display: "block", height: 480, objectFit: "cover", objectPosition: "center" }} draggable={false} />
-                      </div>
-                      {/* Divider line */}
-                      <div style={{ position: "absolute", top: 0, bottom: 0, left: `${sliderPos}%`, width: 2, background: "#fff", transform: "translateX(-50%)", pointerEvents: "none" }} />
-                      {/* Handle */}
-                      <div style={{ position: "absolute", top: "50%", left: `${sliderPos}%`, transform: "translate(-50%,-50%)", width: 44, height: 44, borderRadius: "50%", background: "#fff", boxShadow: "0 2px 16px rgba(0,0,0,.3)", display: "flex", alignItems: "center", justifyContent: "center", animation: hinted && !dragging ? "sliderPulse 1.2s ease 1" : "none", pointerEvents: "none", zIndex: 2 }}>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M8 5l-5 7 5 7M16 5l5 7-5 7" stroke="#1d1d1f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                      </div>
-                      {/* Labels */}
-                      <span style={{ position: "absolute", top: 16, left: 16, fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", background: "rgba(0,0,0,.5)", color: "#fff", padding: "5px 12px", borderRadius: 6, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}>Before</span>
-                      <span style={{ position: "absolute", top: 16, right: 16, fontSize: 11, fontWeight: 700, letterSpacing: ".12em", textTransform: "uppercase", background: "rgba(29,29,31,.7)", color: "#fff", padding: "5px 12px", borderRadius: 6, backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)" }}>After · AI</span>
-                    </div>
-                  );
-                })()}
+                <BeforeAfterSlider />
               </div>
             </RevealSection>
           </section>
@@ -3594,14 +3591,7 @@ export default function App() {
 
                   {/* AI Studio Tools: Design Transfer / Color Swap / Texture Swap */}
                   {(() => {
-                    const [aiToolMode, setAiToolMode] = React.useState<"none"|"transfer"|"color"|"texture">("none");
-                    const [inspFile, setInspFile] = React.useState<{data:string;type:string}|null>(null);
-                    const [inspLoading, setInspLoading] = React.useState(false);
-                    const [selectedColor, setSelectedColor] = React.useState<string|null>(null);
-                    const [selectedFloorMat, setSelectedFloorMat] = React.useState<string|null>(null);
-                    const [selectedWallMat, setSelectedWallMat] = React.useState<string|null>(null);
-                    const [matCategory, setMatCategory] = React.useState<"floor"|"wall">("floor");
-                    const wallColors = [
+                    const aiWallColors = [
                       { name: "White", hex: "#F5F5F0" }, { name: "Cream", hex: "#F5EDD6" },
                       { name: "Gray", hex: "#B0B0B0" }, { name: "Navy", hex: "#1B2A4A" },
                       { name: "Sage", hex: "#7A9E7E" }, { name: "Terracotta", hex: "#C1714F" },
@@ -3609,140 +3599,98 @@ export default function App() {
                       { name: "Warm Beige", hex: "#D4C4A8" }, { name: "Charcoal", hex: "#3C3C3C" },
                       { name: "Forest Green", hex: "#2D5A3D" }, { name: "Clay", hex: "#B8735A" },
                     ];
-                    const floorMats = ["Hardwood", "Marble", "Concrete", "Carpet", "Tile", "Bamboo"];
-                    const wallMats = ["Brick", "Stone", "Wood Paneling", "Plaster"];
-
+                    const aiFloorMats = ["Hardwood", "Marble", "Concrete", "Carpet", "Tile", "Bamboo"];
+                    const aiWallMats = ["Brick", "Stone", "Wood Paneling", "Plaster"];
                     const runAITool = async () => {
                       if (userPlan !== "pro") { setShowUpgradeModal(true); return; }
                       if (aiToolMode === "transfer") {
-                        if (!inspFile) return;
-                        setVizSt("loading");
-                        setVizErr("");
+                        if (!aiInspFile) return;
+                        setVizSt("loading"); setVizErr("");
                         try {
-                          const styleDesc = await analyzeImage(inspFile.data, inspFile.type, "Describe this room's design style, color palette, materials, and aesthetic in detail for recreation in another space.");
+                          const styleDesc = await analyzeImage(aiInspFile.data, aiInspFile.type, "Describe this room's design style, color palette, materials, and aesthetic in detail for recreation in another space.");
                           const prompt = `Photorealistic interior photo of a ${room || "room"}. Apply this design style: ${styleDesc}. Keep the room's architectural structure, change only the furniture, colors, and materials.`;
                           const imgUrl = await generateAIImage(prompt, roomPhoto?.data || null, [], null);
-                          if (imgUrl && imgUrl !== "__CREDITS_REQUIRED__") {
-                            setVizUrls([{ url: imgUrl, label: "Design Transfer" }]);
-                          } else {
-                            setVizErr("Could not generate visualization. Please try again.");
-                          }
+                          if (imgUrl && imgUrl !== "__CREDITS_REQUIRED__") { setVizUrls([{ url: imgUrl, label: "Design Transfer" }]); } else { setVizErr("Could not generate visualization. Please try again."); }
                         } catch (_e) { setVizErr("An error occurred. Please try again."); }
                         setVizSt("idle");
                       } else if (aiToolMode === "color") {
-                        if (!selectedColor) return;
-                        setVizSt("loading");
-                        setVizErr("");
+                        if (!aiSelectedColor) return;
+                        setVizSt("loading"); setVizErr("");
                         try {
-                          const prompt = `Same ${room || "room"} but with ${selectedColor} walls. Photorealistic interior photo. Keep all furniture exactly the same. High quality render.`;
-                          const imgUrl = await generateAIImage(prompt, roomPhoto?.data || null, [], null);
-                          if (imgUrl && imgUrl !== "__CREDITS_REQUIRED__") {
-                            setVizUrls([{ url: imgUrl, label: `Color Swap — ${selectedColor} walls` }]);
-                          } else {
-                            setVizErr("Could not generate visualization. Please try again.");
-                          }
+                          const imgUrl = await generateAIImage(`Same ${room || "room"} but with ${aiSelectedColor} walls. Photorealistic interior photo. Keep all furniture exactly the same.`, roomPhoto?.data || null, [], null);
+                          if (imgUrl && imgUrl !== "__CREDITS_REQUIRED__") { setVizUrls([{ url: imgUrl, label: `Color Swap — ${aiSelectedColor} walls` }]); } else { setVizErr("Could not generate visualization. Please try again."); }
                         } catch (_e) { setVizErr("An error occurred. Please try again."); }
                         setVizSt("idle");
                       } else if (aiToolMode === "texture") {
-                        const mat = matCategory === "floor" ? selectedFloorMat : selectedWallMat;
+                        const mat = aiMatCategory === "floor" ? aiSelectedFloorMat : aiSelectedWallMat;
                         if (!mat) return;
-                        setVizSt("loading");
-                        setVizErr("");
+                        setVizSt("loading"); setVizErr("");
                         try {
-                          const prompt = `Same ${room || "room"} with ${mat} ${matCategory === "floor" ? "flooring" : "wall treatment"}. Photorealistic interior photo. Keep all furniture the same. High quality render.`;
-                          const imgUrl = await generateAIImage(prompt, roomPhoto?.data || null, [], null);
-                          if (imgUrl && imgUrl !== "__CREDITS_REQUIRED__") {
-                            setVizUrls([{ url: imgUrl, label: `Texture Swap — ${mat} ${matCategory === "floor" ? "Floor" : "Wall"}` }]);
-                          } else {
-                            setVizErr("Could not generate visualization. Please try again.");
-                          }
+                          const imgUrl = await generateAIImage(`Same ${room || "room"} with ${mat} ${aiMatCategory === "floor" ? "flooring" : "wall treatment"}. Photorealistic interior photo. Keep all furniture the same.`, roomPhoto?.data || null, [], null);
+                          if (imgUrl && imgUrl !== "__CREDITS_REQUIRED__") { setVizUrls([{ url: imgUrl, label: `Texture Swap — ${mat}` }]); } else { setVizErr("Could not generate visualization. Please try again."); }
                         } catch (_e) { setVizErr("An error occurred. Please try again."); }
                         setVizSt("idle");
                       }
                     };
-
-                    const isReady = aiToolMode === "transfer" ? !!inspFile
-                      : aiToolMode === "color" ? !!selectedColor
-                      : aiToolMode === "texture" ? !!(matCategory === "floor" ? selectedFloorMat : selectedWallMat)
-                      : false;
-
+                    const isReady = aiToolMode === "transfer" ? !!aiInspFile : aiToolMode === "color" ? !!aiSelectedColor : aiToolMode === "texture" ? !!(aiMatCategory === "floor" ? aiSelectedFloorMat : aiSelectedWallMat) : false;
                     return (
                       <div style={{ marginBottom: 20 }}>
                         <p style={{ fontSize: 11, letterSpacing: ".12em", textTransform: "uppercase", color: "#9B8B7B", fontWeight: 600, marginBottom: 10 }}>AI Studio Tools {userPlan !== "pro" && <span style={{ background: "#F0D8C0", color: "#C17550", borderRadius: 4, padding: "2px 8px", fontSize: 10, marginLeft: 6 }}>Pro only</span>}</p>
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: aiToolMode !== "none" ? 16 : 0 }}>
                           {(["transfer","color","texture"] as const).map(mode => {
                             const labels = { transfer: "🎨 Design Transfer", color: "🖌️ Color Swap", texture: "🪵 Texture Swap" };
-                            return (
-                              <button key={mode} onClick={() => setAiToolMode(aiToolMode === mode ? "none" : mode)} style={{ padding: "9px 18px", borderRadius: 8, border: aiToolMode === mode ? "2px solid #C17550" : "1px solid #E8E0D8", background: aiToolMode === mode ? "#FFF8F0" : "#fff", color: aiToolMode === mode ? "#C17550" : "#7A6B5B", fontSize: 13, fontWeight: aiToolMode === mode ? 600 : 400, cursor: "pointer", fontFamily: "inherit", transition: "all .15s" }}>{labels[mode]}</button>
-                            );
+                            return <button key={mode} onClick={() => setAiToolMode(aiToolMode === mode ? "none" : mode)} style={{ padding: "9px 18px", borderRadius: 8, border: aiToolMode === mode ? "2px solid #C17550" : "1px solid #E8E0D8", background: aiToolMode === mode ? "#FFF8F0" : "#fff", color: aiToolMode === mode ? "#C17550" : "#7A6B5B", fontSize: 13, fontWeight: aiToolMode === mode ? 600 : 400, cursor: "pointer", fontFamily: "inherit", transition: "all .15s" }}>{labels[mode]}</button>;
                           })}
                         </div>
-
                         {aiToolMode === "transfer" && (
                           <div style={{ background: "#FDFCFA", border: "1px solid #EDE8E0", borderRadius: 12, padding: "20px 20px 16px" }}>
                             <p style={{ fontSize: 13, fontWeight: 600, color: "#1A1815", margin: "0 0 6px" }}>Upload an inspiration photo</p>
                             <p style={{ fontSize: 12, color: "#9B8B7B", margin: "0 0 14px", lineHeight: 1.5 }}>AI will analyze its style and apply it to your room layout.</p>
-                            {!inspFile ? (
+                            {!aiInspFile ? (
                               <label style={{ display: "inline-block", padding: "10px 20px", background: "#1A1815", color: "#fff", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
                                 Choose photo
                                 <input type="file" accept="image/*" style={{ display: "none" }} onChange={async e => {
-                                  const file = e.target.files?.[0];
-                                  if (!file) return;
-                                  setInspLoading(true);
-                                  try {
-                                    const compressed = await compressImage(file);
-                                    setInspFile({ data: compressed.data, type: compressed.type });
-                                  } catch (_e) {}
-                                  setInspLoading(false);
+                                  const file = e.target.files?.[0]; if (!file) return;
+                                  setAiInspLoading(true);
+                                  try { const compressed = await compressImage(file); setAiInspFile({ data: compressed.data, type: compressed.type }); } catch (_e) {}
+                                  setAiInspLoading(false);
                                 }} />
                               </label>
                             ) : (
                               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                                <img src={"data:" + inspFile.type + ";base64," + inspFile.data} alt="Inspiration" style={{ width: 72, height: 52, objectFit: "cover", borderRadius: 8, border: "1px solid #EDE8E0" }} />
-                                <div>
-                                  <p style={{ fontSize: 13, fontWeight: 600, color: "#1A1815", margin: "0 0 4px" }}>Inspiration uploaded</p>
-                                  <button onClick={() => setInspFile(null)} style={{ fontSize: 11, color: "#C17550", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: 0 }}>Remove</button>
-                                </div>
+                                <img src={"data:" + aiInspFile.type + ";base64," + aiInspFile.data} alt="Inspiration" style={{ width: 72, height: 52, objectFit: "cover", borderRadius: 8, border: "1px solid #EDE8E0" }} />
+                                <div><p style={{ fontSize: 13, fontWeight: 600, color: "#1A1815", margin: "0 0 4px" }}>Inspiration uploaded</p><button onClick={() => setAiInspFile(null)} style={{ fontSize: 11, color: "#C17550", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", padding: 0 }}>Remove</button></div>
                               </div>
                             )}
-                            {inspLoading && <p style={{ fontSize: 12, color: "#9B8B7B", marginTop: 8 }}>Processing image...</p>}
+                            {aiInspLoading && <p style={{ fontSize: 12, color: "#9B8B7B", marginTop: 8 }}>Processing image...</p>}
                             {isReady && vizRemaining > 0 && <button onClick={runAITool} disabled={vizSt === "loading"} style={{ marginTop: 14, padding: "10px 22px", background: "#C17550", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: vizSt === "loading" ? 0.6 : 1 }}>{vizSt === "loading" ? "Generating..." : "Apply Design Transfer"}</button>}
                           </div>
                         )}
-
                         {aiToolMode === "color" && (
                           <div style={{ background: "#FDFCFA", border: "1px solid #EDE8E0", borderRadius: 12, padding: "20px 20px 16px" }}>
                             <p style={{ fontSize: 13, fontWeight: 600, color: "#1A1815", margin: "0 0 14px" }}>Pick a wall color</p>
                             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
-                              {wallColors.map(c => (
-                                <button key={c.name} title={c.name} onClick={() => setSelectedColor(c.name)} style={{ width: 36, height: 36, borderRadius: "50%", background: c.hex, border: selectedColor === c.name ? "3px solid #C17550" : "2px solid rgba(0,0,0,.1)", cursor: "pointer", outline: "none", transition: "transform .1s", transform: selectedColor === c.name ? "scale(1.2)" : "scale(1)" }} />
-                              ))}
+                              {aiWallColors.map(c => <button key={c.name} title={c.name} onClick={() => setAiSelectedColor(c.name)} style={{ width: 36, height: 36, borderRadius: "50%", background: c.hex, border: aiSelectedColor === c.name ? "3px solid #C17550" : "2px solid rgba(0,0,0,.1)", cursor: "pointer", outline: "none", transition: "transform .1s", transform: aiSelectedColor === c.name ? "scale(1.2)" : "scale(1)" }} />)}
                             </div>
-                            {selectedColor && <p style={{ fontSize: 13, color: "#6e6e73", margin: "0 0 12px" }}>Selected: <strong>{selectedColor}</strong></p>}
+                            {aiSelectedColor && <p style={{ fontSize: 13, color: "#6e6e73", margin: "0 0 12px" }}>Selected: <strong>{aiSelectedColor}</strong></p>}
                             {isReady && vizRemaining > 0 && <button onClick={runAITool} disabled={vizSt === "loading"} style={{ padding: "10px 22px", background: "#C17550", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: vizSt === "loading" ? 0.6 : 1 }}>{vizSt === "loading" ? "Generating..." : "Apply Color Swap"}</button>}
                           </div>
                         )}
-
                         {aiToolMode === "texture" && (
                           <div style={{ background: "#FDFCFA", border: "1px solid #EDE8E0", borderRadius: 12, padding: "20px 20px 16px" }}>
                             <p style={{ fontSize: 13, fontWeight: 600, color: "#1A1815", margin: "0 0 12px" }}>Choose surface & material</p>
                             <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-                              {(["floor","wall"] as const).map(cat => (
-                                <button key={cat} onClick={() => setMatCategory(cat)} style={{ padding: "8px 18px", borderRadius: 8, border: matCategory === cat ? "2px solid #1A1815" : "1px solid #E8E0D8", background: matCategory === cat ? "#1A1815" : "#fff", color: matCategory === cat ? "#fff" : "#7A6B5B", fontSize: 13, fontWeight: matCategory === cat ? 600 : 400, cursor: "pointer", fontFamily: "inherit", textTransform: "capitalize" }}>{cat}</button>
-                              ))}
+                              {(["floor","wall"] as const).map(cat => <button key={cat} onClick={() => setAiMatCategory(cat)} style={{ padding: "8px 18px", borderRadius: 8, border: aiMatCategory === cat ? "2px solid #1A1815" : "1px solid #E8E0D8", background: aiMatCategory === cat ? "#1A1815" : "#fff", color: aiMatCategory === cat ? "#fff" : "#7A6B5B", fontSize: 13, fontWeight: aiMatCategory === cat ? 600 : 400, cursor: "pointer", fontFamily: "inherit", textTransform: "capitalize" }}>{cat}</button>)}
                             </div>
                             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-                              {(matCategory === "floor" ? floorMats : wallMats).map(m => {
-                                const active = matCategory === "floor" ? selectedFloorMat === m : selectedWallMat === m;
-                                return (
-                                  <button key={m} onClick={() => matCategory === "floor" ? setSelectedFloorMat(m) : setSelectedWallMat(m)} style={{ padding: "8px 16px", borderRadius: 8, border: active ? "2px solid #C17550" : "1px solid #E8E0D8", background: active ? "#FFF8F0" : "#fff", color: active ? "#C17550" : "#7A6B5B", fontSize: 13, fontWeight: active ? 600 : 400, cursor: "pointer", fontFamily: "inherit" }}>{m}</button>
-                                );
+                              {(aiMatCategory === "floor" ? aiFloorMats : aiWallMats).map(m => {
+                                const active = aiMatCategory === "floor" ? aiSelectedFloorMat === m : aiSelectedWallMat === m;
+                                return <button key={m} onClick={() => aiMatCategory === "floor" ? setAiSelectedFloorMat(m) : setAiSelectedWallMat(m)} style={{ padding: "8px 16px", borderRadius: 8, border: active ? "2px solid #C17550" : "1px solid #E8E0D8", background: active ? "#FFF8F0" : "#fff", color: active ? "#C17550" : "#7A6B5B", fontSize: 13, fontWeight: active ? 600 : 400, cursor: "pointer", fontFamily: "inherit" }}>{m}</button>;
                               })}
                             </div>
                             {isReady && vizRemaining > 0 && <button onClick={runAITool} disabled={vizSt === "loading"} style={{ padding: "10px 22px", background: "#C17550", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", opacity: vizSt === "loading" ? 0.6 : 1 }}>{vizSt === "loading" ? "Generating..." : "Apply Texture Swap"}</button>}
                           </div>
                         )}
-
                         {aiToolMode !== "none" && userPlan !== "pro" && (
                           <div style={{ marginTop: 12, padding: "14px 18px", background: "#FFF8F0", borderRadius: 10, border: "1px solid #F0D8C0", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
                             <p style={{ fontSize: 13, color: "#7A6B5B", margin: 0 }}>AI Studio Tools are available on Pro.</p>
