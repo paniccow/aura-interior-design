@@ -2736,40 +2736,8 @@ export default function App() {
             <img src={homeHeroImg} alt="Modern living room interior design" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 30%" }} />
             {/* Gradient overlay — subtle dark at top for nav, strong at bottom for text */}
             <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,.45) 0%, rgba(0,0,0,.05) 35%, rgba(0,0,0,0) 55%, rgba(0,0,0,.72) 100%)" }} />
-            {/* Floating 3D product images */}
-            {previewProducts.slice(0, 6).map((p, i) => {
-              const positions = [
-                { top: "8%", left: "3%", w: 120, h: 120, anim: "float3d1", dur: "6s", delay: "0s" },
-                { top: "15%", right: "4%", w: 110, h: 110, anim: "float3d2", dur: "7s", delay: "0.5s" },
-                { top: "40%", left: "2%", w: 100, h: 100, anim: "float3d3", dur: "8s", delay: "1s" },
-                { top: "35%", right: "3%", w: 115, h: 115, anim: "float3d4", dur: "6.5s", delay: "0.3s" },
-                { top: "62%", left: "5%", w: 95, h: 95, anim: "float3d2", dur: "7.5s", delay: "0.8s" },
-                { top: "58%", right: "5%", w: 105, h: 105, anim: "float3d1", dur: "8.5s", delay: "1.2s" },
-              ];
-              const pos = positions[i];
-              return (
-                <div key={p.id} className="aura-float-product" style={{
-                  top: pos.top, left: pos.left, right: pos.right,
-                  width: pos.w, height: pos.h,
-                  animation: `floatEnter .8s ease ${parseFloat(pos.delay) + i * 0.15}s forwards, ${pos.anim} ${pos.dur} ease-in-out ${parseFloat(pos.delay) + 0.8 + i * 0.15}s infinite`,
-                }}>
-                  <img src={p.img} alt={p.n} loading="eager" />
-                  <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "6px 8px", background: "linear-gradient(transparent, rgba(0,0,0,.7))" }}>
-                    <p style={{ fontSize: 9, color: "#fff", fontWeight: 600, margin: 0, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.n}</p>
-                    <p style={{ fontSize: 8, color: "rgba(255,255,255,.7)", margin: 0 }}>${p.p.toLocaleString()}</p>
-                  </div>
-                </div>
-              );
-            })}
             {/* Text positioned at bottom like Tesla */}
             <div className="aura-hero-bottom" style={{ position: "absolute", bottom: 0, left: 0, right: 0, textAlign: "center", padding: "0 6% 64px", animation: "fadeUp .8s ease" }}>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,.12)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", borderRadius: 980, padding: "6px 16px", marginBottom: 14, border: "1px solid rgba(255,255,255,.15)" }}>
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,.85)", fontWeight: 500, letterSpacing: ".02em" }}>100,000+ products</span>
-                <span style={{ width: 3, height: 3, borderRadius: "50%", background: "rgba(255,255,255,.4)" }} />
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,.85)", fontWeight: 500 }}>14 design styles</span>
-                <span style={{ width: 3, height: 3, borderRadius: "50%", background: "rgba(255,255,255,.4)" }} />
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,.85)", fontWeight: 500 }}>200+ retailers</span>
-              </div>
               <p style={{ fontSize: "clamp(10px,1.2vw,13px)", letterSpacing: ".2em", textTransform: "uppercase", color: "rgba(255,255,255,.6)", marginBottom: 10, fontWeight: 500 }}>AI Interior Design · No experience required</p>
               <h1 style={{ fontSize: "clamp(36px,6vw,72px)", fontWeight: 700, lineHeight: 1.05, marginBottom: 12, letterSpacing: "-0.025em", color: "#fff" }}>Design <span key={heroRoomIdx} style={{ display: "inline-block", animation: "fadeInText .5s ease" }}>{heroRooms[heroRoomIdx]}</span></h1>
               <p style={{ fontSize: "clamp(14px,1.5vw,18px)", color: "rgba(255,255,255,.75)", lineHeight: 1.5, maxWidth: 480, margin: "0 auto 28px", fontWeight: 400 }}>Describe your space. Get curated furniture picks and a photorealistic visualization in minutes.</p>
@@ -2792,23 +2760,18 @@ export default function App() {
           </section>
 
           {/* ─── How It Works — 3 Steps ─── */}
-          <section className="aura-home-section" style={{ padding: "80px 6%", background: "#fff" }}>
-            <div style={{ maxWidth: 1000, margin: "0 auto", textAlign: "center" }}>
-              <p style={{ fontSize: 12, letterSpacing: ".2em", textTransform: "uppercase", color: "#9B8B7B", fontWeight: 600, marginBottom: 10 }}>How it works</p>
-              <h2 style={{ fontSize: "clamp(28px,3.5vw,44px)", fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.02em", marginBottom: 48 }}>Design any room in 3 steps.</h2>
-              <div className="aura-howit-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 32 }}>
+          <section className="aura-home-section" style={{ padding: "100px 6%", background: "#fff" }}>
+            <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+              <div className="aura-howit-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 0 }}>
                 {[
-                  { num: "01", title: "Describe your space", desc: "Pick a room type, choose your style, enter dimensions. Upload a photo if you have one.", icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" },
-                  { num: "02", title: "AI finds your furniture", desc: "Chat with your AI designer. It searches " + DB.length + "+ real products and builds mood boards that match your style.", icon: "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" },
-                  { num: "03", title: "Visualize & shop", desc: "See a photorealistic render of your room with the products you picked. Then buy everything with one click.", icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" },
-                ].map(step => (
-                  <div key={step.num} style={{ textAlign: "center", padding: "32px 20px" }}>
-                    <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#F8F5F0", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style={{ opacity: .6 }}><path d={step.icon} stroke="#1A1815" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                    </div>
-                    <p style={{ fontSize: 12, fontWeight: 700, color: "#C17550", letterSpacing: ".1em", marginBottom: 8 }}>{step.num}</p>
-                    <h3 style={{ fontSize: 20, fontWeight: 700, color: "#1A1815", marginBottom: 8, letterSpacing: "-0.01em" }}>{step.title}</h3>
-                    <p style={{ fontSize: 15, color: "#5A5045", lineHeight: 1.6 }}>{step.desc}</p>
+                  { num: "01", title: "Describe your space", desc: "Pick a room type, choose your style, enter dimensions. Upload a photo if you have one." },
+                  { num: "02", title: "AI curates your design", desc: "Our AI searches 100,000+ real products and builds mood boards that match your style and budget." },
+                  { num: "03", title: "Visualize & shop", desc: "See a photorealistic render of your room with the products you picked. Buy everything with one click." },
+                ].map((step, i) => (
+                  <div key={step.num} style={{ padding: "48px 36px", borderLeft: i > 0 ? "1px solid #E8E0D8" : "none", position: "relative" }}>
+                    <div style={{ fontSize: 64, fontWeight: 800, color: "#F0EBE4", letterSpacing: "-0.04em", lineHeight: 1, marginBottom: 20 }}>{step.num}</div>
+                    <h3 style={{ fontSize: 22, fontWeight: 700, color: "#1A1815", marginBottom: 12, letterSpacing: "-0.01em" }}>{step.title}</h3>
+                    <p style={{ fontSize: 15, color: "#7A6B5B", lineHeight: 1.7 }}>{step.desc}</p>
                   </div>
                 ))}
               </div>
