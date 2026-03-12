@@ -283,8 +283,7 @@ export default function App() {
     const alreadyShown = sessionStorage.getItem("aura_popup_shown");
     if (alreadyShown) return;
     const onScroll = () => {
-      const scrollPct = window.scrollY / (document.documentElement.scrollHeight - window.innerHeight);
-      if (scrollPct > 0.35) { setShowSignupPopup(true); sessionStorage.setItem("aura_popup_shown", "1"); window.removeEventListener("scroll", onScroll); }
+      if (window.scrollY > 100) { setShowSignupPopup(true); sessionStorage.setItem("aura_popup_shown", "1"); window.removeEventListener("scroll", onScroll); }
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
