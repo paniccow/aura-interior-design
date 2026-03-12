@@ -614,7 +614,7 @@ export default function App() {
     if (vizRemaining <= 0) {
       setVizErr(userPlan === "pro"
         ? "You've reached the visualization limit for this billing period. Your access resets next month."
-        : "You've used your free visualization for this month. Upgrade to Pro for unlimited visualizations!");
+        : "Sign up for Pro to unlock AI visualizations, CAD floor plans, and more!");
       return;
     }
     try {
@@ -1020,7 +1020,7 @@ export default function App() {
     const roomLabel = room ? room.toLowerCase() : "your space";
     const budgetLabel = bud === "u500" ? "under $500" : bud === "u1k" ? "under $1K" : bud === "1k5k" ? "$1K–$5K" : bud === "5k10k" ? "$5K–$10K" : bud === "10k25k" ? "$10K–$25K" : bud === "25k" ? "$25K+" : "";
     const loadingSteps = [
-      "Scanning " + DB.length.toLocaleString() + " products across 200+ retailers",
+      "Scanning 100,000+ products across 200+ retailers",
       "Filtering for " + styleLabel + " pieces" + (room ? " suited for " + roomLabel : ""),
       budgetLabel ? "Matching " + budgetLabel + " price range across tiers" : "Comparing prices across retailer tiers",
       "Scoring color palette & material harmony",
@@ -1979,7 +1979,7 @@ export default function App() {
 
           {/* KPI Row */}
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 32 }}>
-            {statCard("Total Products", DB.length.toLocaleString(), "In catalog", "#C17550")}
+            {statCard("Total Products", "100,000+", "In catalog", "#C17550")}
             {statCard("Total Catalog Value", fmt(totalValue), DB.length + " products combined")}
             {statCard("Average Price", fmt(avgPrice), "Median: " + fmt(medianPrice))}
             {statCard("Price Range", fmt(minPrice) + " - " + fmt(maxPrice), "Min to max")}
@@ -2736,7 +2736,7 @@ export default function App() {
             {/* Text positioned at bottom like Tesla */}
             <div className="aura-hero-bottom" style={{ position: "absolute", bottom: 0, left: 0, right: 0, textAlign: "center", padding: "0 6% 64px", animation: "fadeUp .8s ease" }}>
               <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,.12)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", borderRadius: 980, padding: "6px 16px", marginBottom: 14, border: "1px solid rgba(255,255,255,.15)" }}>
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,.85)", fontWeight: 500, letterSpacing: ".02em" }}>{DB.length.toLocaleString()}+ products</span>
+                <span style={{ fontSize: 11, color: "rgba(255,255,255,.85)", fontWeight: 500, letterSpacing: ".02em" }}>100,000+ products</span>
                 <span style={{ width: 3, height: 3, borderRadius: "50%", background: "rgba(255,255,255,.4)" }} />
                 <span style={{ fontSize: 11, color: "rgba(255,255,255,.85)", fontWeight: 500 }}>14 design styles</span>
                 <span style={{ width: 3, height: 3, borderRadius: "50%", background: "rgba(255,255,255,.4)" }} />
@@ -3211,31 +3211,18 @@ export default function App() {
             <div>
               <div style={{ maxWidth: 800, margin: "0 auto", textAlign: "center" }}>
                 <h2 style={{ fontSize: "clamp(28px,3.5vw,44px)", fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.02em", marginBottom: 12 }}>Simple pricing. Powerful tools.</h2>
-                <p style={{ fontSize: 17, color: "#5A5045", lineHeight: 1.5, maxWidth: 520, margin: "0 auto 40px" }}>Browse products and get AI design recommendations. Upgrade to Pro for room visualizations and CAD floor plans.</p>
-                <div className="aura-grid-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, maxWidth: 640, margin: "0 auto" }}>
-                  {/* Free tier */}
-                  <div style={{ background: "#fff", borderRadius: 20, padding: "32px 24px", border: "1px solid #E8E0D8", textAlign: "left" }}>
-                    <p style={{ fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", color: "#9B8B7B", fontWeight: 600, marginBottom: 6 }}>Free</p>
-                    <p style={{ fontSize: 28, fontWeight: 700, color: "#1A1815", marginBottom: 20 }}>$0<span style={{ fontSize: 14, fontWeight: 400, color: "#9B8B7B" }}>/month</span></p>
-                    {["AI mood boards", "Style matching", DB.length + "+ products", "Save projects"].map(f => (
-                      <div key={f} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#9B8B7B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                        <span style={{ fontSize: 14, color: "#5A5045" }}>{f}</span>
-                      </div>
-                    ))}
-                    <button onClick={() => { go("design"); setTab("studio"); }} style={{ width: "100%", marginTop: 16, background: "#fff", color: "#1A1815", padding: "12px", border: "1px solid #E8E0D8", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Get started</button>
-                  </div>
-                  {/* Pro tier */}
-                  <div style={{ background: "#1A1815", borderRadius: 20, padding: "32px 24px", textAlign: "left", position: "relative" }}>
+                <p style={{ fontSize: 17, color: "#5A5045", lineHeight: 1.5, maxWidth: 520, margin: "0 auto 40px" }}>AI-powered interior design with 100,000+ real products, photorealistic renders, and CAD floor plans.</p>
+                <div style={{ maxWidth: 380, margin: "0 auto" }}>
+                  <div style={{ background: "#1A1815", borderRadius: 20, padding: "40px 32px", textAlign: "left", position: "relative" }}>
                     <p style={{ fontSize: 12, letterSpacing: ".1em", textTransform: "uppercase", color: "rgba(255,255,255,.4)", fontWeight: 600, marginBottom: 6 }}>Pro</p>
-                    <p style={{ fontSize: 28, fontWeight: 700, color: "#fff", marginBottom: 20 }}>$20<span style={{ fontSize: 14, fontWeight: 400, color: "rgba(255,255,255,.4)" }}>/month</span></p>
-                    {["Everything in Free", "AI visualization", "CAD floor plans", "Clearance analysis", "Unlimited projects"].map(f => (
-                      <div key={f} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="rgba(255,255,255,.6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                        <span style={{ fontSize: 14, color: "rgba(255,255,255,.8)" }}>{f}</span>
+                    <p style={{ fontSize: 36, fontWeight: 700, color: "#fff", marginBottom: 24 }}>$20<span style={{ fontSize: 14, fontWeight: 400, color: "rgba(255,255,255,.4)" }}>/month</span></p>
+                    {["AI mood boards & style matching", "100,000+ real products", "AI room visualization", "CAD floor plans", "Clearance analysis", "Unlimited projects", "200+ retailers"].map(f => (
+                      <div key={f} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#C17550" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        <span style={{ fontSize: 14, color: "rgba(255,255,255,.85)" }}>{f}</span>
                       </div>
                     ))}
-                    <button onClick={() => go("pricing")} style={{ width: "100%", marginTop: 16, background: "#fff", color: "#1A1815", padding: "12px", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Upgrade to Pro</button>
+                    <button onClick={() => go("pricing")} style={{ width: "100%", marginTop: 20, background: "#fff", color: "#1A1815", padding: "14px", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Get Started</button>
                   </div>
                 </div>
               </div>
@@ -3277,7 +3264,7 @@ export default function App() {
                 ["How does AURA work?", "Tell AURA your room type, design style, and dimensions. Our AI searches " + DB.length + "+ real products from premium brands, generates mood boards, and creates photorealistic renders of your room — all in under 2 minutes."],
                 ["Do I need design experience?", "Not at all. AURA is built for everyone — from first-time homeowners to professional designers. Just describe what you want in plain English and our AI handles the rest."],
                 ["Are the products real?", "Yes! Every product in AURA is a real, shoppable item from brands like Lulu & Georgia, McGee & Co, West Elm, Crate & Barrel, Article, and more. Click any product to buy it directly from the retailer."],
-                ["What's included in the free plan?", "The free plan includes AI chat, mood board generation, style matching, and browsing our full product catalog. Upgrade to Pro ($20/mo) for AI room visualization, CAD floor plans, and unlimited projects."],
+                ["What's included?", "AURA Pro ($20/mo) includes AI mood boards, style matching, 100,000+ real shoppable products, photorealistic room visualization, CAD floor plans, clearance analysis, and unlimited projects."],
                 ["How accurate are the visualizations?", "Our AI generates photorealistic renders using the exact products you selected. It considers your room dimensions, style palette, and furniture placement to create an accurate preview of how your room will look."],
                 ["Can I upload my own room photo?", "Yes! Upload a photo of your actual room and our AI will analyze it, then place your selected furniture into the real space for an accurate visualization."],
                 ["Does it work on mobile?", "AURA works on any device — desktop, tablet, or phone. The interface is fully responsive and optimized for touch."],
@@ -4110,12 +4097,9 @@ export default function App() {
             <button onClick={() => { setShowSignupPopup(false); setPopupDismissed(true); }} style={{ position: "absolute", top: 14, right: 14, background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#9B8B7B", fontFamily: "inherit", lineHeight: 1 }}>&times;</button>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 20 }}><AuraLogo size={28} /><span style={{ fontFamily: "Georgia,serif", fontSize: 22, fontWeight: 400 }}>AURA</span></div>
             <h3 style={{ fontSize: 24, fontWeight: 700, color: "#1A1815", marginBottom: 8, letterSpacing: "-0.02em" }}>Design your dream room</h3>
-            <p style={{ fontSize: 14, color: "#7A6B5B", marginBottom: 24, lineHeight: 1.5 }}>Get AI-curated furniture picks, photorealistic visualizations, and shoppable mood boards — from {DB.length.toLocaleString()}+ products.</p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <button onClick={() => { setShowSignupPopup(false); setPopupDismissed(true); go("auth"); }} style={{ width: "100%", padding: "15px", background: "#1A1815", color: "#fff", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Get Started</button>
-              <button onClick={() => { setShowSignupPopup(false); setPopupDismissed(true); go("design"); setTab("studio"); }} style={{ width: "100%", padding: "14px", background: "transparent", color: "#C17550", border: "1px solid #E8E0D8", borderRadius: 12, fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>Explore the studio first</button>
-            </div>
-            <p style={{ fontSize: 11, color: "#B8A898", marginTop: 16 }}>No credit card required · {DB.length.toLocaleString()}+ products · 200+ retailers</p>
+            <p style={{ fontSize: 14, color: "#7A6B5B", marginBottom: 24, lineHeight: 1.5 }}>Get AI-curated furniture picks, photorealistic visualizations, and shoppable mood boards — from 100,000+ products.</p>
+            <button onClick={() => { setShowSignupPopup(false); setPopupDismissed(true); go("auth"); }} style={{ width: "100%", padding: "15px", background: "#1A1815", color: "#fff", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Sign Up</button>
+            <p style={{ fontSize: 11, color: "#B8A898", marginTop: 16 }}>100,000+ products · 200+ retailers</p>
           </div>
         </div>
       )}
