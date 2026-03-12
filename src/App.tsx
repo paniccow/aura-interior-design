@@ -2559,6 +2559,16 @@ export default function App() {
         @keyframes bentoScrollRight{0%{transform:translateX(-50%)}100%{transform:translateX(0)}}
         @keyframes sliderPulse{0%{transform:translate(-50%,-50%) scale(1)}30%{transform:translate(-50%,-50%) scale(1.18)}60%{transform:translate(-50%,-50%) scale(0.9)}100%{transform:translate(-50%,-50%) scale(1)}}
         @keyframes tickerScroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+        @keyframes float3d1{0%{transform:translateY(0px) rotateY(0deg) rotateX(5deg)}50%{transform:translateY(-20px) rotateY(8deg) rotateX(-3deg)}100%{transform:translateY(0px) rotateY(0deg) rotateX(5deg)}}
+        @keyframes float3d2{0%{transform:translateY(-10px) rotateY(-5deg) rotateX(0deg)}50%{transform:translateY(15px) rotateY(5deg) rotateX(6deg)}100%{transform:translateY(-10px) rotateY(-5deg) rotateX(0deg)}}
+        @keyframes float3d3{0%{transform:translateY(5px) rotateY(3deg) rotateX(-4deg)}50%{transform:translateY(-18px) rotateY(-6deg) rotateX(4deg)}100%{transform:translateY(5px) rotateY(3deg) rotateX(-4deg)}}
+        @keyframes float3d4{0%{transform:translateY(-15px) rotateY(-8deg) rotateX(3deg)}50%{transform:translateY(10px) rotateY(4deg) rotateX(-5deg)}100%{transform:translateY(-15px) rotateY(-8deg) rotateX(3deg)}}
+        @keyframes floatShadow{0%,100%{opacity:.15;transform:scale(1)}50%{opacity:.08;transform:scale(.85)}}
+        .aura-float-product{position:absolute;border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.3);background:#fff;perspective:800px;transform-style:preserve-3d;pointer-events:none;z-index:2;opacity:0;animation-fill-mode:forwards}
+        .aura-float-product img{width:100%;height:100%;object-fit:cover;display:block}
+        .aura-float-enter{animation:floatEnter .8s ease forwards}
+        @keyframes floatEnter{from{opacity:0;transform:scale(.6) translateY(40px)}to{opacity:1;transform:scale(1) translateY(0)}}
+        @media(max-width:768px){.aura-float-product{display:none!important}}
         .aura-ticker-track{animation:tickerScroll 30s linear infinite}
         .aura-ticker-track:hover{animation-play-state:paused}
         .aura-bento-scroll-left{animation:bentoScrollLeft 40s linear infinite}
@@ -2726,6 +2736,31 @@ export default function App() {
             <img src={homeHeroImg} alt="Modern living room interior design" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 30%" }} />
             {/* Gradient overlay — subtle dark at top for nav, strong at bottom for text */}
             <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,.45) 0%, rgba(0,0,0,.05) 35%, rgba(0,0,0,0) 55%, rgba(0,0,0,.72) 100%)" }} />
+            {/* Floating 3D product images */}
+            {previewProducts.slice(0, 6).map((p, i) => {
+              const positions = [
+                { top: "8%", left: "3%", w: 120, h: 120, anim: "float3d1", dur: "6s", delay: "0s" },
+                { top: "15%", right: "4%", w: 110, h: 110, anim: "float3d2", dur: "7s", delay: "0.5s" },
+                { top: "40%", left: "2%", w: 100, h: 100, anim: "float3d3", dur: "8s", delay: "1s" },
+                { top: "35%", right: "3%", w: 115, h: 115, anim: "float3d4", dur: "6.5s", delay: "0.3s" },
+                { top: "62%", left: "5%", w: 95, h: 95, anim: "float3d2", dur: "7.5s", delay: "0.8s" },
+                { top: "58%", right: "5%", w: 105, h: 105, anim: "float3d1", dur: "8.5s", delay: "1.2s" },
+              ];
+              const pos = positions[i];
+              return (
+                <div key={p.id} className="aura-float-product" style={{
+                  top: pos.top, left: pos.left, right: pos.right,
+                  width: pos.w, height: pos.h,
+                  animation: `floatEnter .8s ease ${parseFloat(pos.delay) + i * 0.15}s forwards, ${pos.anim} ${pos.dur} ease-in-out ${parseFloat(pos.delay) + 0.8 + i * 0.15}s infinite`,
+                }}>
+                  <img src={p.img} alt={p.n} loading="eager" />
+                  <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "6px 8px", background: "linear-gradient(transparent, rgba(0,0,0,.7))" }}>
+                    <p style={{ fontSize: 9, color: "#fff", fontWeight: 600, margin: 0, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.n}</p>
+                    <p style={{ fontSize: 8, color: "rgba(255,255,255,.7)", margin: 0 }}>${p.p.toLocaleString()}</p>
+                  </div>
+                </div>
+              );
+            })}
             {/* Text positioned at bottom like Tesla */}
             <div className="aura-hero-bottom" style={{ position: "absolute", bottom: 0, left: 0, right: 0, textAlign: "center", padding: "0 6% 64px", animation: "fadeUp .8s ease" }}>
               <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,.12)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", borderRadius: 980, padding: "6px 16px", marginBottom: 14, border: "1px solid rgba(255,255,255,.15)" }}>
