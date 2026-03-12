@@ -3066,20 +3066,20 @@ export default function App() {
               </div>
               <div className="aura-slider-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 20 }}>
                 <BeforeAfterSlider
-                  before="/images/sliders/before-room.png"
-                  after="/images/sliders/after-budget.png"
+                  before="/images/sliders/before-room.jpg"
+                  after="/images/sliders/after-budget.jpg"
                   label="Budget-Friendly"
                   afterLabel="Under $2k"
                 />
                 <BeforeAfterSlider
-                  before="/images/sliders/before-room.png"
-                  after="/images/sliders/after-midrange.png"
+                  before="/images/sliders/before-room.jpg"
+                  after="/images/sliders/after-midrange.jpg"
                   label="Mid-Range"
                   afterLabel="$2k - $8k"
                 />
                 <BeforeAfterSlider
-                  before="/images/sliders/before-room.png"
-                  after="/images/sliders/after-luxury.png"
+                  before="/images/sliders/before-room.jpg"
+                  after="/images/sliders/after-luxury.jpg"
                   label="Luxury"
                   afterLabel="$8k+"
                 />
