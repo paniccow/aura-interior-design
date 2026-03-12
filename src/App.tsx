@@ -172,6 +172,8 @@ export default function App() {
   const [aiMatCategory, setAiMatCategory] = useState<"floor"|"wall">("floor");
   const [aiSelectedFloorMat, setAiSelectedFloorMat] = useState<string|null>(null);
   const [aiSelectedWallMat, setAiSelectedWallMat] = useState<string|null>(null);
+  const [showSignupPopup, setShowSignupPopup] = useState<boolean>(false);
+  const [popupDismissed, setPopupDismissed] = useState<boolean>(false);
   const [adminAuthed, setAdminAuthed] = useState<boolean>(false);
   const [adminPassInput, setAdminPassInput] = useState<string>("");
   const [adminPassErr, setAdminPassErr] = useState<string>("");
@@ -275,6 +277,18 @@ export default function App() {
     const t = setInterval(() => setHeroRoomIdx(i => (i + 1) % heroRooms.length), 3000);
     return () => clearInterval(t);
   }, []);
+  // Scroll-triggered signup popup (Cal AI style) — only for non-logged-in users on homepage
+  useEffect(() => {
+    if (user || pg !== "home" || popupDismissed) return;
+    const alreadyShown = sessionStorage.getItem("aura_popup_shown");
+    if (alreadyShown) return;
+    const onScroll = () => {
+      const scrollPct = window.scrollY / (document.documentElement.scrollHeight - window.innerHeight);
+      if (scrollPct > 0.35) { setShowSignupPopup(true); sessionStorage.setItem("aura_popup_shown", "1"); window.removeEventListener("scroll", onScroll); }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [user, pg, popupDismissed]);
   useEffect(() => {
     try { sessionStorage.setItem("aura_sel", JSON.stringify(Array.from(sel.entries()))); } catch (_e) {}
   }, [sel]);
@@ -2722,6 +2736,13 @@ export default function App() {
             <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,.45) 0%, rgba(0,0,0,.05) 35%, rgba(0,0,0,0) 55%, rgba(0,0,0,.72) 100%)" }} />
             {/* Text positioned at bottom like Tesla */}
             <div className="aura-hero-bottom" style={{ position: "absolute", bottom: 0, left: 0, right: 0, textAlign: "center", padding: "0 6% 64px", animation: "fadeUp .8s ease" }}>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,.12)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", borderRadius: 980, padding: "6px 16px", marginBottom: 14, border: "1px solid rgba(255,255,255,.15)" }}>
+                <span style={{ fontSize: 11, color: "rgba(255,255,255,.85)", fontWeight: 500, letterSpacing: ".02em" }}>{DB.length.toLocaleString()}+ products</span>
+                <span style={{ width: 3, height: 3, borderRadius: "50%", background: "rgba(255,255,255,.4)" }} />
+                <span style={{ fontSize: 11, color: "rgba(255,255,255,.85)", fontWeight: 500 }}>14 design styles</span>
+                <span style={{ width: 3, height: 3, borderRadius: "50%", background: "rgba(255,255,255,.4)" }} />
+                <span style={{ fontSize: 11, color: "rgba(255,255,255,.85)", fontWeight: 500 }}>200+ retailers</span>
+              </div>
               <p style={{ fontSize: "clamp(10px,1.2vw,13px)", letterSpacing: ".2em", textTransform: "uppercase", color: "rgba(255,255,255,.6)", marginBottom: 10, fontWeight: 500 }}>AI Interior Design · No experience required</p>
               <h1 style={{ fontSize: "clamp(36px,6vw,72px)", fontWeight: 700, lineHeight: 1.05, marginBottom: 12, letterSpacing: "-0.025em", color: "#fff" }}>Design <span key={heroRoomIdx} style={{ display: "inline-block", animation: "fadeInText .5s ease" }}>{heroRooms[heroRoomIdx]}</span></h1>
               <p style={{ fontSize: "clamp(14px,1.5vw,18px)", color: "rgba(255,255,255,.75)", lineHeight: 1.5, maxWidth: 480, margin: "0 auto 28px", fontWeight: 400 }}>Describe your space. Get curated furniture picks and a photorealistic visualization in minutes.</p>
@@ -4081,6 +4102,23 @@ export default function App() {
           onSave={(state) => { setFloorPlanState(state); }}
           savedState={floorPlanState}
         />
+      )}
+
+      {/* SIGNUP POPUP (Cal AI style) */}
+      {showSignupPopup && !user && pg === "home" && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,.5)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", animation: "fadeUp .3s ease" }} onClick={() => { setShowSignupPopup(false); setPopupDismissed(true); }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 20, padding: "40px 36px", maxWidth: 420, width: "90%", textAlign: "center", position: "relative", boxShadow: "0 24px 80px rgba(0,0,0,.25)" }}>
+            <button onClick={() => { setShowSignupPopup(false); setPopupDismissed(true); }} style={{ position: "absolute", top: 14, right: 14, background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#9B8B7B", fontFamily: "inherit", lineHeight: 1 }}>&times;</button>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 20 }}><AuraLogo size={28} /><span style={{ fontFamily: "Georgia,serif", fontSize: 22, fontWeight: 400 }}>AURA</span></div>
+            <h3 style={{ fontSize: 24, fontWeight: 700, color: "#1A1815", marginBottom: 8, letterSpacing: "-0.02em" }}>Design your dream room</h3>
+            <p style={{ fontSize: 14, color: "#7A6B5B", marginBottom: 24, lineHeight: 1.5 }}>Get AI-curated furniture picks, photorealistic visualizations, and shoppable mood boards — from {DB.length.toLocaleString()}+ products.</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <button onClick={() => { setShowSignupPopup(false); setPopupDismissed(true); go("auth"); }} style={{ width: "100%", padding: "15px", background: "#1A1815", color: "#fff", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Get Started</button>
+              <button onClick={() => { setShowSignupPopup(false); setPopupDismissed(true); go("design"); setTab("studio"); }} style={{ width: "100%", padding: "14px", background: "transparent", color: "#C17550", border: "1px solid #E8E0D8", borderRadius: 12, fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>Explore the studio first</button>
+            </div>
+            <p style={{ fontSize: 11, color: "#B8A898", marginTop: 16 }}>No credit card required · {DB.length.toLocaleString()}+ products · 200+ retailers</p>
+          </div>
+        </div>
       )}
 
       {/* FOOTER */}
