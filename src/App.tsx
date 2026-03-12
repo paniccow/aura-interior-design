@@ -1879,7 +1879,7 @@ export default function App() {
           {adminStats && (
             <>
               <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 24 }}>
-                {statCard("Registered Users", adminStats.totalUsers, adminStats.proUsers + " Pro · " + adminStats.freeUsers + " Free", "#5B4B9B")}
+                {statCard("Registered Users", adminStats.totalUsers, adminStats.proUsers + " Pro · " + adminStats.freeUsers + " Free", "#8B7355")}
                 {statCard("Pro Subscribers", adminStats.proUsers, adminStats.totalUsers > 0 ? Math.round(adminStats.proUsers / adminStats.totalUsers * 100) + "% conversion" : "—", "#5B8B6B")}
                 {statCard("Total Visualizations", adminStats.totalVizCount, "Across all users", "#C17550")}
               </div>
@@ -1930,9 +1930,9 @@ export default function App() {
                 <div style={{ display: "flex", gap: 16, flexWrap: "wrap", padding: 20 }}>
                   {statCard("Buy Page Views", a.buyPageVisits, "Users who saw purchase list", "#C17550")}
                   {statCard("Buy Clicks", a.byEvent["buy_click"] || 0, "Clicked Buy → on a product", "#5B8B6B")}
-                  {statCard("Checkout Clicks", a.checkoutClicks, "Clicked Subscribe", "#5B4B9B")}
+                  {statCard("Checkout Clicks", a.checkoutClicks, "Clicked Subscribe", "#8B7355")}
                   {statCard("Sign Ups", a.byEvent["signup"] || 0, "New accounts created", "#8B7355")}
-                  {statCard("AI Chats", a.byEvent["ai_chat"] || 0, "Messages sent to AI", "#3B7B9B")}
+                  {statCard("AI Chats", a.byEvent["ai_chat"] || 0, "Messages sent to AI", "#7A6B5B")}
                   {statCard("Products Added", a.byEvent["product_add"] || 0, "Items added to selection", "#9B5B5B")}
                   {statCard("CTA Clicks", a.byEvent["cta_click"] || 0, "Start Designing clicks", "#6B8B5B")}
                 </div>
@@ -2376,30 +2376,30 @@ export default function App() {
           <div style={{ textAlign: "center", marginBottom: 32 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 8 }}><AuraLogo size={28} /><span style={{ fontSize: 21, fontWeight: 600 }}>AURA</span></div>
             <h1 style={{ fontSize: 28, fontWeight: 700, margin: "0 0 6px", letterSpacing: "-0.02em" }}>{authMode === "signup" ? "Create your account" : authMode === "forgot" ? "Reset password" : "Welcome back"}</h1>
-            <p style={{ fontSize: 15, color: "#6e6e73", margin: 0 }}>{authMode === "signup" ? "Start designing in minutes." : authMode === "forgot" ? "We'll send you a link." : "Sign in to continue."}</p>
+            <p style={{ fontSize: 15, color: "#7A6B5B", margin: 0 }}>{authMode === "signup" ? "Start designing in minutes." : authMode === "forgot" ? "We'll send you a link." : "Sign in to continue."}</p>
           </div>
           {authMode !== "forgot" && (<>
-            <button onClick={() => { supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } }); }} style={{ width: "100%", padding: "14px", background: "#fff", color: "#1d1d1f", border: "1px solid #d2d2d7", borderRadius: 12, fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, transition: "background .2s", boxSizing: "border-box" }} onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f5f7")} onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}>
+            <button onClick={() => { supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } }); }} style={{ width: "100%", padding: "14px", background: "#fff", color: "#1A1815", border: "1px solid #E8E0D8", borderRadius: 12, fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, transition: "background .2s", boxSizing: "border-box" }} onMouseEnter={(e) => (e.currentTarget.style.background = "#F5F0EB")} onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}>
               <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59a14.5 14.5 0 0 1 0-9.18l-7.98-6.19a24.01 24.01 0 0 0 0 21.56l7.98-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
               Continue with Google
             </button>
             <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0" }}>
-              <div style={{ flex: 1, height: 1, background: "#d2d2d7" }} />
-              <span style={{ fontSize: 13, color: "#86868b", flexShrink: 0 }}>or continue with email</span>
-              <div style={{ flex: 1, height: 1, background: "#d2d2d7" }} />
+              <div style={{ flex: 1, height: 1, background: "#E8E0D8" }} />
+              <span style={{ fontSize: 13, color: "#9B8B7B", flexShrink: 0 }}>or continue with email</span>
+              <div style={{ flex: 1, height: 1, background: "#E8E0D8" }} />
             </div>
           </>)}
-          {authMode === "signup" && <><label style={{ fontSize: 13, fontWeight: 600, color: "#1d1d1f", display: "block", marginBottom: 6 }}>Full Name</label><input value={an} onChange={(e) => setAn(e.target.value)} placeholder="John Doe" style={{ width: "100%", padding: "12px 14px", border: "1px solid #d2d2d7", borderRadius: 10, fontSize: 15, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 16, transition: "border-color .2s" }} onFocus={e => e.currentTarget.style.borderColor = "#0071e3"} onBlur={e => e.currentTarget.style.borderColor = "#d2d2d7"} /></>}
-          <label style={{ fontSize: 13, fontWeight: 600, color: "#1d1d1f", display: "block", marginBottom: 6 }}>Email</label>
-          <input value={ae} onChange={(e) => setAe(e.target.value)} type="email" placeholder="you@example.com" style={{ width: "100%", padding: "12px 14px", border: "1px solid #d2d2d7", borderRadius: 10, fontSize: 15, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 16, transition: "border-color .2s" }} onFocus={e => e.currentTarget.style.borderColor = "#0071e3"} onBlur={e => e.currentTarget.style.borderColor = "#d2d2d7"} />
-          {authMode !== "forgot" && <><label style={{ fontSize: 13, fontWeight: 600, color: "#1d1d1f", display: "block", marginBottom: 6 }}>Password</label><input value={ap} onChange={(e) => setAp(e.target.value)} type="password" placeholder="" onKeyDown={(e) => { if (e.key === "Enter" && authMode !== "signup") submit(); }} style={{ width: "100%", padding: "12px 14px", border: "1px solid #d2d2d7", borderRadius: 10, fontSize: 15, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 16, transition: "border-color .2s" }} onFocus={e => e.currentTarget.style.borderColor = "#0071e3"} onBlur={e => e.currentTarget.style.borderColor = "#d2d2d7"} /></>}
-          {authMode === "signup" && <><label style={{ fontSize: 13, fontWeight: 600, color: "#1d1d1f", display: "block", marginBottom: 6 }}>Confirm Password</label><input value={ap2} onChange={(e) => setAp2(e.target.value)} type="password" placeholder="" onKeyDown={(e) => { if (e.key === "Enter") submit(); }} style={{ width: "100%", padding: "12px 14px", border: "1px solid #d2d2d7", borderRadius: 10, fontSize: 15, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 20, transition: "border-color .2s" }} onFocus={e => e.currentTarget.style.borderColor = "#0071e3"} onBlur={e => e.currentTarget.style.borderColor = "#d2d2d7"} /></>}
-          {aErr && <p style={{ color: "#ff3b30", fontSize: 13, textAlign: "center", marginBottom: 12 }}>{aErr}</p>}
-          {resetEmailSent && authMode === "forgot" && <p style={{ color: "#34c759", fontSize: 13, textAlign: "center", marginBottom: 12 }}>Reset link sent! Check your email.</p>}
-          <button onClick={submit} disabled={aLd} style={{ width: "100%", padding: "14px", background: "#1d1d1f", color: "#fff", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", opacity: aLd ? 0.5 : 1, transition: "opacity .2s" }} onMouseEnter={e => { if (!aLd) e.currentTarget.style.opacity = "0.85"; }} onMouseLeave={e => { if (!aLd) e.currentTarget.style.opacity = "1"; }}>{aLd ? "..." : authMode === "signup" ? "Create Account" : authMode === "forgot" ? "Send Reset Link" : "Sign In"}</button>
-          {authMode === "signup" && <p style={{ textAlign: "center", fontSize: 12, color: "#86868b", marginTop: 16, lineHeight: 1.5 }}>By creating an account, you agree to our <span style={{ color: "#06c", cursor: "pointer" }}>Terms of Service</span> and <span style={{ color: "#06c", cursor: "pointer" }}>Privacy Policy</span>.</p>}
-          {authMode === "signin" && <p style={{ textAlign: "center", fontSize: 13, color: "#86868b", marginTop: 16 }}><span onClick={() => { setAuthMode("forgot"); setAErr(""); setAp2(""); setResetEmailSent(false); }} style={{ cursor: "pointer", color: "#06c" }}>Forgot password?</span></p>}
-          <p style={{ textAlign: "center", fontSize: 14, color: "#6e6e73", marginTop: 24 }}>{authMode === "signup" ? "Already have an account? " : authMode === "forgot" ? "Remember it? " : "Don't have an account? "}<span onClick={() => { setAuthMode(authMode === "signup" ? "signin" : authMode === "forgot" ? "signin" : "signup"); setAErr(""); setAp2(""); setResetEmailSent(false); }} style={{ color: "#06c", cursor: "pointer", fontWeight: 500 }}>{authMode === "signup" ? "Sign In" : authMode === "forgot" ? "Sign In" : "Sign Up"}</span></p>
+          {authMode === "signup" && <><label style={{ fontSize: 13, fontWeight: 600, color: "#1A1815", display: "block", marginBottom: 6 }}>Full Name</label><input value={an} onChange={(e) => setAn(e.target.value)} placeholder="John Doe" style={{ width: "100%", padding: "12px 14px", border: "1px solid #E8E0D8", borderRadius: 10, fontSize: 15, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 16, transition: "border-color .2s" }} onFocus={e => e.currentTarget.style.borderColor = "#C17550"} onBlur={e => e.currentTarget.style.borderColor = "#E8E0D8"} /></>}
+          <label style={{ fontSize: 13, fontWeight: 600, color: "#1A1815", display: "block", marginBottom: 6 }}>Email</label>
+          <input value={ae} onChange={(e) => setAe(e.target.value)} type="email" placeholder="you@example.com" style={{ width: "100%", padding: "12px 14px", border: "1px solid #E8E0D8", borderRadius: 10, fontSize: 15, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 16, transition: "border-color .2s" }} onFocus={e => e.currentTarget.style.borderColor = "#C17550"} onBlur={e => e.currentTarget.style.borderColor = "#E8E0D8"} />
+          {authMode !== "forgot" && <><label style={{ fontSize: 13, fontWeight: 600, color: "#1A1815", display: "block", marginBottom: 6 }}>Password</label><input value={ap} onChange={(e) => setAp(e.target.value)} type="password" placeholder="" onKeyDown={(e) => { if (e.key === "Enter" && authMode !== "signup") submit(); }} style={{ width: "100%", padding: "12px 14px", border: "1px solid #E8E0D8", borderRadius: 10, fontSize: 15, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 16, transition: "border-color .2s" }} onFocus={e => e.currentTarget.style.borderColor = "#C17550"} onBlur={e => e.currentTarget.style.borderColor = "#E8E0D8"} /></>}
+          {authMode === "signup" && <><label style={{ fontSize: 13, fontWeight: 600, color: "#1A1815", display: "block", marginBottom: 6 }}>Confirm Password</label><input value={ap2} onChange={(e) => setAp2(e.target.value)} type="password" placeholder="" onKeyDown={(e) => { if (e.key === "Enter") submit(); }} style={{ width: "100%", padding: "12px 14px", border: "1px solid #E8E0D8", borderRadius: 10, fontSize: 15, fontFamily: "inherit", outline: "none", boxSizing: "border-box", marginBottom: 20, transition: "border-color .2s" }} onFocus={e => e.currentTarget.style.borderColor = "#C17550"} onBlur={e => e.currentTarget.style.borderColor = "#E8E0D8"} /></>}
+          {aErr && <p style={{ color: "#D45B5B", fontSize: 13, textAlign: "center", marginBottom: 12 }}>{aErr}</p>}
+          {resetEmailSent && authMode === "forgot" && <p style={{ color: "#5B8B6B", fontSize: 13, textAlign: "center", marginBottom: 12 }}>Reset link sent! Check your email.</p>}
+          <button onClick={submit} disabled={aLd} style={{ width: "100%", padding: "14px", background: "#1A1815", color: "#fff", border: "none", borderRadius: 12, fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", opacity: aLd ? 0.5 : 1, transition: "opacity .2s" }} onMouseEnter={e => { if (!aLd) e.currentTarget.style.opacity = "0.85"; }} onMouseLeave={e => { if (!aLd) e.currentTarget.style.opacity = "1"; }}>{aLd ? "..." : authMode === "signup" ? "Create Account" : authMode === "forgot" ? "Send Reset Link" : "Sign In"}</button>
+          {authMode === "signup" && <p style={{ textAlign: "center", fontSize: 12, color: "#9B8B7B", marginTop: 16, lineHeight: 1.5 }}>By creating an account, you agree to our <span style={{ color: "#C17550", cursor: "pointer" }}>Terms of Service</span> and <span style={{ color: "#C17550", cursor: "pointer" }}>Privacy Policy</span>.</p>}
+          {authMode === "signin" && <p style={{ textAlign: "center", fontSize: 13, color: "#9B8B7B", marginTop: 16 }}><span onClick={() => { setAuthMode("forgot"); setAErr(""); setAp2(""); setResetEmailSent(false); }} style={{ cursor: "pointer", color: "#C17550" }}>Forgot password?</span></p>}
+          <p style={{ textAlign: "center", fontSize: 14, color: "#7A6B5B", marginTop: 24 }}>{authMode === "signup" ? "Already have an account? " : authMode === "forgot" ? "Remember it? " : "Don't have an account? "}<span onClick={() => { setAuthMode(authMode === "signup" ? "signin" : authMode === "forgot" ? "signin" : "signup"); setAErr(""); setAp2(""); setResetEmailSent(false); }} style={{ color: "#C17550", cursor: "pointer", fontWeight: 500 }}>{authMode === "signup" ? "Sign In" : authMode === "forgot" ? "Sign In" : "Sign Up"}</span></p>
         </div>
       </div>
     );
@@ -2411,26 +2411,26 @@ export default function App() {
       <div style={{ minHeight: "100vh", padding: "120px 5% 60px", background: "#fff" }}>
         <div style={{ textAlign: "center", maxWidth: 800, margin: "0 auto" }}>
           <h1 className="aura-pricing-h" style={{ fontSize: 48, fontWeight: 700, marginBottom: 12, letterSpacing: "-0.025em" }}>Upgrade to Pro.</h1>
-          <p style={{ fontSize: 19, color: "#6e6e73", marginBottom: 32, fontWeight: 400 }}>Unlimited designs. Unlimited potential.</p>
+          <p style={{ fontSize: 19, color: "#7A6B5B", marginBottom: 32, fontWeight: 400 }}>Unlimited designs. Unlimited potential.</p>
           {/* Billing toggle */}
-          <div style={{ display: "inline-flex", background: "#f5f5f7", borderRadius: 980, padding: 3, marginBottom: 48 }}>
-            <button onClick={() => setBillingCycle("monthly")} style={{ padding: "10px 24px", borderRadius: 980, border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", background: billingCycle === "monthly" ? "#fff" : "transparent", color: billingCycle === "monthly" ? "#1d1d1f" : "#86868b", boxShadow: billingCycle === "monthly" ? "0 1px 4px rgba(0,0,0,.1)" : "none", transition: "all .2s" }}>Monthly</button>
-            <button onClick={() => setBillingCycle("yearly")} style={{ padding: "10px 24px", borderRadius: 980, border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", background: billingCycle === "yearly" ? "#fff" : "transparent", color: billingCycle === "yearly" ? "#1d1d1f" : "#86868b", boxShadow: billingCycle === "yearly" ? "0 1px 4px rgba(0,0,0,.1)" : "none", transition: "all .2s" }}>Yearly <span style={{ fontSize: 12, color: "#06c", fontWeight: 600 }}>Save 50%</span></button>
+          <div style={{ display: "inline-flex", background: "#F5F0EB", borderRadius: 980, padding: 3, marginBottom: 48 }}>
+            <button onClick={() => setBillingCycle("monthly")} style={{ padding: "10px 24px", borderRadius: 980, border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", background: billingCycle === "monthly" ? "#fff" : "transparent", color: billingCycle === "monthly" ? "#1A1815" : "#9B8B7B", boxShadow: billingCycle === "monthly" ? "0 1px 4px rgba(0,0,0,.1)" : "none", transition: "all .2s" }}>Monthly</button>
+            <button onClick={() => setBillingCycle("yearly")} style={{ padding: "10px 24px", borderRadius: 980, border: "none", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", background: billingCycle === "yearly" ? "#fff" : "transparent", color: billingCycle === "yearly" ? "#1A1815" : "#9B8B7B", boxShadow: billingCycle === "yearly" ? "0 1px 4px rgba(0,0,0,.1)" : "none", transition: "all .2s" }}>Yearly <span style={{ fontSize: 12, color: "#C17550", fontWeight: 600 }}>Save 50%</span></button>
           </div>
           <div className="aura-pricing-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 20 }}>
-            <div style={{ background: "#f5f5f7", borderRadius: 24, padding: "40px 32px", textAlign: "left" }}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: "#86868b", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.04em" }}>Free</p>
-              <div style={{ fontSize: 56, fontWeight: 700, marginBottom: 4, letterSpacing: "-0.03em" }}>$0<span style={{ fontSize: 17, color: "#86868b", fontWeight: 500 }}>/mo</span></div>
-              <p style={{ fontSize: 15, color: "#6e6e73", marginBottom: 28 }}>To get started.</p>
-              {["3 mood boards/month", "Core catalog", "AI design chat", "1 visualization/month", "1 project"].map((f) => <p key={f} style={{ fontSize: 14, color: "#1d1d1f", padding: "10px 0", borderBottom: "1px solid #e8e8ed", margin: 0, fontWeight: 400 }}>&#10003;&ensp;{f}</p>)}
-              <button onClick={() => { go("design"); setTab("studio"); }} style={{ width: "100%", marginTop: 28, padding: "14px", background: "transparent", color: "#06c", border: "1px solid #06c", borderRadius: 980, fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>Get started</button>
+            <div style={{ background: "#F5F0EB", borderRadius: 24, padding: "40px 32px", textAlign: "left" }}>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "#9B8B7B", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.04em" }}>Free</p>
+              <div style={{ fontSize: 56, fontWeight: 700, marginBottom: 4, letterSpacing: "-0.03em" }}>$0<span style={{ fontSize: 17, color: "#9B8B7B", fontWeight: 500 }}>/mo</span></div>
+              <p style={{ fontSize: 15, color: "#7A6B5B", marginBottom: 28 }}>To get started.</p>
+              {["3 mood boards/month", "Core catalog", "AI design chat", "1 visualization/month", "1 project"].map((f) => <p key={f} style={{ fontSize: 14, color: "#1A1815", padding: "10px 0", borderBottom: "1px solid #EDE8E2", margin: 0, fontWeight: 400 }}>&#10003;&ensp;{f}</p>)}
+              <button onClick={() => { go("design"); setTab("studio"); }} style={{ width: "100%", marginTop: 28, padding: "14px", background: "transparent", color: "#C17550", border: "1px solid #C17550", borderRadius: 980, fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>Get started</button>
             </div>
-            <div style={{ background: "#1d1d1f", borderRadius: 24, padding: "40px 32px", textAlign: "left", position: "relative" }}>
-              {billingCycle === "yearly" && <div style={{ position: "absolute", top: 16, right: 16, background: "#06c", color: "#fff", fontSize: 11, fontWeight: 600, padding: "5px 14px", borderRadius: 980 }}>Best value</div>}
-              <p style={{ fontSize: 13, fontWeight: 600, color: "#86868b", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.04em" }}>Pro</p>
-              <div style={{ fontSize: 56, fontWeight: 700, marginBottom: 4, letterSpacing: "-0.03em", color: "#fff" }}>{billingCycle === "yearly" ? "$10" : "$20"}<span style={{ fontSize: 17, color: "#86868b", fontWeight: 500 }}>/mo</span></div>
-              {billingCycle === "yearly" ? <p style={{ fontSize: 14, color: "#86868b", marginBottom: 28 }}>$120/year <span style={{ textDecoration: "line-through" }}>$240</span></p> : <p style={{ fontSize: 14, color: "#86868b", marginBottom: 28 }}>Billed monthly.</p>}
-              {["Unlimited mood boards", "Full " + DB.length + " product catalog", "Unlimited AI visualizations", "CAD floor plan analysis", "AI furniture layout plans", "Exact placement + dimensions", "Unlimited projects", "All 14 design styles"].map((f) => <p key={f} style={{ fontSize: 14, color: "#f5f5f7", padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,.1)", margin: 0, fontWeight: 400 }}>&#10003;&ensp;{f}</p>)}
+            <div style={{ background: "#1A1815", borderRadius: 24, padding: "40px 32px", textAlign: "left", position: "relative" }}>
+              {billingCycle === "yearly" && <div style={{ position: "absolute", top: 16, right: 16, background: "#C17550", color: "#fff", fontSize: 11, fontWeight: 600, padding: "5px 14px", borderRadius: 980 }}>Best value</div>}
+              <p style={{ fontSize: 13, fontWeight: 600, color: "#9B8B7B", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.04em" }}>Pro</p>
+              <div style={{ fontSize: 56, fontWeight: 700, marginBottom: 4, letterSpacing: "-0.03em", color: "#fff" }}>{billingCycle === "yearly" ? "$10" : "$20"}<span style={{ fontSize: 17, color: "#9B8B7B", fontWeight: 500 }}>/mo</span></div>
+              {billingCycle === "yearly" ? <p style={{ fontSize: 14, color: "#9B8B7B", marginBottom: 28 }}>$120/year <span style={{ textDecoration: "line-through" }}>$240</span></p> : <p style={{ fontSize: 14, color: "#9B8B7B", marginBottom: 28 }}>Billed monthly.</p>}
+              {["Unlimited mood boards", "Full " + DB.length + " product catalog", "Unlimited AI visualizations", "CAD floor plan analysis", "AI furniture layout plans", "Exact placement + dimensions", "Unlimited projects", "All 14 design styles"].map((f) => <p key={f} style={{ fontSize: 14, color: "#F5F0EB", padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,.1)", margin: 0, fontWeight: 400 }}>&#10003;&ensp;{f}</p>)}
               <button onClick={async () => {
                 trackEvent("checkout_click", { plan: "pro", billing: billingCycle, loggedIn: user ? "yes" : "no" });
                 if (!user) { go("auth"); return; }
@@ -2447,10 +2447,10 @@ export default function App() {
                   if (result.url) window.location.href = result.url;
                   else setAErr(result.error || "Failed to start checkout");
                 } catch (err) { console.error("Checkout error:", err); }
-              }} style={{ width: "100%", marginTop: 28, padding: "14px", background: "#fff", color: "#1d1d1f", border: "none", borderRadius: 980, fontSize: 15, fontWeight: 500, cursor: userPlan === "pro" ? "default" : "pointer", fontFamily: "inherit", transition: "opacity .2s", opacity: userPlan === "pro" ? 0.5 : 1 }} onMouseEnter={e => { if (userPlan !== "pro") e.currentTarget.style.opacity = "0.85"; }} onMouseLeave={e => { if (userPlan !== "pro") e.currentTarget.style.opacity = "1"; }}>{userPlan === "pro" ? "Current Plan" : user ? (billingCycle === "yearly" ? "Subscribe - $120/yr" : "Subscribe - $20/mo") : "Sign up to subscribe"}</button>
+              }} style={{ width: "100%", marginTop: 28, padding: "14px", background: "#fff", color: "#1A1815", border: "none", borderRadius: 980, fontSize: 15, fontWeight: 500, cursor: userPlan === "pro" ? "default" : "pointer", fontFamily: "inherit", transition: "opacity .2s", opacity: userPlan === "pro" ? 0.5 : 1 }} onMouseEnter={e => { if (userPlan !== "pro") e.currentTarget.style.opacity = "0.85"; }} onMouseLeave={e => { if (userPlan !== "pro") e.currentTarget.style.opacity = "1"; }}>{userPlan === "pro" ? "Current Plan" : user ? (billingCycle === "yearly" ? "Subscribe - $120/yr" : "Subscribe - $20/mo") : "Sign up to subscribe"}</button>
             </div>
           </div>
-          <button onClick={() => go("home")} style={{ marginTop: 40, background: "none", border: "none", fontSize: 15, color: "#06c", cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>{"<"} Back</button>
+          <button onClick={() => go("home")} style={{ marginTop: 40, background: "none", border: "none", fontSize: 15, color: "#C17550", cursor: "pointer", fontFamily: "inherit", fontWeight: 500 }}>{"<"} Back</button>
         </div>
       </div>
     );
@@ -2460,7 +2460,7 @@ export default function App() {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#fff" }}>
         <div style={{ textAlign: "center" }}>
-          <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#1d1d1f", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px", fontSize: 28, color: "#fff" }}>&#10003;</div>
+          <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#1A1815", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px", fontSize: 28, color: "#fff" }}>&#10003;</div>
           <h1 style={{ fontSize: 40, fontWeight: 700, marginBottom: 12, letterSpacing: "-0.025em" }}>Welcome to Pro.</h1>
           <p style={{ color: "#9B8B7B", marginBottom: 32 }}>All features unlocked — including AI floor plan layouts.</p>
           <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#C17550", color: "#fff", padding: "14px 36px", border: "none", borderRadius: 12, fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Start Designing</button>
@@ -2498,7 +2498,7 @@ export default function App() {
               <div>
                 <p style={{ fontSize: 16, fontWeight: 600, color: "#1A1815" }}>{userPlan === "pro" ? "Pro Plan" : "Free Plan"}</p>
                 <p style={{ fontSize: 13, color: "#9B8B7B", marginTop: 4 }}>{userPlan === "pro" ? (profile?.billing_cycle === "yearly" ? "$120/year ($10/mo)" : "$20/month") : "$0/month"}</p>
-                {userPlan === "pro" && profile?.plan_expires_at && <p style={{ fontSize: 12, color: "#86868b", marginTop: 4 }}>Renews {new Date(profile.plan_expires_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</p>}
+                {userPlan === "pro" && profile?.plan_expires_at && <p style={{ fontSize: 12, color: "#9B8B7B", marginTop: 4 }}>Renews {new Date(profile.plan_expires_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</p>}
               </div>
               <span style={{ background: userPlan === "pro" ? "#C17550" : "#F0EBE4", color: userPlan === "pro" ? "#fff" : "#9B8B7B", padding: "5px 14px", borderRadius: 20, fontSize: 11, fontWeight: 700, letterSpacing: ".1em", textTransform: "uppercase" }}>{userPlan === "pro" ? "Active" : "Free"}</span>
             </div>
@@ -2535,7 +2535,7 @@ export default function App() {
 
   /* ─── MAIN LAYOUT ─── */
   return (
-    <div style={{ fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',Helvetica,Arial,sans-serif", background: "#fff", minHeight: "100vh", color: "#1d1d1f" }}>
+    <div style={{ fontFamily: "-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',Helvetica,Arial,sans-serif", background: "#fff", minHeight: "100vh", color: "#1A1815" }}>
       <style>{`
         @keyframes spin{to{transform:rotate(360deg)}}
         @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
@@ -2640,8 +2640,8 @@ export default function App() {
           .aura-fp-toolbar{overflow-x:auto!important;flex-wrap:nowrap!important;-webkit-overflow-scrolling:touch;padding:6px 8px!important}
           .aura-fp-preview{height:260px!important}
           .aura-fp-statusbar{display:none!important}
-          .aura-brands-section{background:#f5f5f7!important}
-          .aura-cta-section{background:#1d1d1f!important}
+          .aura-brands-section{background:#F5F0EB!important}
+          .aura-cta-section{background:#1A1815!important}
           /* Nav — hide pricing link to prevent crowding; shrink wordmark */
           .aura-nav-pricing{display:none!important}
           .aura-nav-wordmark{font-size:18px!important;letter-spacing:.1em!important}
@@ -2690,8 +2690,8 @@ export default function App() {
       {(() => {
         const onHero = pg === "home" && !sc;
         const logoColor = onHero ? "#fff" : "#1A1815";
-        const textColor = onHero ? "rgba(255,255,255,.92)" : "#6e6e73";
-        const ctaBg = onHero ? "rgba(255,255,255,.18)" : "#1d1d1f";
+        const textColor = onHero ? "rgba(255,255,255,.92)" : "#7A6B5B";
+        const ctaBg = onHero ? "rgba(255,255,255,.18)" : "#1A1815";
         const ctaBorder = onHero ? "1px solid rgba(255,255,255,.35)" : "none";
         return (
           <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000, padding: sc ? "10px 5%" : "16px 5%", display: "flex", alignItems: "center", justifyContent: "space-between", background: sc ? "rgba(255,255,255,.82)" : "transparent", backdropFilter: sc ? "saturate(180%) blur(20px)" : "none", WebkitBackdropFilter: sc ? "saturate(180%) blur(20px)" : "none", transition: "all .35s ease", borderBottom: sc ? "1px solid rgba(0,0,0,.06)" : "none" }}>
@@ -2726,7 +2726,7 @@ export default function App() {
               <h1 style={{ fontSize: "clamp(36px,6vw,72px)", fontWeight: 700, lineHeight: 1.05, marginBottom: 12, letterSpacing: "-0.025em", color: "#fff" }}>Design <span key={heroRoomIdx} style={{ display: "inline-block", animation: "fadeInText .5s ease" }}>{heroRooms[heroRoomIdx]}</span></h1>
               <p style={{ fontSize: "clamp(14px,1.5vw,18px)", color: "rgba(255,255,255,.75)", lineHeight: 1.5, maxWidth: 480, margin: "0 auto 28px", fontWeight: 400 }}>Describe your space. Get curated furniture picks and a photorealistic visualization in minutes.</p>
               <div className="aura-hero-btns" style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
-                <button onClick={() => { go("design"); setTab("studio"); trackEvent("cta_click", { button: "hero_start_designing" }); }} style={{ background: "rgba(255,255,255,.95)", color: "#1A1815", padding: "15px 40px", border: "none", borderRadius: 4, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "background .2s", letterSpacing: ".02em", textTransform: "uppercase" }} onMouseEnter={e => e.currentTarget.style.background = "#fff"} onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.95)"}>Start Designing Free</button>
+                <button onClick={() => { go("design"); setTab("studio"); trackEvent("cta_click", { button: "hero_start_designing" }); }} style={{ background: "rgba(255,255,255,.95)", color: "#1A1815", padding: "15px 40px", border: "none", borderRadius: 4, fontSize: 15, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "background .2s", letterSpacing: ".02em", textTransform: "uppercase" }} onMouseEnter={e => e.currentTarget.style.background = "#fff"} onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.95)"}>Start Designing</button>
                 <button onClick={() => go("pricing")} style={{ background: "rgba(255,255,255,.12)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", color: "#fff", padding: "15px 36px", border: "1px solid rgba(255,255,255,.3)", borderRadius: 4, fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", transition: "background .2s", letterSpacing: ".02em", textTransform: "uppercase" }} onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.22)"} onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.12)"}>See Pricing</button>
               </div>
             </div>
@@ -2900,7 +2900,7 @@ export default function App() {
                 {/* Chat UI mockup */}
                 <div style={{ background: "#FDFCFA", borderRadius: 24, border: "1px solid #E8E0D8", boxShadow: "0 20px 60px rgba(0,0,0,.08)", overflow: "hidden" }}>
                   <div style={{ padding: "14px 24px", borderBottom: "1px solid #E8E0D8", display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#34C759" }} />
+                    <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#5B8B6B" }} />
                     <span style={{ fontSize: 13, fontWeight: 600, color: "#1A1815" }}>AI Designer</span>
                     <span style={{ fontSize: 11, color: "#9B8B7B", marginLeft: "auto" }}>Online</span>
                   </div>
@@ -2923,8 +2923,8 @@ export default function App() {
                               <span style={{ fontSize: 13, fontWeight: 700 }}>{fmt(p.p)}</span>
                             </div>
                             <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}>
-                              <div style={{ height: 4, flex: 1, borderRadius: 2, background: "#E8E0D8" }}><div style={{ height: "100%", width: "92%", borderRadius: 2, background: "#34C759" }} /></div>
-                              <span style={{ fontSize: 10, color: "#34C759", fontWeight: 700 }}>92%</span>
+                              <div style={{ height: 4, flex: 1, borderRadius: 2, background: "#E8E0D8" }}><div style={{ height: "100%", width: "92%", borderRadius: 2, background: "#5B8B6B" }} /></div>
+                              <span style={{ fontSize: 10, color: "#5B8B6B", fontWeight: 700 }}>92%</span>
                             </div>
                           </div>
                         </div>
@@ -3017,7 +3017,7 @@ export default function App() {
                       </div>
                     ))}
                   </div>
-                  <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#1A1815", color: "#fff", padding: "14px 32px", border: "none", borderRadius: 980, fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Try it free</button>
+                  <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#1A1815", color: "#fff", padding: "14px 32px", border: "none", borderRadius: 980, fontSize: 15, fontWeight: 500, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Try it now</button>
                 </div>
               </div>
             </div>
@@ -3134,7 +3134,7 @@ export default function App() {
                   onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
                   Generate Your Design
                 </button>
-                <p style={{ textAlign: "center", fontSize: 13, color: "#9B8B7B", marginTop: 12 }}>Free to try. No credit card required.</p>
+                <p style={{ textAlign: "center", fontSize: 13, color: "#9B8B7B", marginTop: 12 }}>No credit card required to get started.</p>
               </div>
             </div>
           </section>
@@ -3190,8 +3190,8 @@ export default function App() {
           <section className="aura-home-section" style={{ padding: "100px 6%", background: "#F8F5F0" }}>
             <div>
               <div style={{ maxWidth: 800, margin: "0 auto", textAlign: "center" }}>
-                <h2 style={{ fontSize: "clamp(28px,3.5vw,44px)", fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.02em", marginBottom: 12 }}>Start free. Upgrade when you're ready.</h2>
-                <p style={{ fontSize: 17, color: "#5A5045", lineHeight: 1.5, maxWidth: 520, margin: "0 auto 40px" }}>Design mood boards and browse products at no cost. Upgrade to Pro for AI room renders and CAD floor plans.</p>
+                <h2 style={{ fontSize: "clamp(28px,3.5vw,44px)", fontWeight: 700, lineHeight: 1.1, letterSpacing: "-0.02em", marginBottom: 12 }}>Simple pricing. Powerful tools.</h2>
+                <p style={{ fontSize: 17, color: "#5A5045", lineHeight: 1.5, maxWidth: 520, margin: "0 auto 40px" }}>Browse products and get AI design recommendations. Upgrade to Pro for room visualizations and CAD floor plans.</p>
                 <div className="aura-grid-2col" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, maxWidth: 640, margin: "0 auto" }}>
                   {/* Free tier */}
                   <div style={{ background: "#fff", borderRadius: 20, padding: "32px 24px", border: "1px solid #E8E0D8", textAlign: "left" }}>
@@ -3231,7 +3231,7 @@ export default function App() {
               </div>
               <div className="aura-why-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 20 }}>
                 {[
-                  { icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z", title: "Budget Friendly", desc: "Free to start. Pro is just $20/mo — a fraction of hiring a designer." },
+                  { icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z", title: "Budget Friendly", desc: "Pro is just $20/mo — a fraction of hiring a designer." },
                   { icon: "M13 10V3L4 14h7v7l9-11h-7z", title: "Ultra-Fast", desc: "Get AI-generated designs, mood boards, and renders in under 2 minutes." },
                   { icon: "M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z", title: "Professional Quality", desc: "Photorealistic renders and CAD floor plans trusted by interior designers." },
                   { icon: "M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z", title: "Zero Learning Curve", desc: "Just describe what you want in plain English. No design skills required." },
@@ -3285,7 +3285,7 @@ export default function App() {
               <h2 style={{ fontSize: "clamp(32px,4.5vw,52px)", fontWeight: 700, marginBottom: 16, letterSpacing: "-0.025em", lineHeight: 1.08, color: "#1A1815" }}>Your dream room<br />is one click away.</h2>
               <p style={{ fontSize: 17, color: "#9B8B7B", marginBottom: 36, lineHeight: 1.5 }}>Join thousands of homeowners designing smarter with AI.</p>
               <div className="aura-final-cta-btns" style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", maxWidth: 400, margin: "0 auto" }}>
-                <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#1A1815", color: "#fff", padding: "16px 40px", border: "none", borderRadius: 980, fontSize: 16, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s", flex: "1 1 auto" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Start designing free</button>
+                <button onClick={() => { go("design"); setTab("studio"); }} style={{ background: "#1A1815", color: "#fff", padding: "16px 40px", border: "none", borderRadius: 980, fontSize: 16, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", transition: "opacity .2s", flex: "1 1 auto" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.85"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>Start designing now</button>
                 <button onClick={() => go("pricing")} style={{ background: "#F8F5F0", border: "none", padding: "16px 32px", borderRadius: 980, fontSize: 16, color: "#1A1815", cursor: "pointer", fontFamily: "inherit", fontWeight: 500, flex: "1 1 auto" }}>See pricing</button>
               </div>
             </div>
@@ -3690,9 +3690,9 @@ export default function App() {
                   {vizErr && vizErr === "sign_up_prompt" ? (
                     <div style={{ marginBottom: 20, borderRadius: 16, border: "1px solid #E8E0D8", padding: "32px 28px", background: "linear-gradient(135deg, #FDFCFA, #F8F5F0)", textAlign: "center" }}>
                       <h3 style={{ fontSize: 20, fontWeight: 700, color: "#1A1815", margin: "0 0 8px" }}>You're almost there!</h3>
-                      <p style={{ fontSize: 14, color: "#7A6B5B", margin: "0 0 20px", lineHeight: 1.5 }}>Create a free account to visualize your room. It takes 10 seconds — your selections are saved.</p>
+                      <p style={{ fontSize: 14, color: "#7A6B5B", margin: "0 0 20px", lineHeight: 1.5 }}>Create an account to visualize your room. It takes 10 seconds — your selections are saved.</p>
                       <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-                        <button onClick={() => { setVizErr(""); go("auth"); }} style={{ background: "#1A1815", color: "#fff", border: "none", borderRadius: 10, padding: "14px 32px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Create free account</button>
+                        <button onClick={() => { setVizErr(""); go("auth"); }} style={{ background: "#1A1815", color: "#fff", border: "none", borderRadius: 10, padding: "14px 32px", fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Create account</button>
                         <button onClick={() => { setVizErr(""); go("auth"); }} style={{ background: "none", border: "1px solid #E8E0D8", borderRadius: 10, padding: "14px 24px", fontSize: 14, color: "#7A6B5B", cursor: "pointer", fontFamily: "inherit" }}>Sign in</button>
                       </div>
                     </div>
